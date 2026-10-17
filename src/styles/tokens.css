@@ -1,0 +1,86 @@
+/*
+  Basis-Tokens des Produkts.
+  Gelten für alle Kunden. Kundenspezifische Werte werden in
+  src/customers/<kunde>/theme.css über [data-customer="<kunde>"] überschrieben.
+  Komponenten verwenden ausschließlich diese Variablen bzw. die daraus
+  abgeleiteten Tailwind-Klassen (siehe globals.css), nie feste Farbwerte.
+*/
+:root {
+  /* Flächen */
+  --canvas: #f4f3f0;
+  --surface: #ffffff;
+  --surface-muted: #faf9f7;
+  --surface-sunken: #ece9e4;
+
+  /* Linien */
+  --line: #e9e6e1;
+  --line-strong: #d9d3ca;
+  --line-soft: #f1efeb;
+
+  /* Text (Kontrast gegen --canvas geprüft, mind. 4,5:1) */
+  --ink: #171717;
+  --ink-2: #333333;
+  --ink-3: #4b4f55;
+  --muted: #5f646b;
+  --muted-2: #666b73;
+
+  /* Rahmen / Seitenleiste */
+  --frame: #171717;
+  --frame-2: #232323;
+  --frame-ink: #e9e6e2;
+  --frame-muted: #9ca3af;
+  --frame-line: rgb(255 255 255 / 0.08);
+
+  /* Akzent: neutraler Standard, wird je Kunde überschrieben.
+     Regel: --accent nur für Flächen. Text auf Akzent = --accent-ink.
+     Akzent als Textfarbe nur über --accent-text. */
+  --accent: #171717;
+  --accent-hover: #2e2e2e;
+  --accent-ink: #ffffff;
+  --accent-soft: #f1efeb;
+  --accent-soft-2: #e4e2df;
+  --accent-text: #333333;
+
+  /* Statusfarben (Hintergrund / Text), alle mind. 4,5:1 */
+  --tone-gray-bg: #f1efeb;
+  --tone-gray-fg: #4b4f55;
+  --tone-blue-bg: #e7edf4;
+  --tone-blue-fg: #35557a;
+  --tone-green-bg: #e6f0ea;
+  --tone-green-fg: #2f6447;
+  --tone-amber-bg: #f6eedf;
+  --tone-amber-fg: #7a5418;
+  --tone-red-bg: #f8e7e3;
+  --tone-red-fg: #a33a2e;
+  --tone-dark-bg: #e4e2df;
+  --tone-dark-fg: #2b2b2b;
+  --tone-brand-bg: var(--accent-soft);
+  --tone-brand-fg: var(--accent-text);
+
+  /* Statuspunkte (Pipeline, Legenden) */
+  --dot-gray: #b9b4ad;
+  --dot-blue: #7c8693;
+  --dot-brand: var(--accent);
+  --dot-green: #8fb59c;
+  --dot-amber: #c9a46a;
+  --dot-red: #c8776a;
+  --dot-dark: #171717;
+
+  /* Fokus */
+  --focus-ring: rgb(23 23 23 / 0.25);
+
+  /* Radien */
+  --radius-xs: 8px;
+  --radius-sm: 10px;
+  --radius-md: 12px;
+  --radius-lg: 18px;
+  --radius-xl: 26px;
+
+  /* Schatten */
+  --shadow-card: 0 1px 2px rgb(23 23 23 / 0.04);
+  --shadow-hover: 0 6px 18px rgb(23 23 23 / 0.06);
+  --shadow-pop: 0 18px 40px rgb(23 23 23 / 0.16);
+
+  /* Schrift */
+  --font-sans: "Inter Variable", system-ui, -apple-system, "Segoe UI", sans-serif;
+}

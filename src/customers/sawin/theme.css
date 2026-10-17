@@ -1,0 +1,20 @@
+/*
+  Kunden-Theme Sawin Bauelemente.
+  Farbwelt nach sawin-bauelemente.de: Sand #D1B19A, Anthrazit #171717.
+  Sand hat auf Weiß nur 2,0:1 Kontrast und ist deshalb nur Flächenfarbe.
+  Text in Sand-Optik verwendet --accent-text (#7A6150, 5,2:1 auf --canvas).
+*/
+[data-customer="sawin"] {
+  --accent: #d1b19a;
+  --accent-hover: #c7a68e;
+  --accent-ink: #171717;
+  --accent-soft: #f5ede6;
+  --accent-soft-2: #eadcce;
+  --accent-text: #7a6150;
+
+  --tone-brand-bg: #f5ede6;
+  --tone-brand-fg: #6e4f38;
+  --dot-brand: #d1b19a;
+
+  --focus-ring: rgb(209 177 154 / 0.45);
+}
