@@ -26,7 +26,7 @@ export function PipelineCard(p: PipelineCardProps) {
       className="flex flex-col gap-[9px] rounded-[15px] border border-transparent bg-surface px-[15px] pt-[15px] pb-3 shadow-card transition hover:border-line-strong hover:shadow-hover"
     >
       <div className="flex items-baseline justify-between gap-2">
-        <span className="tabular text-[12.5px] text-muted">{p.auftragId}</span>
+        <span className="font-mono text-xs text-muted">{p.auftragId}</span>
         <span className="tabular text-sm font-medium">{p.wert != null ? eurK(p.wert) : "offen"}</span>
       </div>
       <span className="text-md leading-snug font-medium">{p.kunde}</span>

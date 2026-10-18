@@ -1,20 +1,67 @@
 /*
   Kunden-Theme Sawin Bauelemente.
-  Farbwelt nach sawin-bauelemente.de: Sand #D1B19A, Anthrazit #171717.
-  Sand hat auf Weiß nur 2,0:1 Kontrast und ist deshalb nur Flächenfarbe.
-  Text in Sand-Optik verwendet --accent-text (#7A6150, 5,2:1 auf --canvas).
+  Farben aus dem Designsystem „Sawin Bauelemente“ (claude.ai, Stand 18.10.2026), Aufbau und Radien
+  bleiben wie im Klick-Prototyp (dunkle Seitenleiste, Basis-Radien).
+  Sand #D1B19A hat auf Weiß nur 2,0:1 Kontrast und ist deshalb nur Flächenfarbe.
+  Abweichungen vom Designsystem wegen Kontrast mind. 4,5:1:
+    --muted-2      #736f67 statt ink-3 #9b968b (2,95:1)
+    --tone-amber-fg #7c6a2c statt #83702e (4,27:1)
 */
 [data-customer="sawin"] {
+  --canvas: #f7f6f3;
+  --surface: #ffffff;
+  --surface-muted: #faf9f6;
+  --surface-sunken: #f1efea;
+
+  --line: #e8e5df;
+  --line-strong: #d8d4cb;
+
+  --ink: #1c1b18;
+  --ink-2: #2e2c28;
+  --ink-3: #5f5b53;
+  --muted: #5f5b53;
+  --muted-2: #736f67;
+
   --accent: #d1b19a;
-  --accent-hover: #c7a68e;
+  --accent-hover: #c4a089;
   --accent-ink: #171717;
-  --accent-soft: #f5ede6;
-  --accent-soft-2: #eadcce;
-  --accent-text: #7a6150;
+  --accent-soft: #faf5f0;
+  --accent-soft-2: #f1e5d8;
+  --accent-text: #8a6140;
 
-  --tone-brand-bg: #f5ede6;
-  --tone-brand-fg: #6e4f38;
+  --tone-gray-bg: #f0eee9;
+  --tone-gray-fg: #6b675d;
+  --tone-green-bg: #e9f2eb;
+  --tone-green-fg: #3e7354;
+  --tone-amber-bg: #f6f0e1;
+  --tone-amber-fg: #7c6a2c;
+  --tone-red-bg: #f7ece8;
+  --tone-red-fg: #9c4a38;
+  --tone-brand-bg: #faf5f0;
+  --tone-brand-fg: #6b4b31;
+
+  --dot-gray: #a39d90;
   --dot-brand: #d1b19a;
+  --dot-green: #6fa384;
+  --dot-amber: #b8a458;
+  --dot-red: #c07b67;
+  --dot-dark: #1c1b18;
 
-  --focus-ring: rgb(209 177 154 / 0.45);
+  --focus-ring: #8a6140;
+  --frame-focus-ring: #d1b19a;
+}
+
+/* Dunkles Theme (Anmeldeseite): Look der Website, Primäraktion in Sawin-Sand */
+[data-customer="sawin"] [data-theme="dark"] {
+  --accent: #d1b19a;
+  --accent-hover: #c4a089;
+  --accent-ink: #171717;
+  --accent-soft: #241d18;
+  --accent-soft-2: #2e241c;
+  --accent-text: #d1b19a;
+
+  --tone-brand-bg: #241d18;
+  --tone-brand-fg: #e0c9b2;
+
+  --focus-ring: #d1b19a;
 }

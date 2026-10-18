@@ -25,7 +25,7 @@ export function AppShell({ active, crumbs, brand, user, children }: AppShellProp
       <aside
         aria-label="Hauptnavigation"
         className={cn(
-          "sticky top-3 flex h-[calc(100vh-24px)] w-[252px] shrink-0 flex-col gap-0.5 overflow-y-auto py-2.5 pr-3.5 pl-[18px] text-frame-ink [scrollbar-width:none]",
+          "sticky top-3 flex h-[calc(100vh-24px)] w-[252px] shrink-0 flex-col gap-0.5 overflow-y-auto py-2.5 pr-3.5 pl-[18px] text-frame-ink [--focus-ring:var(--frame-focus-ring)] [scrollbar-width:none]",
           "max-[960px]:fixed max-[960px]:top-0 max-[960px]:left-0 max-[960px]:z-[60] max-[960px]:h-screen max-[960px]:bg-frame max-[960px]:pl-3.5 max-[960px]:transition-transform",
           open ? "max-[960px]:translate-x-0 max-[960px]:shadow-[0_0_40px_rgb(0_0_0/0.3)]" : "max-[960px]:-translate-x-[105%]",
         )}

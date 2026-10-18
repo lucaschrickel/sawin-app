@@ -8,6 +8,7 @@ import { Shell } from "@/components/app/shell";
 import { Badge, Tag, type Tone } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/field";
 import { Table, Td, Th, Tr } from "@/components/ui/table";
 import { resolveSlot } from "@/customers";
 import { eur } from "@/lib/format";
@@ -34,6 +35,7 @@ const TYPE: { cls: string; label: string; sample: string }[] = [
   { cls: "text-base", label: "Fließtext · 14 / 400", sample: "Haustür mit Seitenteil und 4 Fenster" },
   { cls: "text-sm text-muted", label: "Nebentext · 13 / 400", sample: "Grüner Weg 17, 38524 Sassenburg" },
   { cls: "text-xs font-medium text-muted-2", label: "Beschriftung · 12 / 500", sample: "Auftragswert (aus AB, brutto)" },
+  { cls: "font-mono text-[13px] font-medium", label: "Mono · 13 / 500", sample: "AG1260385 · 26-0142 · 07:30" },
 ];
 
 const DEMO_CARDS: PipelineCardProps[] = [
@@ -212,7 +214,7 @@ export default function StyleguidePage() {
                 ["RE1260083", "Abschlagsrechnung", "Autohaus Lüdtke", 1733.64, "Überfällig"],
               ].map(([nr, art, kunde, betrag, status]) => (
                 <Tr key={nr as string}>
-                  <Td className="tabular">{nr}</Td>
+                  <Td className="font-mono text-[13px]">{nr}</Td>
                   <Td>{art}</Td>
                   <Td>{kunde}</Td>
                   <Td className="tabular text-right">{eur(betrag as number)}</Td>
@@ -227,6 +229,28 @@ export default function StyleguidePage() {
 
         <Section title="Dialog" description="Für Bestätigungen und Formulare · auf dem Handy bildschirmfüllend">
           <DialogDemo />
+        </Section>
+
+        <Section title="Dunkles Theme" description="Für die Anmeldeseite · data-theme=&quot;dark&quot; auf einem umschließenden Element">
+          <div data-theme="dark" className="rounded-lg bg-canvas p-6 text-ink">
+            <div className="mx-auto flex max-w-sm flex-col gap-4 rounded-lg border border-line bg-surface p-6">
+              <div>
+                <div className="text-lg font-semibold">Anmelden</div>
+                <p className="mt-1 text-sm text-muted">Mit der E-Mail-Adresse aus Ihrer Einladung</p>
+              </div>
+              <label className="flex flex-col gap-1.5 text-sm font-medium text-ink-3">
+                E-Mail
+                <Input type="email" placeholder="name@firma.de" />
+              </label>
+              <div className="flex flex-wrap gap-2">
+                <Badge tone="green">Angenommen</Badge>
+                <Badge tone="amber">Bald fällig</Badge>
+                <Badge tone="red">Überfällig</Badge>
+                <Badge tone="brand">Montage</Badge>
+              </div>
+              <Button variant="accent">Weiter</Button>
+            </div>
+          </div>
         </Section>
       </div>
     </Shell>

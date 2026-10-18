@@ -5,7 +5,7 @@ import { useId, type ComponentProps, type ReactNode } from "react";
 import { cn } from "@/lib/cn";
 
 const control =
-  "w-full rounded-md border border-line bg-surface px-[13px] text-base text-ink outline-none placeholder:text-muted-2 focus:border-accent focus:shadow-[0_0_0_3px_var(--focus-ring)] disabled:bg-surface-muted disabled:text-muted aria-[invalid=true]:border-tone-red-fg";
+  "w-full rounded-md border border-line bg-surface px-[13px] text-base text-ink outline-none placeholder:text-muted-2 focus:border-(--focus-ring) focus:shadow-[0_0_0_1px_var(--focus-ring)] disabled:bg-surface-muted disabled:text-muted aria-[invalid=true]:border-tone-red-fg";
 
 export function Input({ className, ...props }: ComponentProps<"input">) {
   return <input className={cn(control, "h-[42px]", className)} {...props} />;

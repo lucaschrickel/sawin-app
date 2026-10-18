@@ -30,6 +30,7 @@
   --frame-ink: #e9e6e2;
   --frame-muted: #9ca3af;
   --frame-line: rgb(255 255 255 / 0.08);
+  --frame-focus-ring: #e9e6e2;
 
   /* Akzent: neutraler Standard, wird je Kunde überschrieben.
      Regel: --accent nur für Flächen. Text auf Akzent = --accent-ink.
@@ -66,8 +67,8 @@
   --dot-red: #c8776a;
   --dot-dark: #171717;
 
-  /* Fokus */
-  --focus-ring: rgb(23 23 23 / 0.25);
+  /* Fokus: deckende Farbe, mind. 3:1 gegen --surface und --canvas */
+  --focus-ring: #171717;
 
   /* Radien */
   --radius-xs: 8px;
@@ -83,4 +84,58 @@
 
   /* Schrift */
   --font-sans: "Inter Variable", system-ui, -apple-system, "Segoe UI", sans-serif;
+  /* Belegnummern, Auftragsnummern, Uhrzeiten, Kennzeichen */
+  --font-mono: "JetBrains Mono", ui-monospace, "Cascadia Mono", monospace;
+}
+
+/*
+  Dunkles Theme, z. B. für die Anmeldeseite. Auf ein Element innerhalb von <html> setzen
+  (data-theme="dark"), nicht auf <html> selbst, sonst gewinnt das helle Kunden-Theme.
+  Kunden überschreiben den Akzent über [data-customer="<kunde>"] [data-theme="dark"].
+*/
+[data-theme="dark"] {
+  color-scheme: dark;
+
+  --canvas: #0c0c0c;
+  --surface: #1a1a1a;
+  --surface-muted: #171717;
+  --surface-sunken: #2a2a2a;
+
+  --line: rgb(255 255 255 / 0.1);
+  --line-strong: rgb(255 255 255 / 0.25);
+  --line-soft: rgb(255 255 255 / 0.06);
+
+  --ink: #ffffff;
+  --ink-2: #d1d5db;
+  --ink-3: #d1d5db;
+  --muted: #9ca3af;
+  --muted-2: #9ca3af;
+
+  --accent: #e9e6e2;
+  --accent-hover: #ffffff;
+  --accent-ink: #171717;
+  --accent-soft: #222120;
+  --accent-soft-2: #2a2a2a;
+  --accent-text: #e9e6e2;
+
+  --tone-gray-bg: #222120;
+  --tone-gray-fg: #b8b2a6;
+  --tone-blue-bg: #222120;
+  --tone-blue-fg: #c9c4ba;
+  --tone-green-bg: #16231b;
+  --tone-green-fg: #8fc4a3;
+  --tone-amber-bg: #26220f;
+  --tone-amber-fg: #d4c07a;
+  --tone-red-bg: #2a1813;
+  --tone-red-fg: #e09a86;
+  --tone-dark-bg: #2a2a2a;
+  --tone-dark-fg: #ffffff;
+
+  --dot-dark: #d1d5db;
+
+  --focus-ring: #e9e6e2;
+
+  --shadow-card: none;
+  --shadow-hover: none;
+  --shadow-pop: 0 4px 6px -1px rgb(0 0 0 / 0.5), 0 2px 4px -1px rgb(0 0 0 / 0.4);
 }

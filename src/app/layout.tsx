@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 // Schrift lokal gebündelt (kein Google-Fonts-CDN, DSGVO)
 import "@fontsource-variable/inter";
+import "@fontsource/jetbrains-mono/500.css";
 import "./globals.css";
 import { getCustomer } from "@/customers";
 
