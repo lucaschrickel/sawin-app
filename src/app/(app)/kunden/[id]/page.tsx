@@ -12,8 +12,10 @@ import { getCustomer } from "@/customers";
 import { ladeBenutzerAuswahl, ladeZumKunden } from "@/lib/anfragen";
 import { ANFRAGE_STATUS_TEXT, ANFRAGE_STATUS_TON, type AnfrageStatus } from "@/lib/anfragen-status";
 import { pruefeSitzung } from "@/lib/auth/sitzung";
+import { ladeAufgabenZu } from "@/lib/aufgaben";
+import { AufgabenKarte } from "../../aufgaben/ui";
 import { datum } from "@/lib/format";
-import { tag } from "@/lib/zeit";
+import { heuteBerlin, tag } from "@/lib/zeit";
 import { AnfrageDialog } from "../../anfragen/anfrage-dialog";
 import { adresseText, ladeKunde } from "@/lib/kunden";
 import { KundeDialog } from "../kunde-dialog";
@@ -23,7 +25,7 @@ export const metadata: Metadata = { title: "Kunde" };
 
 export default async function KundePage({ params }: PageProps<"/kunden/[id]">) {
   const { id } = await params;
-  const [daten, zum, benutzer, { benutzer: ich }] = await Promise.all([ladeKunde(id), ladeZumKunden(id), ladeBenutzerAuswahl(), pruefeSitzung()]);
+  const [daten, zum, benutzer, { benutzer: ich }, aufgaben] = await Promise.all([ladeKunde(id), ladeZumKunden(id), ladeBenutzerAuswahl(), pruefeSitzung(), ladeAufgabenZu({ kunde_id: id })]);
   if (!daten) notFound();
   const c = getCustomer();
   const { kunde: k, lieferadressen, konditionen } = daten;
@@ -143,6 +145,8 @@ export default async function KundePage({ params }: PageProps<"/kunden/[id]">) {
               {k.notiz && <Angabe name="Notiz"><span className="whitespace-pre-line">{k.notiz}</span></Angabe>}
             </dl>
           </Karte>
+
+          <AufgabenKarte aufgaben={aufgaben} bezug={{ art: "kunde", id: k.id, text: k.name }} kontext={{ benutzer, ichId: ich.id, heute: heuteBerlin() }} />
 
           {konditionen && (
             <Karte

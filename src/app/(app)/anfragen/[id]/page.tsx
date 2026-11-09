@@ -10,8 +10,10 @@ import { getCustomer } from "@/customers";
 import { ladeAnfrage, ladeBenutzerAuswahl } from "@/lib/anfragen";
 import { ANFRAGE_STATUS_TEXT, ANFRAGE_STATUS_TON } from "@/lib/anfragen-status";
 import { pruefeSitzung } from "@/lib/auth/sitzung";
+import { ladeAufgabenZu } from "@/lib/aufgaben";
+import { AufgabenKarte } from "../../aufgaben/ui";
 import { eurK } from "@/lib/format";
-import { tag, zeitpunkt } from "@/lib/zeit";
+import { heuteBerlin, tag, zeitpunkt } from "@/lib/zeit";
 import { AnfrageDialog } from "../anfrage-dialog";
 import { AnfrageAktionen, NotizFormular, StatusAuswahl } from "../ui";
 
@@ -19,7 +21,7 @@ export const metadata: Metadata = { title: "Anfrage" };
 
 export default async function AnfragePage({ params }: PageProps<"/anfragen/[id]">) {
   const { id } = await params;
-  const [daten, benutzer, { benutzer: ich }] = await Promise.all([ladeAnfrage(id), ladeBenutzerAuswahl(), pruefeSitzung()]);
+  const [daten, benutzer, { benutzer: ich }, aufgaben] = await Promise.all([ladeAnfrage(id), ladeBenutzerAuswahl(), pruefeSitzung(), ladeAufgabenZu({ anfrage_id: id })]);
   if (!daten) notFound();
   const { anfrage: a, kunde: k, lieferadressen, auftrag, historie } = daten;
   const c = getCustomer();
@@ -116,6 +118,7 @@ export default async function AnfragePage({ params }: PageProps<"/anfragen/[id]"
               {a.notiz && <Angabe name="Interne Notiz"><span className="whitespace-pre-line">{a.notiz}</span></Angabe>}
             </dl>
           </Karte>
+          <AufgabenKarte aufgaben={aufgaben} bezug={{ art: "anfrage", id: a.id, text: a.titel }} kontext={{ benutzer, ichId: ich.id, heute: heuteBerlin() }} />
         </div>
       </div>
     </Shell>

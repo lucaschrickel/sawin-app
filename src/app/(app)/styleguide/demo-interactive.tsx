@@ -4,6 +4,7 @@ import { Bestaetigen } from "@/components/ui/bestaetigen";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogClose, DialogContent, DialogTrigger } from "@/components/ui/dialog";
 import { Field, Input, Textarea } from "@/components/ui/field";
+import { FormularDialog } from "@/components/ui/formular-dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 const PRODUKTE = ["Haustür", "Fenster", "Garagentor", "Rollläden", "Insektenschutz"];
@@ -81,5 +82,23 @@ export function BestaetigenDemo() {
     >
       <Button variant="danger">Löschen …</Button>
     </Bestaetigen>
+  );
+}
+
+export function FormularDialogDemo() {
+  return (
+    <FormularDialog titel="Notiz erfassen" ausloeser={<Button>Formular-Dialog öffnen</Button>}>
+      {(st) => (
+        <form onInput={st.aenderung} onSubmit={(e) => { e.preventDefault(); st.fertig(); }} className="flex flex-col gap-4">
+          <Field label="Notiz" hint="Etwas eintippen und dann mit × schließen: der Dialog fragt nach">
+            {(a) => <Textarea {...a} />}
+          </Field>
+          <div className="flex justify-end gap-2.5">
+            <Button onClick={st.abbrechen}>Abbrechen</Button>
+            <Button type="submit" variant="primary">Speichern</Button>
+          </div>
+        </form>
+      )}
+    </FormularDialog>
   );
 }

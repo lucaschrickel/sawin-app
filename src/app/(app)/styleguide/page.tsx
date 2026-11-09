@@ -13,7 +13,7 @@ import { Table, Td, Th, Tr } from "@/components/ui/table";
 import { resolveSlot } from "@/customers";
 import { eur } from "@/lib/format";
 import { AUFTRAG_STATUS, AUFTRAG_TONE, BELEG_STATUS_TONE } from "@/lib/status";
-import { BestaetigenDemo, DialogDemo, FormDemo } from "./demo-interactive";
+import { BestaetigenDemo, DialogDemo, FormDemo, FormularDialogDemo } from "./demo-interactive";
 
 export const metadata: Metadata = { title: "Designsystem" };
 
@@ -229,6 +229,10 @@ export default function StyleguidePage() {
 
         <Section title="Dialog" description="Für Bestätigungen und Formulare · auf dem Handy bildschirmfüllend">
           <DialogDemo />
+        </Section>
+
+        <Section title="Formular-Dialog" description="Dialog mit Formular, fragt beim Schließen mit ungespeicherten Änderungen nach (FormularDialog)">
+          <FormularDialogDemo />
         </Section>
 
         <Section title="Bestätigung" description="Nur vor endgültigen oder destruktiven Schritten (Baustein Bestaetigen)">

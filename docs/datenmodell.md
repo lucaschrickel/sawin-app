@@ -113,7 +113,7 @@ Wahl der Rechnung). Höchstens eine Zahlungsbestätigung je Zahlung. Höchstens 
 |---|---|
 | `einsatz` | Auftrag **oder** Ticket, Beginn, Ende (`ende > beginn`), Fahrzeug, Ressource, `fest` (freigegeben), Farbe (Paletten-Token `plan-1` … `plan-10` oder `#RRGGBB`, geprüft) |
 | `einsatz_monteur` | Einsatz, Mitarbeiter (mehrere Monteure je Einsatz) |
-| `aufgabe` | Titel, Zuständig, fällig, Priorität, Status (offen, in_arbeit, wartet_zulieferer, wartet_kunde, erledigt), Notiz, optional Auftrag oder Ticket |
+| `aufgabe` | Titel, Zuständig (Benutzer), fällig, Priorität, Status (offen, in_arbeit, wartet_zulieferer, wartet_kunde, erledigt), erledigt am (Trigger), Notiz, optional Kunde, Anfrage, Auftrag oder Ticket (höchstens einer) |
 | `termin` | Titel, Art (beratung, intern), Datum, Beginn, Ende, optional Kunde/Anfrage/Auftrag, Ort, Notiz |
 | `termin_mitarbeiter` | Termin, Mitarbeiter |
 | `formular` | Typ (aufmass, montageprotokoll, servicebericht, uebergabeprotokoll), Anfrage (nur Aufmaß), Auftrag oder Ticket, Datum, Status, Hinweise, PDF- und Scan-Pfad |

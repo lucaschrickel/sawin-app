@@ -472,8 +472,12 @@ Die Monteur-App kommt in Version 2.
 
 ### Aufgaben
 
-- Zuweisung an eine Person, Fälligkeitsdatum, Priorität, Status (Offen, In Arbeit, Wartet auf Zulieferer, Wartet
-  auf Kunde, Erledigt), Notiz, optional verknüpft mit Auftrag oder Ticket.
+- Zuweisung an einen Benutzer, Fälligkeitsdatum, Priorität, Status (Offen, In Arbeit, Wartet auf Zulieferer, Wartet
+  auf Kunde, Erledigt), Notiz, optional verknüpft mit **Kunde, Anfrage, Auftrag oder Ticket** (höchstens einer;
+  Entscheidung 10.11.2026).
+- Seite „Aufgaben“ mit „Meine Aufgaben“ (Standard) und „Alle Aufgaben“, Filter Offen/Erledigt/Alle, Gruppen
+  Überfällig, Heute, Demnächst, Ohne Datum, Erledigt. Abhaken direkt in der Liste (speichert „erledigt am“).
+  Kunden- und Anfrageseite zeigen ihre Aufgaben mit „Aufgabe“-Knopf (Bezug vorbelegt).
 
 ### Montagepläne (Plantafel)
 

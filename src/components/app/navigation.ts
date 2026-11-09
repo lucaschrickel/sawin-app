@@ -37,7 +37,7 @@ const ALLE: NavGroup[] = [
     label: "Übersicht",
     items: [
       { key: "dashboard", href: "/", label: "Dashboard", icon: LayoutDashboard },
-      { key: "aufgaben", href: "/aufgaben", label: "Aufgaben", icon: CheckSquare },
+      { key: "aufgaben", href: "/aufgaben", label: "Aufgaben", icon: CheckSquare, bereit: true },
     ],
   },
   {

@@ -69,6 +69,17 @@ export async function testAdmin({ konditionen = true } = {}) {
   return { id: data.user.id, email, passwort, secret: enr.data.totp.secret };
 }
 
+/** Weiterer Benutzer ohne Anmeldung (z. B. als Zuständiger für Aufgaben). */
+export async function weitererBenutzer(name) {
+  const email = `e2e-${lauf}-${randomBytes(2).toString("hex")}@example.com`;
+  const { data, error } = await service.auth.admin.createUser({ email, password: `Test-${randomBytes(6).toString("hex")}A1`, email_confirm: true });
+  if (error) throw error;
+  nutzer.push(data.user.id);
+  const ins = await service.from("benutzer").insert({ id: data.user.id, name: `${name} ${lauf}`, email });
+  if (ins.error) throw ins.error;
+  return { id: data.user.id, name: `${name} ${lauf}` };
+}
+
 /** Entfernt alle gemerkten Zeilen und Testbenutzer (über die Datenbankverbindung, die API löscht nie echt). */
 export async function aufraeumen() {
   const db = new pg.Client({ connectionString: DB_URL, ssl: { rejectUnauthorized: false } });

@@ -356,6 +356,31 @@ describe("Anfragen", () => {
   });
 });
 
+describe("Aufgaben", () => {
+  it("höchstens ein Bezug (Kunde, Anfrage, Auftrag oder Ticket)", async () => {
+    const zwei = await buero.client.from("aufgabe").insert({ titel: "zwei Bezüge", kunde_id: daten.kunde.id, anfrage_id: daten.anfrage.id });
+    assert.ok(zwei.error, "Aufgabe mit zwei Bezügen angelegt");
+    const { data, error } = await buero.client.from("aufgabe").insert({ titel: `Bezug Kunde ${lauf}`, kunde_id: daten.kunde.id, zustaendig_id: buero.id }).select().single();
+    assert.ifError(error);
+    angelegt.push(["aufgabe", data.id]);
+    assert.equal(data.kunde_id, daten.kunde.id);
+  });
+
+  it("Abhaken setzt erledigt_am, wieder öffnen leert es", async () => {
+    const { data: a } = await buero.client.from("aufgabe").insert({ titel: `Abhaken ${lauf}` }).select().single();
+    angelegt.push(["aufgabe", a.id]);
+    const { data: erledigt } = await buero.client.from("aufgabe").update({ status: "erledigt" }).eq("id", a.id).select().single();
+    assert.ok(erledigt.erledigt_am);
+    const { data: offen } = await buero.client.from("aufgabe").update({ status: "offen" }).eq("id", a.id).select().single();
+    assert.equal(offen.erledigt_am, null);
+  });
+
+  it("Zuständig ist ein Benutzer, kein Mitarbeiter", async () => {
+    const { error } = await buero.client.from("aufgabe").insert({ titel: "Monteur zuständig", zustaendig_id: daten.monteur.id });
+    assert.ok(error, "Mitarbeiter als Zuständiger akzeptiert");
+  });
+});
+
 describe("Soft Delete und Audit-Log", () => {
   let aufgabe;
   it("echtes Löschen ist gesperrt", async () => {
