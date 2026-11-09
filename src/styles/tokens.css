@@ -67,6 +67,19 @@
   --dot-red: #c8776a;
   --dot-dark: #171717;
 
+  /* Planungspalette für Einsätze in den Plantafeln (gespeichert wird der Name plan-1 … plan-10).
+     Text darauf in --ink, Kontrast je Farbe mind. 4,5:1. plan-1 = Auftrag, plan-2 = Service, plan-5 = Reklamation. */
+  --plan-1: #e9d3c1;
+  --plan-2: #cbd8e8;
+  --plan-3: #c3dbc8;
+  --plan-4: #ebd7a6;
+  --plan-5: #ebc2b9;
+  --plan-6: #d8cfe6;
+  --plan-7: #d3e0b6;
+  --plan-8: #bfe0dc;
+  --plan-9: #e8c9dc;
+  --plan-10: #dad7d2;
+
   /* Fokus: deckende Farbe, mind. 3:1 gegen --surface und --canvas */
   --focus-ring: #171717;
 
@@ -132,6 +145,17 @@
   --tone-dark-fg: #ffffff;
 
   --dot-dark: #d1d5db;
+
+  --plan-1: #6b5444;
+  --plan-2: #3f5268;
+  --plan-3: #3e5a46;
+  --plan-4: #6a5730;
+  --plan-5: #6e4740;
+  --plan-6: #54496a;
+  --plan-7: #4e5b35;
+  --plan-8: #355955;
+  --plan-9: #664559;
+  --plan-10: #4f4c47;
 
   --focus-ring: #e9e6e2;
 

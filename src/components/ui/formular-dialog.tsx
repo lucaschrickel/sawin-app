@@ -17,8 +17,10 @@ type Props = {
   titel: string;
   beschreibung?: string;
   breit?: boolean;
-  /** Auslöser (z. B. ein Button) */
-  ausloeser: ReactNode;
+  /** Auslöser (z. B. ein Button). Ohne Auslöser ist der Dialog beim Einblenden offen (z. B. Klick in die Plantafel). */
+  ausloeser?: ReactNode;
+  /** wird nach dem Schließen aufgerufen (für Dialoge ohne Auslöser) */
+  beiSchliessen?: () => void;
   children: (s: FormularSteuerung) => ReactNode;
 };
 
@@ -26,8 +28,8 @@ type Props = {
  * Dialog mit Formular. Schließen per ×, Escape, Klick daneben oder „Abbrechen“ fragt nach, wenn es ungespeicherte
  * Änderungen gibt (CLAUDE.md „Speichern“). Bei jedem Öffnen ist das Formular frisch.
  */
-export function FormularDialog({ titel, beschreibung, breit, ausloeser, children }: Props) {
-  const [offen, setOffen] = useState(false);
+export function FormularDialog({ titel, beschreibung, breit, ausloeser, beiSchliessen, children }: Props) {
+  const [offen, setOffen] = useState(!ausloeser);
   const [geaendert, setGeaendert] = useState(false);
   const [nachfrage, setNachfrage] = useState(false);
   const [schluessel, setSchluessel] = useState(0);
@@ -36,6 +38,7 @@ export function FormularDialog({ titel, beschreibung, breit, ausloeser, children
     setOffen(false);
     setGeaendert(false);
     setNachfrage(false);
+    beiSchliessen?.();
   };
   const oeffnenAendern = (o: boolean) => {
     if (o) {
@@ -47,7 +50,7 @@ export function FormularDialog({ titel, beschreibung, breit, ausloeser, children
 
   return (
     <Dialog open={offen} onOpenChange={oeffnenAendern}>
-      <DialogTrigger asChild>{ausloeser}</DialogTrigger>
+      {ausloeser && <DialogTrigger asChild>{ausloeser}</DialogTrigger>}
       <DialogContent title={titel} description={beschreibung} wide={breit}>
         {nachfrage && (
           <div role="alertdialog" aria-label="Ungespeicherte Änderungen" className="mb-4 flex flex-wrap items-center gap-3 rounded-md bg-tone-amber-bg px-4 py-3 text-sm text-tone-amber-fg">

@@ -1,6 +1,8 @@
 import { redirect } from "next/navigation";
+import { pruefeSitzung } from "@/lib/auth/sitzung";
 
-// Bis weitere Reiter gebaut sind, öffnet „Einstellungen“ die Benutzerverwaltung.
-export default function EinstellungenPage() {
-  redirect("/einstellungen/benutzer");
+// „Einstellungen“ öffnet den ersten Reiter, den der Benutzer sehen darf
+export default async function EinstellungenPage() {
+  const { benutzer } = await pruefeSitzung();
+  redirect(benutzer.admin ? "/einstellungen/benutzer" : "/einstellungen/montageplan");
 }

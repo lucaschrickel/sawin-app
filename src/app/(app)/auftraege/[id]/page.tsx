@@ -12,7 +12,8 @@ import { ladeAufgabenZu } from "@/lib/aufgaben";
 import { ladeAuftrag } from "@/lib/auftraege";
 import { cn } from "@/lib/cn";
 import { AUFTRAG_PHASE_TEXT, AUFTRAG_PHASE_TON, MONTAGESTATUS_TEXT } from "@/lib/status";
-import { heuteBerlin, kurzTermin, tag, zeitpunkt } from "@/lib/zeit";
+import { montagVon } from "@/lib/woche";
+import { heuteBerlin, kurzTermin, tag, utcNachBerlinLokal, zeitpunkt } from "@/lib/zeit";
 import { NotizFormular } from "../../anfragen/ui";
 import { AufgabenKarte } from "../../aufgaben/ui";
 import { AuftragDialog, AuftragLoeschen, LieferungFormular, PhaseAuswahl, Phasenleiste, PruefhinweisEntfernen } from "../ui";
@@ -30,6 +31,9 @@ export default async function AuftragPage({ params, searchParams }: PageProps<"/
   const { auftrag: a, kunde: k, anfrage, einsaetze, ursprung, nachtraege, historie } = daten;
   const c = getCustomer();
   const zustaendig = benutzer.find((b) => b.id === a.zustaendig_id)?.name;
+  const heute = heuteBerlin();
+  const woche = (iso: string) => montagVon(utcNachBerlinLokal(iso).slice(0, 10));
+  const planWoche = montagVon(a.liefertermin && a.liefertermin > heute ? a.liefertermin : heute);
   const tab = (aktiv: boolean) => cn("-mb-px border-b-2 px-1 pb-2.5 text-[15px]", aktiv ? "border-ink font-semibold text-ink" : "border-transparent text-muted hover:text-ink");
 
   return (
@@ -100,7 +104,7 @@ export default async function AuftragPage({ params, searchParams }: PageProps<"/
                   <ul className="flex flex-col">
                     {einsaetze.map((e) => (
                       <li key={e.id} className="flex flex-wrap items-baseline gap-x-3 gap-y-1 border-t border-line-soft py-2.5 text-sm first:border-t-0">
-                        <b className="font-semibold">{kurzTermin(e.beginn)}–{tag(e.beginn) === tag(e.ende) ? uhrzeit(e.ende) : kurzTermin(e.ende)}</b>
+                        <Link href={`/montageplan?woche=${woche(e.beginn)}`} className="font-semibold hover:underline">{kurzTermin(e.beginn)}–{tag(e.beginn) === tag(e.ende) ? uhrzeit(e.ende) : kurzTermin(e.ende)}</Link>
                         <span className="text-muted">{e.monteure.map((m) => m.name).join(", ") || "ohne Monteur"}</span>
                         {!e.fest && <Badge tone="amber">vorgeplant</Badge>}
                         {e.hinweis && <span className="basis-full text-xs text-muted-2">{e.hinweis}</span>}
@@ -110,14 +114,19 @@ export default async function AuftragPage({ params, searchParams }: PageProps<"/
                 ) : (
                   <p className="text-sm text-muted">Noch kein Montagetermin.</p>
                 )}
-                <p className="mt-3 text-xs text-muted-2">Montagestatus: {MONTAGESTATUS_TEXT[a.montagestatus]}</p>
+                <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
+                  <span className="text-xs text-muted-2">Montagestatus: {MONTAGESTATUS_TEXT[a.montagestatus]}</span>
+                  <Link href={`/montageplan?woche=${planWoche}&auftrag=${a.id}`} className="inline-flex h-8 items-center gap-1.5 rounded-full border border-line bg-surface px-3 text-sm font-medium hover:border-line-strong">
+                    {einsaetze.length ? "Weiterer Einsatz" : "Montage planen"}
+                  </Link>
+                </div>
               </Karte>
 
               <Karte titel="Bestellung & Lieferung">
                 <LieferungFormular auftrag={a} />
               </Karte>
 
-              <AufgabenKarte aufgaben={aufgaben} bezug={{ art: "auftrag", id: a.id, text: `${a.nummer} · ${a.titel}` }} kontext={{ benutzer, ichId: ich.id, heute: heuteBerlin() }} />
+              <AufgabenKarte aufgaben={aufgaben} bezug={{ art: "auftrag", id: a.id, text: `${a.nummer} · ${a.titel}` }} kontext={{ benutzer, ichId: ich.id, heute }} />
               {a.bemerkung && <p className="text-sm whitespace-pre-line text-muted">Bemerkung: {a.bemerkung}</p>}
             </div>
 

@@ -124,6 +124,17 @@ export default function StyleguidePage() {
           </div>
         </Section>
 
+        <Section title="Planungspalette" description="Einsätze in den Plantafeln (--plan-1 bis --plan-10), Text in --ink · plan-1 Auftrag, plan-5 Reklamation">
+          <div className="flex flex-wrap gap-2">
+            {Array.from({ length: 10 }, (_, i) => (
+              <span key={i} className="rounded-md px-3 py-2 text-sm font-medium text-ink" style={{ background: `var(--plan-${i + 1})` }}>
+                plan-{i + 1}
+              </span>
+            ))}
+            <span className="rounded-md border-2 border-dashed border-(--plan-1) bg-surface px-3 py-2 text-sm text-ink-3">vorgeplant</span>
+          </div>
+        </Section>
+
         <Section title="Typografie" description="Inter, lokal eingebunden · Zahlen mit festen Ziffernbreiten (tabular)">
           <div className="flex flex-col divide-y divide-line-soft">
             {TYPE.map((t) => (

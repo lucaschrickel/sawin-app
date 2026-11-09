@@ -62,7 +62,7 @@ const ALLE: NavGroup[] = [
   {
     label: "Montage & Service",
     items: [
-      { key: "montageplan", href: "/montageplan", label: "Montageplan", icon: CalendarRange },
+      { key: "montageplan", href: "/montageplan", label: "Montageplan", icon: CalendarRange, bereit: true },
       { key: "service", href: "/service", label: "Service-Tickets", icon: Wrench },
       { key: "serviceplan", href: "/serviceplan", label: "Service-Plan", icon: ClipboardList },
     ],

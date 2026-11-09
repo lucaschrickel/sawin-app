@@ -3,6 +3,7 @@ import { PageHeader } from "@/components/app/page-header";
 import { Shell } from "@/components/app/shell";
 import { pruefeAdmin, type Benutzer } from "@/lib/auth/sitzung";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { EinstellungenReiter } from "../reiter";
 import { BenutzerTabelle, EinladenDialog, type Zeile } from "./ui";
 
 export const metadata: Metadata = { title: "Benutzer" };
@@ -32,6 +33,7 @@ export default async function BenutzerPage() {
         sub="Anmeldung nur per Einladung, mit Zwei-Faktor-Anmeldung. Rechte: Admin und „Konditionen sehen“."
         actions={<EinladenDialog />}
       />
+      <EinstellungenReiter aktiv="benutzer" admin />
       <BenutzerTabelle zeilen={zeilen} ichId={ich.id} />
     </Shell>
   );

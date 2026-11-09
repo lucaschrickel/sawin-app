@@ -113,6 +113,7 @@ Wahl der Rechnung). Höchstens eine Zahlungsbestätigung je Zahlung. Höchstens 
 |---|---|
 | `einsatz` | Auftrag **oder** Ticket, Beginn, Ende (`ende > beginn`), Fahrzeug, Ressource, `fest` (freigegeben), Farbe (Paletten-Token `plan-1` … `plan-10` oder `#RRGGBB`, geprüft) |
 | `einsatz_monteur` | Einsatz, Mitarbeiter (mehrere Monteure je Einsatz) |
+| `einsatz_speichern()`, `einsatz_loeschen()`, `einsatz_konflikte()` | Funktionen (SECURITY INVOKER): Einsatz samt Team in einem Schritt speichern (mindestens ein Monteur, entfernte Monteure nur markiert), Einsatz samt Team als gelöscht markieren, Konflikte im Zeitraum (Monteur gleichzeitig in einem anderen Einsatz oder abwesend, beantragt oder genehmigt). Die Arbeitszeit in `einstellung` ist auf volle Stunden beschränkt (Stundenraster der Plantafel). |
 | `aufgabe` | Titel, Zuständig (Benutzer), fällig, Priorität, Status (offen, in_arbeit, wartet_zulieferer, wartet_kunde, erledigt), erledigt am (Trigger), Notiz, optional Kunde, Anfrage, Auftrag oder Ticket (höchstens einer) |
 | `termin` | Titel, Art (beratung, intern), Datum, Beginn, Ende, optional Kunde/Anfrage/Auftrag, Ort, Notiz |
 | `termin_mitarbeiter` | Termin, Mitarbeiter |
@@ -160,6 +161,9 @@ und danach wieder entfernt:
 6. **Konditionen:** ohne Recht leer, mit Recht lesbar.
 7. **Aufträge:** nur die Phasen aus CLAUDE.md, `abgeschlossen_am` folgt der Phase, Nummer unveränderlich, Löschen mit
    Belegen oder Einsätzen gesperrt, ein leerer Auftrag wird nur markiert.
+8. **Montageplan:** Einsatz mit zwei Monteuren anlegen, Konflikte (Abwesenheit, Überschneidung), Monteur tauschen
+   (alter nur markiert), Ablehnung ohne Monteur, mit Ende vor Beginn oder mit Nicht-Monteur, Löschen als Markierung,
+   Arbeitszeit nur in vollen Stunden.
 
 ## Nicht in diesem Schritt
 

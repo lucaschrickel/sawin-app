@@ -421,6 +421,91 @@ describe("Aufträge", () => {
   });
 });
 
+describe("Montageplan", () => {
+  let zweiter, einsatzId;
+  const t = (iso) => new Date(iso).toISOString();
+  before(async () => {
+    const kz = "U" + Array.from(randomBytes(3), (b) => "ABCDEFGHIJKLMNOPQRSTUVWXYZ"[b % 26]).join("");
+    zweiter = await svcInsert("mitarbeiter", { kuerzel: kz, name: `Zweiter Monteur ${lauf}`, ist_monteur: true });
+  });
+  const team = async (id) =>
+    (await buero.client.from("einsatz_monteur").select("mitarbeiter_id").eq("einsatz_id", id)).data.map((x) => x.mitarbeiter_id).sort();
+
+  it("Einsatz mit zwei Monteuren in einem Schritt anlegen", async () => {
+    const { data, error } = await buero.client.rpc("einsatz_speichern", {
+      p_id: null, p_auftrag_id: daten.auftrag.id, p_beginn: t("2026-12-02T06:00:00Z"), p_ende: t("2026-12-02T15:00:00Z"),
+      p_monteure: [daten.monteur.id, zweiter.id], p_fest: false, p_hinweis: "Seiteneingang",
+    });
+    assert.ifError(error);
+    einsatzId = data;
+    angelegt.push(["einsatz", data]);
+    const { data: em } = await service.from("einsatz_monteur").select("id").eq("einsatz_id", data);
+    em.forEach((x) => angelegt.push(["einsatz_monteur", x.id]));
+    assert.deepEqual(await team(data), [daten.monteur.id, zweiter.id].sort());
+  });
+
+  it("Konflikte: Abwesenheit (beantragt) und Überschneidung mit einem anderen Einsatz", async () => {
+    const { data, error } = await buero.client.rpc("einsatz_konflikte", { p_von: t("2026-11-30T00:00:00Z"), p_bis: t("2026-12-07T00:00:00Z") });
+    assert.ifError(error);
+    const eigene = data.filter((k) => k.einsatz_id === einsatzId);
+    assert.ok(eigene.some((k) => k.art === "abwesend" && k.mitarbeiter_id === daten.monteur.id && k.detail === "urlaub:beantragt"), "Abwesenheit fehlt");
+    assert.ok(!eigene.some((k) => k.mitarbeiter_id === zweiter.id), "zweiter Monteur ohne Konflikt");
+    const { data: zweiterEinsatz } = await buero.client.rpc("einsatz_speichern", {
+      p_id: null, p_auftrag_id: daten.auftrag.id, p_beginn: t("2026-12-02T12:00:00Z"), p_ende: t("2026-12-02T14:00:00Z"),
+      p_monteure: [zweiter.id], p_fest: true, p_hinweis: null,
+    });
+    angelegt.push(["einsatz", zweiterEinsatz]);
+    const { data: em } = await service.from("einsatz_monteur").select("id").eq("einsatz_id", zweiterEinsatz);
+    em.forEach((x) => angelegt.push(["einsatz_monteur", x.id]));
+    const { data: neu } = await buero.client.rpc("einsatz_konflikte", { p_von: t("2026-11-30T00:00:00Z"), p_bis: t("2026-12-07T00:00:00Z") });
+    assert.ok(neu.some((k) => k.einsatz_id === einsatzId && k.mitarbeiter_id === zweiter.id && k.art === "ueberschneidung" && k.detail === daten.auftrag.nummer));
+    assert.ok(neu.some((k) => k.einsatz_id === zweiterEinsatz && k.art === "ueberschneidung"));
+  });
+
+  it("Monteur tauschen: der entfernte wird nur markiert", async () => {
+    const { error } = await buero.client.rpc("einsatz_speichern", {
+      p_id: einsatzId, p_auftrag_id: daten.auftrag.id, p_beginn: t("2026-12-02T06:00:00Z"), p_ende: t("2026-12-03T15:00:00Z"),
+      p_monteure: [zweiter.id], p_fest: null, p_hinweis: "Seiteneingang",
+    });
+    assert.ifError(error);
+    assert.deepEqual(await team(einsatzId), [zweiter.id]);
+    const { data: roh } = await service.from("einsatz_monteur").select("deleted_at").eq("einsatz_id", einsatzId).eq("mitarbeiter_id", daten.monteur.id).single();
+    assert.ok(roh.deleted_at);
+    const { data: e } = await buero.client.from("einsatz").select("ende, fest").eq("id", einsatzId).single();
+    assert.equal(new Date(e.ende).toISOString(), t("2026-12-03T15:00:00Z"));
+    assert.equal(e.fest, false, "p_fest leer lässt den Stand");
+  });
+
+  it("ohne Monteur, mit Ende vor Beginn oder mit Nicht-Monteur abgelehnt", async () => {
+    const basis = { p_id: null, p_auftrag_id: daten.auftrag.id, p_beginn: t("2026-12-09T06:00:00Z"), p_ende: t("2026-12-09T15:00:00Z"), p_fest: false, p_hinweis: null };
+    assert.equal((await buero.client.rpc("einsatz_speichern", { ...basis, p_monteure: [] })).error?.code, "23514");
+    assert.equal((await buero.client.rpc("einsatz_speichern", { ...basis, p_ende: basis.p_beginn, p_monteure: [zweiter.id] })).error?.code, "23514");
+    const buerokraft = await svcInsert("mitarbeiter", { kuerzel: "Q" + lauf.replace(/[^a-z]/g, "").toUpperCase().padEnd(3, "Z").slice(0, 3), name: `Bürokraft ${lauf}` });
+    const nicht = await buero.client.rpc("einsatz_speichern", { ...basis, p_monteure: [buerokraft.id] });
+    assert.ok(nicht.error, "Nicht-Monteur eingeteilt");
+    const { data: rest } = await service.from("einsatz").select("id").eq("auftrag_id", daten.auftrag.id).eq("beginn", basis.p_beginn);
+    assert.equal(rest.length, 0, "abgelehnter Einsatz blieb gespeichert");
+  });
+
+  it("Einsatz löschen markiert Einsatz und Team", async () => {
+    const { error } = await buero.client.rpc("einsatz_loeschen", { p_id: einsatzId });
+    assert.ifError(error);
+    const { data: sichtbar } = await buero.client.from("einsatz").select("id").eq("id", einsatzId);
+    assert.equal(sichtbar.length, 0);
+    const { data: roh } = await service.from("einsatz_monteur").select("deleted_at").eq("einsatz_id", einsatzId);
+    assert.ok(roh.length && roh.every((x) => x.deleted_at));
+  });
+
+  it("Arbeitszeit nur in vollen Stunden; nicht angemeldet keine Konflikte", async () => {
+    const halb = await buero.client.from("einstellung").update({ arbeitszeit_von: "07:30" }).eq("einzig", true);
+    assert.ok(halb.error, "halbe Stunde akzeptiert");
+    const { error } = await buero.client.from("einstellung").update({ arbeitszeit_von: "07:00", arbeitszeit_bis: "16:00" }).eq("einzig", true);
+    assert.ifError(error);
+    const fremd = await anon.rpc("einsatz_konflikte", { p_von: t("2026-11-30T00:00:00Z"), p_bis: t("2026-12-07T00:00:00Z") });
+    assert.ok(fremd.error || !fremd.data?.length);
+  });
+});
+
 describe("Soft Delete und Audit-Log", () => {
   let aufgabe;
   it("echtes Löschen ist gesperrt", async () => {
