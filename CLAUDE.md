@@ -747,6 +747,8 @@ Maßstab ist OWASP ASVS Level 1. Vor dem Start mit Echtdaten müssen alle Mindes
 
 - [ ] RLS auf allen Tabellen, Policies getestet, Supabase Advisors ohne Warnung
 - [ ] MFA für alle Nutzer aktiv
+- [ ] Auth-E-Mails (Einladung, Passwort vergessen) über einen eigenen SMTP-Zugang getestet; Inaktivitäts-Grenze der
+      Sitzungen in Supabase (Pro-Tarif) auf 60 Minuten gesetzt
 - [ ] Backups aktiv (Pro-Tarif, PITR) und eine Wiederherstellung einmal getestet
 - [ ] Lexware-Testpunkte (a) bis (s) geprüft und die offene Entscheidung zu AG/AB in Lexware getroffen
       und in dieser Datei festgehalten

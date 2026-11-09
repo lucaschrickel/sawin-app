@@ -1,0 +1,20 @@
+<!doctype html>
+<html lang="de">
+  <body style="margin:0;padding:24px;background:#f7f6f3;font-family:Arial,Helvetica,sans-serif;color:#1c1b18">
+    <div style="max-width:520px;margin:0 auto;background:#ffffff;border:1px solid #e8e5df;border-radius:12px;padding:28px">
+      <h1 style="margin:0 0 14px;font-size:20px">Einladung zur Büro-App</h1>
+      <p style="margin:0 0 12px;font-size:15px;line-height:1.5">Hallo,</p>
+      <p style="margin:0 0 18px;font-size:15px;line-height:1.5">
+        du hast einen Zugang zur Büro-App bekommen. Über den Knopf legst du dein Passwort fest und richtest danach die
+        Zwei-Faktor-Anmeldung mit einer Authenticator-App auf deinem Handy ein (z. B. Microsoft oder Google Authenticator).
+      </p>
+      <p style="margin:0 0 22px">
+        <a href="{{ .SiteURL }}/auth/bestaetigen?token_hash={{ .TokenHash }}&amp;type=invite"
+           style="display:inline-block;background:#d1b19a;color:#171717;text-decoration:none;font-weight:bold;padding:12px 20px;border-radius:10px">Einladung annehmen</a>
+      </p>
+      <p style="margin:0;font-size:13px;line-height:1.5;color:#5f5b53">
+        Der Link gilt 24 Stunden und nur einmal. Wenn du diese E-Mail nicht erwartet hast, kannst du sie ignorieren.
+      </p>
+    </div>
+  </body>
+</html>

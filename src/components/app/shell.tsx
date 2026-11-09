@@ -1,17 +1,29 @@
 import type { ReactNode } from "react";
 import { getCustomer } from "@/customers";
+import { INAKTIV_MINUTEN } from "@/lib/auth/konstanten";
+import { pruefeSitzung } from "@/lib/auth/sitzung";
 import { AppShell } from "./app-shell";
 
-/** Server-Hülle: holt das Kunden-Branding und rendert den App-Rahmen. */
-export function Shell(props: { active: string; crumbs: { label: string; href?: string }[]; children: ReactNode }) {
+const initialen = (name: string) =>
+  name
+    .split(/\s+/)
+    .filter(Boolean)
+    .map((t) => t[0])
+    .slice(0, 2)
+    .join("")
+    .toUpperCase();
+
+/** Server-Hülle: prüft die Sitzung, holt das Kunden-Branding und rendert den App-Rahmen. */
+export async function Shell(props: { active: string; crumbs: { label: string; href?: string }[]; children: ReactNode }) {
+  const { benutzer } = await pruefeSitzung();
   const c = getCustomer();
   const { Logo } = c;
   return (
     <AppShell
       {...props}
       brand={{ wordmark: c.brandWordmark, tagline: c.brandTagline, logo: <Logo className="w-full" /> }}
-      // Platzhalter bis zur Anmeldung über Supabase Auth
-      user={{ initials: "JS", name: "Jannis Sawin", role: "Admin" }}
+      user={{ initials: initialen(benutzer.name), name: benutzer.name, role: benutzer.admin ? "Admin" : "Benutzer" }}
+      inaktivMinuten={INAKTIV_MINUTEN}
     />
   );
 }

@@ -58,7 +58,7 @@ async function svcInsert(tabelle, zeile) {
 }
 async function benutzerAnlegen(name, { admin = false, konditionen = false, mfa = true } = {}) {
   const email = `rls-test-${lauf}-${name}@example.com`;
-  const password = randomBytes(18).toString("base64url");
+  const password = `${randomBytes(18).toString("base64url")}Aa1`; // erfüllt die Passwortregeln (Groß, klein, Ziffer)
   const { data, error } = await service.auth.admin.createUser({ email, password, email_confirm: true });
   if (error) throw new Error(`Testbenutzer ${name}: ${error.message}`);
   authUser.push(data.user.id);
@@ -81,11 +81,12 @@ async function tabellenDerApi() {
 }
 
 // ---------- Aufbau ----------
-let admin, buero, ohneMfa, daten;
+let admin, buero, ohneMfa, deaktiviert, daten;
 before(async () => {
   admin = await benutzerAnlegen("admin", { admin: true, konditionen: true });
   buero = await benutzerAnlegen("buero");
   ohneMfa = await benutzerAnlegen("ohnemfa", { mfa: false });
+  deaktiviert = await benutzerAnlegen("deaktiviert");
 
   const kz = "T" + Array.from(randomBytes(3), (b) => "ABCDEFGHIJKLMNOPQRSTUVWXYZ"[b % 26]).join("");
   const monteur = await svcInsert("mitarbeiter", { kuerzel: kz, name: `Testmonteur ${lauf}`, ist_monteur: true });
@@ -158,6 +159,20 @@ describe("Angemeldet ohne bestätigte MFA", () => {
     }
     const ins = await ohneMfa.client.from("aufgabe").insert({ titel: "ohne MFA" }).select();
     assert.ok(ins.error, "ohne MFA konnte eine Aufgabe angelegt werden");
+  });
+});
+
+describe("Deaktivierte Benutzer", () => {
+  it("sehen trotz gültiger MFA-Sitzung nichts mehr", async () => {
+    const vorher = await deaktiviert.client.from("kunde").select("id").eq("id", daten.kunde.id);
+    assert.equal(vorher.data.length, 1, "Kontrolle: aktiv sieht der Benutzer den Kunden");
+    await service.from("benutzer").update({ aktiv: false }).eq("id", deaktiviert.id);
+    for (const t of ["kunde", "auftrag", "beleg", "abwesenheit", "benutzer"]) {
+      const { data, error } = await deaktiviert.client.from(t).select("id").limit(5);
+      assert.ok(error || data.length === 0, `deaktiviert lesbar: ${t}`);
+    }
+    const ins = await deaktiviert.client.from("aufgabe").insert({ titel: "deaktiviert" }).select();
+    assert.ok(ins.error, "deaktivierter Benutzer konnte eine Aufgabe anlegen");
   });
 });
 

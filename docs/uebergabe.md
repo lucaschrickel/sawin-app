@@ -25,6 +25,8 @@ Vorlage: `.env.example`. Lokal in `.env.local` (nie einchecken), auf Vercel in d
 | `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | App | Publishable Key (`sb_publishable_…`) |
 | `SUPABASE_SERVICE_ROLE_KEY` | nur Server, Tests | Secret Key (`sb_secret_…`) aus Supabase › Project Settings › API Keys. Nie mit `NEXT_PUBLIC_`. |
 | `SUPABASE_DB_URL` | nur lokal / Deployment-Rechner | Verbindung zur Datenbank für Migrationen: Supabase › Connect › Session pooler (mit Passwort). Nicht auf Vercel setzen. |
+| `SUPABASE_ACCESS_TOKEN` | nur lokal | Persönliches Token (Supabase › Account › Access Tokens) zum Einspielen der Auth-Einstellungen. Nicht auf Vercel setzen. |
+| `SUPABASE_AUTH_SITE_URL` | nur lokal (beim Einspielen) | Adresse der App für Links in Auth-E-Mails, z. B. `http://localhost:3000` (Staging lokal) oder die Vercel-Adresse |
 | `LEXWARE_API_KEY` | nur Server | Staging: Testkonto, Produktion: Schlüssel des Kunden (erst beim Go-live) |
 | `MS_GRAPH_TENANT_ID`, `MS_GRAPH_CLIENT_ID`, `MS_GRAPH_CLIENT_SECRET` | nur Server | App-Registrierung in Microsoft Entra für OneDrive und E-Mail |
 
@@ -50,14 +52,54 @@ Prüfung der Rechte (legt Testbenutzer mit MFA und Testdaten an und entfernt sie
 npm run test:rls
 ```
 
+## Anmeldung
+
+E-Mail und Passwort über Supabase Auth, danach Pflicht-Code aus einer Authenticator-App (TOTP). Ohne bestätigten
+zweiten Faktor gibt die Datenbank keine Daten heraus. Zugänge nur per Einladung durch einen Admin (Einstellungen ›
+Benutzer). Automatische Abmeldung nach 60 Minuten ohne Aktivität (`src/lib/auth/konstanten.ts`).
+
+Die Auth-Einstellungen stehen als Code in `supabase/config.toml` (keine Selbstregistrierung, Passwort mindestens 12
+Zeichen mit Groß-/Kleinbuchstaben und Ziffer, TOTP an, Links 24 Stunden gültig) mit den deutschen E-Mail-Vorlagen in
+`supabase/templates/`. Einspielen je Projekt (braucht `SUPABASE_ACCESS_TOKEN` und `SUPABASE_AUTH_SITE_URL`):
+
+```bash
+npm run auth:diff     # Unterschiede zum Projekt anzeigen
+npm run auth:push     # einspielen (fragt nach Bestätigung)
+npm run auth:push -- --ohne-vorlagen   # ohne E-Mail-Vorlagen (kostenloser Tarif ohne eigenen SMTP)
+```
+
+Im kostenlosen Tarif mit dem eingebauten E-Mail-Versand lehnt Supabase eigene E-Mail-Vorlagen ab. Dann alles außer
+den Vorlagen mit `--ohne-vorlagen` einspielen; Einladungen und „Passwort vergessen“ per E-Mail funktionieren erst mit
+eigenem SMTP-Zugang (oder Pro-Tarif) und anschließendem `npm run auth:push`. Stand Staging (09.11.2026): ohne Vorlagen
+eingespielt.
+
+Ersten Admin einer Instanz einladen (danach lädt dieser Admin alle weiteren Benutzer in der App ein):
+
+```bash
+npm run admin:einladen -- name@firma.de "Vorname Nachname"
+npm run admin:einladen -- name@firma.de "Vorname Nachname" --ohne-email   # Link in lokale Datei statt E-Mail
+```
+
+Der Admin öffnet den Link aus der E-Mail, klickt „Weiter“, setzt sein Passwort und scannt den QR-Code mit der
+Authenticator-App. Danach meldet er sich mit E-Mail, Passwort und Code an. Verliert jemand sein Handy, setzt ein Admin
+unter Einstellungen › Benutzer die Zwei-Faktor-Anmeldung zurück.
+
+Prüfung im Browser (nur gegen Staging; App vorher bauen und starten):
+
+```bash
+npm run build && npx next start -p 3100
+APP_URL=http://localhost:3100 npm run test:anmeldung
+```
+
+**Vor der Einladung von Mitarbeitern:** Der eingebaute E-Mail-Versand von Supabase schickt nur an Mitglieder der
+Supabase-Organisation und nur wenige E-Mails pro Stunde. Für den Betrieb unter Authentication › Emails › SMTP Settings
+einen eigenen SMTP-Zugang eintragen (z. B. Microsoft 365 des Betriebs oder ein Versanddienst mit Sitz in der EU).
+**Ab dem Pro-Tarif** zusätzlich unter Authentication › Sessions eine Inaktivitäts-Grenze (60 Minuten) setzen.
+
 ### Manuelle Einstellungen je Supabase-Projekt
 
-- Authentication › Sign In / Providers: **„Allow new users to sign up“ ausschalten** (Anmeldung nur per Einladung).
-- Authentication › Multi-Factor: **TOTP aktiviert** (Standard). Die Datenbank lässt nur Benutzer mit bestätigtem
-  zweiten Faktor an Daten.
+- Authentication: prüfen, dass „Allow new users to sign up“ aus und TOTP an ist (setzt `npm run auth:push`).
 - Nummernkreise: nach der Datenübernahme aus Airtable die Startwerte in `nummernkreis.letzte` setzen und das Muster je
   Belegart prüfen (Vorgabe: `AG1JJNNNN`, `AB2JJNNNN`, `LS1JJNNNN`, `ZB1JJNNNN`, `ST-JJ-NNNN`, `BE-JJ-NNN`).
-- Erster Admin: Benutzer in Supabase einladen, danach mit der Service-Rolle eine Zeile in `benutzer` mit
-  `admin = true` anlegen. Weitere Benutzer verwaltet dieser Admin.
 - Interne Kopie (BCC) je Belegart in `belegart_einstellung` eintragen (bei Sawin: Angebot an `angebot@…`, AB und
   Teil-AB an `auftrag@…`).

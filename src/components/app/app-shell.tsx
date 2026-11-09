@@ -1,11 +1,12 @@
 "use client";
 
 import Link from "next/link";
-import { Menu, Plus, Search, Bell } from "lucide-react";
+import { Menu, Plus, Search, Bell, LogOut } from "lucide-react";
 import { useState, type ReactNode } from "react";
 import { Avatar } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/cn";
+import { Inaktivitaet } from "./inaktivitaet";
 import { NAVIGATION } from "./navigation";
 
 type AppShellProps = {
@@ -13,15 +14,18 @@ type AppShellProps = {
   crumbs: { label: string; href?: string }[];
   brand: { wordmark: string; tagline?: string; logo: ReactNode };
   user: { initials: string; name: string; role: string };
+  /** automatische Abmeldung nach so vielen Minuten ohne Eingabe */
+  inaktivMinuten: number;
   children: ReactNode;
 };
 
 /** App-Rahmen: dunkle Seitenleiste, helles Inhaltsfeld, Kopfzeile mit Suche. */
-export function AppShell({ active, crumbs, brand, user, children }: AppShellProps) {
+export function AppShell({ active, crumbs, brand, user, inaktivMinuten, children }: AppShellProps) {
   const [open, setOpen] = useState(false);
 
   return (
     <div className="flex min-h-screen py-3 pr-3 max-[960px]:p-0">
+      <Inaktivitaet minuten={inaktivMinuten} />
       <aside
         aria-label="Hauptnavigation"
         className={cn(
@@ -78,10 +82,21 @@ export function AppShell({ active, crumbs, brand, user, children }: AppShellProp
           </div>
           <div className="flex items-center gap-2.5">
             <Avatar initials={user.initials} size="lg" className="bg-accent text-accent-ink" />
-            <span>
-              <b className="block text-base font-semibold text-white">{user.name}</b>
+            <span className="min-w-0 flex-1">
+              <b className="block truncate text-base font-semibold text-white">{user.name}</b>
               <small className="block text-xs text-frame-muted">{user.role}</small>
             </span>
+            {/* Abmelden per POST an den Route-Handler (kein Link, damit nichts vorab geladen wird) */}
+            <form action="/abmelden" method="post">
+              <button
+                type="submit"
+                aria-label="Abmelden"
+                title="Abmelden"
+                className="inline-flex size-9 cursor-pointer items-center justify-center rounded-full text-frame-muted hover:bg-white/5 hover:text-white"
+              >
+                <LogOut className="size-[17px]" aria-hidden="true" />
+              </button>
+            </form>
           </div>
         </div>
       </aside>
