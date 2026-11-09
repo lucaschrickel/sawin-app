@@ -257,6 +257,55 @@ describe("Abwesenheiten genehmigen", () => {
   });
 });
 
+describe("Kunden", () => {
+  it("kunde_speichern legt Kunde und Lieferadressen in einem Schritt an", async () => {
+    const { data: id, error } = await buero.client.rpc("kunde_speichern", {
+      p_id: null,
+      p_kunde: { name: `RPC-Kunde ${lauf}`, typ: "firma", bauleister_13b: true, ort: "Gifhorn" },
+      p_lieferadressen: [{ bezeichnung: "Objekt A", strasse: "Weg 1", plz: "38518", ort: "Gifhorn", alt: false }],
+    });
+    assert.ifError(error);
+    angelegt.push(["kunde", id]);
+    const { data: la } = await service.from("kunde_lieferadresse").select("id, bezeichnung").eq("kunde_id", id);
+    la.forEach((x) => angelegt.push(["kunde_lieferadresse", x.id]));
+    assert.equal(la.length, 1);
+    const { data: k } = await service.from("kunde").select("nummer, created_by").eq("id", id).single();
+    assert.ok(k.nummer, "Kundennummer vergeben");
+    assert.equal(k.created_by, buero.id);
+  });
+
+  it("Lieferadresse eines anderen Kunden lässt sich darüber nicht ändern", async () => {
+    const { data: fremd } = await service.from("kunde_lieferadresse").insert({ kunde_id: daten.kunde.id, strasse: "Fremd 1" }).select("id").single();
+    angelegt.push(["kunde_lieferadresse", fremd.id]);
+    const { data: id } = await buero.client.rpc("kunde_speichern", { p_id: null, p_kunde: { name: `RPC-Kunde2 ${lauf}` }, p_lieferadressen: [] });
+    angelegt.push(["kunde", id]);
+    const { error } = await buero.client.rpc("kunde_speichern", {
+      p_id: id,
+      p_kunde: { name: `RPC-Kunde2 ${lauf}` },
+      p_lieferadressen: [{ id: fremd.id, strasse: "Gekapert 1" }],
+    });
+    assert.ok(error, "fremde Lieferadresse geändert");
+    const { data } = await service.from("kunde_lieferadresse").select("strasse").eq("id", fremd.id).single();
+    assert.equal(data.strasse, "Fremd 1");
+  });
+
+  it("Lexware-Felder kann kein Benutzer setzen", async () => {
+    await buero.client.from("kunde").update({ lexware_kontakt_id: "gefaelscht", lexware_seit: new Date().toISOString() }).eq("id", daten.kunde.id);
+    const { data } = await service.from("kunde").select("lexware_kontakt_id, lexware_seit").eq("id", daten.kunde.id).single();
+    assert.equal(data.lexware_kontakt_id, null);
+    assert.equal(data.lexware_seit, null);
+  });
+
+  it("ein Kunde mit Anfragen und Aufträgen lässt sich nicht löschen, mit Begründung", async () => {
+    const { error } = await buero.client.rpc("loeschen", { p_tabelle: "kunde", p_id: daten.kunde.id });
+    assert.ok(error, "Kunde mit Anfrage gelöscht");
+    assert.equal(error.code, "23503");
+    assert.match(error.message, /Anfragen, Aufträge/);
+    const { data } = await service.from("kunde").select("deleted_at").eq("id", daten.kunde.id).single();
+    assert.equal(data.deleted_at, null);
+  });
+});
+
 describe("Soft Delete und Audit-Log", () => {
   let aufgabe;
   it("echtes Löschen ist gesperrt", async () => {

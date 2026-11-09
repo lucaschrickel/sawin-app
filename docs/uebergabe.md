@@ -59,7 +59,7 @@ zweiten Faktor gibt die Datenbank keine Daten heraus. Zugänge nur per Einladung
 Benutzer). Automatische Abmeldung nach 60 Minuten ohne Aktivität (`src/lib/auth/konstanten.ts`).
 
 Die Auth-Einstellungen stehen als Code in `supabase/config.toml` (keine Selbstregistrierung, Passwort mindestens 12
-Zeichen mit Groß-/Kleinbuchstaben und Ziffer, TOTP an, Links 24 Stunden gültig) mit den deutschen E-Mail-Vorlagen in
+Zeichen mit Groß-/Kleinbuchstaben und Ziffer, TOTP an, Links eine Stunde gültig) mit den deutschen E-Mail-Vorlagen in
 `supabase/templates/`. Einspielen je Projekt (braucht `SUPABASE_ACCESS_TOKEN` und `SUPABASE_AUTH_SITE_URL`):
 
 ```bash
@@ -89,6 +89,7 @@ Prüfung im Browser (nur gegen Staging; App vorher bauen und starten):
 ```bash
 npm run build && npx next start -p 3100
 APP_URL=http://localhost:3100 npm run test:anmeldung
+APP_URL=http://localhost:3100 npm run test:kunden     # Modul Kunden mit vorübergehendem Test-Admin
 ```
 
 **Vor der Einladung von Mitarbeitern:** Der eingebaute E-Mail-Versand von Supabase schickt nur an Mitglieder der

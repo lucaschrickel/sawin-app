@@ -1,5 +1,6 @@
 "use client";
 
+import { Bestaetigen } from "@/components/ui/bestaetigen";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogClose, DialogContent, DialogTrigger } from "@/components/ui/dialog";
 import { Field, Input, Textarea } from "@/components/ui/field";
@@ -66,5 +67,19 @@ export function DialogDemo() {
         </div>
       </DialogContent>
     </Dialog>
+  );
+}
+
+export function BestaetigenDemo() {
+  return (
+    <Bestaetigen
+      titel="Kunde löschen?"
+      text="Familie Muster wird als gelöscht markiert und verschwindet aus allen Listen."
+      knopf="Löschen"
+      gefahr
+      ausfuehren={() => {}}
+    >
+      <Button variant="danger">Löschen …</Button>
+    </Bestaetigen>
   );
 }

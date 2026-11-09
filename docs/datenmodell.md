@@ -75,6 +75,7 @@ Sonderregeln per Trigger (RLS kann Spaltenänderungen nicht prüfen):
 | `zahlungsbedingung` | Name, Text mit Platzhaltern, Zahlungsziel, Skontoziel, Skonto %, Belegarten, Standard je Belegart |
 | `kunde` | Kundennummer, Name, Typ (privat/firma), Bauleister § 13b, Ansprechpartner, Herkunft, Rechnungsadresse, Telefon, E-Mail, Notiz, Lexware-Kontakt-ID, an Lexware seit |
 | `kunde_lieferadresse` | Kunde, Bezeichnung, Straße, PLZ, Ort, `alt_seit` |
+| `kunde_speichern()` | Funktion: Kunde mit Lieferadressen in einer Transaktion anlegen oder ändern (RLS gilt, Audit mit Benutzer). Gespeicherte Lieferadressen werden nie gelöscht, nur „Alt“. Die Lexware-Felder setzt nur der Server; einen Kunden mit Anfragen, Aufträgen, Belegen oder Tickets lehnt das Löschen mit Begründung ab. |
 | `kunde_kondition` | Kunde, Freitext (eigene RLS, nur Recht „Konditionen“) |
 | `lieferant` | Firma, Produktgruppen, Konfigurator-Link, Händlerportal, unsere Kundennummer, Lieferzeit, Telefon, Notiz |
 | `lieferant_kontakt` | Lieferant, Name, Funktion, Handy, Telefon, E-Mail |

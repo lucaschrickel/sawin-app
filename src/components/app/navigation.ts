@@ -1,59 +1,99 @@
 import {
+  BookUser,
   CalendarDays,
+  CalendarRange,
   CheckSquare,
+  Clock,
+  ClipboardList,
+  Factory,
   FileCheck2,
   FileText,
+  Files,
   Inbox,
   LayoutDashboard,
   Palette,
   Receipt,
+  ReceiptText,
   Settings2,
+  ShoppingCart,
   Truck,
   Undo2,
+  UserX,
   Users,
-  Briefcase,
+  Van,
+  Wrench,
   type LucideIcon,
 } from "lucide-react";
 
-export type NavItem = { key: string; href: string; label: string; icon: LucideIcon };
+export type NavItem = { key: string; href: string; label: string; icon: LucideIcon; bereit?: boolean };
 export type NavGroup = { label: string; items: NavItem[] };
 
 /**
- * Navigation für Version 1. Monteur-App, Zeiterfassung, Abwesenheiten und
- * Plantafel kommen in späteren Ausbaustufen dazu.
+ * Navigation für Version 1, Gruppen und Reihenfolge wie in CLAUDE.md („Rahmen und Navigation“).
+ * Sichtbar sind nur Module mit `bereit: true`; weitere werden beim Bau ihres Moduls freigeschaltet.
  */
-export const NAVIGATION: NavGroup[] = [
-  { label: "Übersicht", items: [{ key: "dashboard", href: "/", label: "Dashboard", icon: LayoutDashboard }] },
+const ALLE: NavGroup[] = [
   {
-    label: "Vertrieb",
+    label: "Übersicht",
     items: [
-      { key: "anfragen", href: "/anfragen", label: "Anfragen", icon: Inbox },
-      { key: "kunden", href: "/kunden", label: "Kunden", icon: Users },
+      { key: "dashboard", href: "/", label: "Dashboard", icon: LayoutDashboard },
+      { key: "aufgaben", href: "/aufgaben", label: "Aufgaben", icon: CheckSquare },
     ],
   },
   {
-    label: "Aufträge",
+    label: "Kunden & Anfragen",
     items: [
-      { key: "auftraege", href: "/auftraege", label: "Aufträge", icon: Briefcase },
-      { key: "montageplan", href: "/montageplan", label: "Montageplan", icon: CalendarDays },
-      { key: "aufgaben", href: "/aufgaben", label: "Aufgaben", icon: CheckSquare },
+      { key: "kunden", href: "/kunden", label: "Kunden", icon: Users, bereit: true },
+      { key: "anfragen", href: "/anfragen", label: "Anfragen", icon: Inbox },
     ],
   },
   {
     label: "Belege",
     items: [
+      { key: "belege", href: "/belege", label: "Alle Belege", icon: Files },
       { key: "angebote", href: "/belege/angebote", label: "Angebote", icon: FileText },
-      { key: "auftragsbestaetigungen", href: "/belege/auftragsbestaetigungen", label: "Auftragsbestätigungen", icon: FileCheck2 },
+      { key: "auftraege", href: "/auftraege", label: "Aufträge", icon: FileCheck2 },
       { key: "lieferscheine", href: "/belege/lieferscheine", label: "Lieferscheine", icon: Truck },
+      { key: "abschlaege", href: "/belege/abschlaege", label: "Abschlagsrechnungen", icon: ReceiptText },
       { key: "rechnungen", href: "/belege/rechnungen", label: "Rechnungen", icon: Receipt },
-      { key: "korrekturen", href: "/belege/korrekturen", label: "Gutschriften", icon: Undo2 },
+      { key: "gutschriften", href: "/belege/gutschriften", label: "Gutschriften", icon: Undo2 },
+    ],
+  },
+  {
+    label: "Montage & Service",
+    items: [
+      { key: "montageplan", href: "/montageplan", label: "Montageplan", icon: CalendarRange },
+      { key: "service", href: "/service", label: "Service-Tickets", icon: Wrench },
+      { key: "serviceplan", href: "/serviceplan", label: "Service-Plan", icon: ClipboardList },
+    ],
+  },
+  {
+    label: "Einkauf",
+    items: [
+      { key: "lieferanten", href: "/lieferanten", label: "Lieferanten", icon: Factory },
+      { key: "bestellungen", href: "/bestellungen", label: "Bestellungen", icon: ShoppingCart },
+    ],
+  },
+  {
+    label: "Team und Ressourcen",
+    items: [
+      { key: "kalender", href: "/kalender", label: "Kalender", icon: CalendarDays },
+      { key: "mitarbeiter", href: "/mitarbeiter", label: "Mitarbeiter", icon: BookUser },
+      { key: "fahrzeuge", href: "/fahrzeuge", label: "Fahrzeuge", icon: Van },
+      { key: "zeiten", href: "/zeiten", label: "Zeiterfassung", icon: Clock },
+      { key: "abwesenheiten", href: "/abwesenheiten", label: "Abwesenheiten", icon: UserX },
     ],
   },
   {
     label: "System",
     items: [
-      { key: "einstellungen", href: "/einstellungen", label: "Einstellungen", icon: Settings2 },
-      { key: "styleguide", href: "/styleguide", label: "Designsystem", icon: Palette },
+      { key: "einstellungen", href: "/einstellungen", label: "Einstellungen", icon: Settings2, bereit: true },
+      { key: "styleguide", href: "/styleguide", label: "Designsystem", icon: Palette, bereit: true },
     ],
   },
 ];
+
+export const NAVIGATION: NavGroup[] = ALLE.map((g) => ({ ...g, items: g.items.filter((i) => i.bereit) })).filter(
+  (g) => g.items.length > 0,
+);
+

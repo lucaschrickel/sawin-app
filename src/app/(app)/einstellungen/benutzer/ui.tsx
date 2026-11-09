@@ -1,8 +1,9 @@
 "use client";
 
 import { Plus } from "lucide-react";
-import { useActionState, useState, useTransition, type ReactNode } from "react";
+import { useActionState, useState, useTransition } from "react";
 import { Badge } from "@/components/ui/badge";
+import { Bestaetigen } from "@/components/ui/bestaetigen";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogClose, DialogContent, DialogTrigger } from "@/components/ui/dialog";
 import { Field, Input } from "@/components/ui/field";
@@ -78,26 +79,6 @@ export function EinladenDialog() {
             </div>
           </form>
         )}
-      </DialogContent>
-    </Dialog>
-  );
-}
-
-/** Nachfrage vor folgenreichen Schritten (Deaktivieren, 2FA zurücksetzen). */
-function Nachfrage({ titel, text, knopf, ausfuehren, children }: { titel: string; text: string; knopf: string; ausfuehren: () => void; children: ReactNode }) {
-  return (
-    <Dialog>
-      <DialogTrigger asChild>{children}</DialogTrigger>
-      <DialogContent title={titel}>
-        <p className="text-base text-ink-3">{text}</p>
-        <div className="flex justify-end gap-2.5 pt-5">
-          <DialogClose asChild>
-            <Button>Abbrechen</Button>
-          </DialogClose>
-          <DialogClose asChild>
-            <Button variant="primary" onClick={ausfuehren}>{knopf}</Button>
-          </DialogClose>
-        </div>
       </DialogContent>
     </Dialog>
   );
@@ -179,25 +160,26 @@ export function BenutzerTabelle({ zeilen, ichId }: { zeilen: Zeile[]; ichId: str
                         </Button>
                       )}
                       {!ich && b.zweiFaktor && (
-                        <Nachfrage
+                        <Bestaetigen
                           titel="Zwei-Faktor-Anmeldung zurücksetzen?"
                           text={`${b.name} richtet die Authenticator-App bei der nächsten Anmeldung neu ein. Nur tun, wenn die Person sich ausgewiesen hat (z. B. Handy verloren).`}
                           knopf="Zurücksetzen"
                           ausfuehren={() => tun(() => zweiFaktorZuruecksetzen(b.id))}
                         >
                           <Button size="xs" disabled={laeuft}>2FA zurücksetzen</Button>
-                        </Nachfrage>
+                        </Bestaetigen>
                       )}
                       {!ich &&
                         (b.aktiv ? (
-                          <Nachfrage
+                          <Bestaetigen
                             titel="Benutzer deaktivieren?"
                             text={`${b.name} kann sich nicht mehr anmelden und sieht keine Daten. Die Daten bleiben erhalten, aktivieren ist jederzeit möglich.`}
                             knopf="Deaktivieren"
+                            gefahr
                             ausfuehren={() => tun(() => aktivSetzen(b.id, false))}
                           >
                             <Button size="xs" variant="danger" disabled={laeuft}>Deaktivieren</Button>
-                          </Nachfrage>
+                          </Bestaetigen>
                         ) : (
                           <Button size="xs" disabled={laeuft} onClick={() => tun(() => aktivSetzen(b.id, true))}>
                             Aktivieren

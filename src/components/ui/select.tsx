@@ -29,10 +29,11 @@ export function SelectContent({ className, children, ...props }: ComponentProps<
   return (
     <SelectPrimitive.Portal>
       <SelectPrimitive.Content
+        // über Dialogen (Abdunklung z-100, Dialog z-101), damit Auswahllisten in Dialogen bedienbar sind
         position="popper"
         sideOffset={6}
         className={cn(
-          "z-50 max-h-72 min-w-[var(--radix-select-trigger-width)] overflow-hidden rounded-lg border border-line-soft bg-surface p-1.5 shadow-pop",
+          "z-[110] max-h-72 min-w-[var(--radix-select-trigger-width)] overflow-hidden rounded-lg border border-line-soft bg-surface p-1.5 shadow-pop",
           className,
         )}
         {...props}

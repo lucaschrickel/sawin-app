@@ -3,7 +3,7 @@
 //
 // Standard: Supabase verschickt die Einladung per E-Mail (braucht die eigenen E-Mail-Vorlagen, siehe docs/uebergabe.md).
 // --ohne-email: erzeugt den Einladungslink über die Admin-API und schreibt ihn in eine lokale Datei (für Projekte ohne
-// eigenen SMTP-Zugang). Der Link gilt einmal und 24 Stunden; die Datei danach löschen.
+// eigenen SMTP-Zugang). Der Link gilt einmal und eine Stunde; die Datei danach löschen.
 import { existsSync, writeFileSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
@@ -52,7 +52,7 @@ if (dbFehler) {
 
 if (link) {
   const datei = path.join(os.tmpdir(), `einladung-${adresse.replace(/[^a-z0-9]+/g, "-")}.txt`);
-  writeFileSync(datei, `Einladungslink für ${name} <${adresse}> (einmal gültig, 24 Stunden):\n${link}\n`, { mode: 0o600 });
+  writeFileSync(datei, `Einladungslink für ${name} <${adresse}> (einmal gültig, eine Stunde):\n${link}\n`, { mode: 0o600 });
   console.log(`${name} ist als Admin angelegt. Einladungslink (nicht weitergeben, nach Gebrauch löschen):\n  ${datei}`);
 } else {
   console.log(`Einladung an ${adresse} verschickt. ${name} ist Admin mit Recht „Konditionen sehen“.`);

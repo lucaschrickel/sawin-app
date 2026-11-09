@@ -17,6 +17,8 @@ export type CustomerConfig = {
   brandTagline?: string;
   Logo: LogoComponent;
   locale: string;
+  /** Auswahl „Herkunft“ bei Kunden und Anfragen (Daten der Instanz, kein Sonder-Code) */
+  herkunft: string[];
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   overrides: Partial<Record<SlotName, ComponentType<any>>>;
 };

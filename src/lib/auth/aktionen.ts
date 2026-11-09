@@ -80,7 +80,7 @@ export async function passwortVergessen(_: Zustand, fd: FormData): Promise<Zusta
   const supabase = await createClient();
   await supabase.auth.resetPasswordForEmail(email);
   return {
-    hinweis: "Wenn es zu dieser Adresse einen Zugang gibt, ist eine E-Mail mit einem Link unterwegs. Der Link gilt 24 Stunden.",
+    hinweis: "Wenn es zu dieser Adresse einen Zugang gibt, ist eine E-Mail mit einem Link unterwegs. Der Link gilt eine Stunde.",
   };
 }
 
