@@ -46,3 +46,21 @@ export function ListenSuche({ wert, label, platzhalter }: { wert: string; label:
     </label>
   );
 }
+
+/** Auswahlfeld als Listenfilter (Parameter in der URL, leer = alle). */
+export function ListenAuswahl({ name, wert, label, alle, optionen }: { name: string; wert: string; label: string; alle: string; optionen: string[] }) {
+  const setze = useListenParameter();
+  return (
+    <select
+      aria-label={label}
+      value={wert}
+      onChange={(e) => setze({ [name]: e.target.value })}
+      className="h-[38px] rounded-full border border-line bg-surface px-3.5 text-sm text-ink"
+    >
+      <option value="">{alle}</option>
+      {optionen.map((o) => (
+        <option key={o} value={o}>{o}</option>
+      ))}
+    </select>
+  );
+}

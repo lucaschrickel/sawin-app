@@ -24,4 +24,4 @@ export const PRIORITAET_TEXT: Record<Prioritaet, string> = { hoch: "Hoch", norma
 /** Bezug einer Aufgabe (höchstens einer) */
 export type Bezug = { art: "kunde" | "anfrage" | "auftrag"; id: string; text: string };
 export const BEZUG_ART_TEXT: Record<Bezug["art"], string> = { kunde: "Kunde", anfrage: "Anfrage", auftrag: "Auftrag" };
-export const bezugHref = (b: Bezug) => (b.art === "kunde" ? `/kunden/${b.id}` : b.art === "anfrage" ? `/anfragen/${b.id}` : null);
+export const bezugHref = (b: Bezug) => (b.art === "kunde" ? `/kunden/${b.id}` : b.art === "anfrage" ? `/anfragen/${b.id}` : `/auftraege/${b.id}`);

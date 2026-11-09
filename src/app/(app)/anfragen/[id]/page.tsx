@@ -60,8 +60,8 @@ export default async function AnfragePage({ params }: PageProps<"/anfragen/[id]"
 
       {auftrag && (
         <Hinweis>
-          Gewonnen · Auftrag <b className="font-mono font-medium">{auftrag.nummer}</b> angelegt. Das Auftragsmodul folgt; bis dahin steht
-          der Auftrag auf der <Link className="text-accent-text hover:underline" href={`/kunden/${a.kunde_id}`}>Kundenseite</Link>.
+          Gewonnen · Auftrag{" "}
+          <Link className="font-mono font-medium text-accent-text hover:underline" href={`/auftraege/${auftrag.id}`}>{auftrag.nummer}</Link> angelegt.
         </Hinweis>
       )}
       {a.archiv === "verloren" && <Hinweis ton="rot">Verloren · Grund: {a.verlust_grund ?? "–"}</Hinweis>}

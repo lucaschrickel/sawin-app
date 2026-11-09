@@ -381,6 +381,46 @@ describe("Aufgaben", () => {
   });
 });
 
+describe("Aufträge", () => {
+  it("nur die Phasen aus CLAUDE.md; „Abgeschlossen“ setzt und leert abgeschlossen_am", async () => {
+    const falsch = await buero.client.from("auftrag").update({ phase: "montiert" }).eq("id", daten.auftrag.id);
+    assert.ok(falsch.error, "unbekannte Phase akzeptiert");
+    const { data: zu, error } = await buero.client.from("auftrag").update({ phase: "abgeschlossen" }).eq("id", daten.auftrag.id).select().single();
+    assert.ifError(error);
+    assert.ok(zu.abgeschlossen_am);
+    const { data: auf } = await buero.client.from("auftrag").update({ phase: "reklamation" }).eq("id", daten.auftrag.id).select().single();
+    assert.equal(auf.abgeschlossen_am, null);
+  });
+
+  it("die Auftragsnummer lässt sich nicht ändern", async () => {
+    const { data } = await buero.client.from("auftrag").update({ nummer: "AB2999999" }).eq("id", daten.auftrag.id).select("nummer").single();
+    assert.equal(data.nummer, daten.auftrag.nummer);
+  });
+
+  it("ein Auftrag mit Belegen oder Einsätzen lässt sich nicht löschen", async () => {
+    const { error } = await buero.client.rpc("loeschen", { p_tabelle: "auftrag", p_id: daten.auftrag.id });
+    assert.equal(error?.code, "23503");
+    assert.match(error.message, /Belege/);
+    assert.match(error.message, /Einsätze/);
+  });
+
+  it("ein leerer Auftrag wird nur markiert; danach lässt sich die Anfrage zurücksetzen", async () => {
+    const { data: q } = await buero.client.from("anfrage").insert({ titel: `Löschtest ${lauf}`, kunde_id: daten.kunde.id }).select().single();
+    angelegt.push(["anfrage", q.id]);
+    const { data: auftragId } = await buero.client.rpc("anfrage_auftrag_anlegen", { p_anfrage_id: q.id });
+    angelegt.push(["auftrag", auftragId]);
+    const { error } = await buero.client.rpc("loeschen", { p_tabelle: "auftrag", p_id: auftragId });
+    assert.ifError(error);
+    const { data: sichtbar } = await buero.client.from("auftrag").select("id").eq("id", auftragId);
+    assert.equal(sichtbar.length, 0, "gelöschter Auftrag noch sichtbar");
+    const { data: roh } = await service.from("auftrag").select("deleted_at, deleted_by").eq("id", auftragId).single();
+    assert.ok(roh.deleted_at, "Datensatz fehlt statt markiert");
+    assert.equal(roh.deleted_by, buero.id);
+    const zurueck = await buero.client.from("anfrage").update({ archiv: null }).eq("id", q.id);
+    assert.ifError(zurueck.error);
+  });
+});
+
 describe("Soft Delete und Audit-Log", () => {
   let aufgabe;
   it("echtes Löschen ist gesperrt", async () => {

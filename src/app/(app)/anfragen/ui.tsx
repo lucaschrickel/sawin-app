@@ -24,7 +24,7 @@ function Meldung({ e }: { e: Ergebnis }) {
 }
 
 /** Liste oder Board, gemerkt je Benutzer */
-export function AnsichtUmschalter({ ansicht }: { ansicht: "liste" | "board" }) {
+export function AnsichtUmschalter({ ansicht, seite = "anfragen" }: { ansicht: "liste" | "board"; seite?: string }) {
   const [laeuft, starten] = useTransition();
   return (
     <div role="group" aria-label="Ansicht" className="flex gap-1 rounded-full bg-surface-sunken p-1">
@@ -34,7 +34,7 @@ export function AnsichtUmschalter({ ansicht }: { ansicht: "liste" | "board" }) {
           type="button"
           aria-pressed={ansicht === v}
           disabled={laeuft}
-          onClick={() => starten(() => ansichtSetzen("anfragen", v))}
+          onClick={() => starten(() => ansichtSetzen(seite, v))}
           className={cn("rounded-full px-3.5 py-1.5 text-sm", ansicht === v ? "bg-surface font-medium text-ink shadow-card" : "text-muted hover:text-ink")}
         >
           {v === "liste" ? "Liste" : "Board"}
@@ -237,8 +237,8 @@ function VerlorenFormular({ id, fertig, abbrechen, aenderung }: { id: string; fe
   );
 }
 
-/** Notiz oder Telefonat in der Historie erfassen */
-export function NotizFormular({ anfrageId }: { anfrageId: string }) {
+/** Notiz oder Telefonat in der Historie einer Anfrage oder eines Auftrags erfassen */
+export function NotizFormular({ anfrageId, auftragId }: { anfrageId?: string; auftragId?: string }) {
   const [schluessel, setSchluessel] = useState(0);
   const [z, aktion, laeuft] = useActionState<Ergebnis, FormData>(async (v, fd) => {
     const r = await notizAnlegen(v, fd);
@@ -247,7 +247,7 @@ export function NotizFormular({ anfrageId }: { anfrageId: string }) {
   }, {});
   return (
     <form key={schluessel} action={aktion} className="flex flex-col gap-2">
-      <input type="hidden" name="anfrage_id" value={anfrageId} />
+      {auftragId ? <input type="hidden" name="auftrag_id" value={auftragId} /> : <input type="hidden" name="anfrage_id" value={anfrageId} />}
       <Textarea name="text" aria-label="Notiz" placeholder="Notiz oder Gesprächsnotiz …" className="min-h-[64px]" />
       {z.fehler && <Meldung e={z} />}
       <div className="flex items-center justify-end gap-2">

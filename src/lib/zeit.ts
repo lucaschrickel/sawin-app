@@ -54,3 +54,10 @@ export function heuteBerlin(): string {
   const b = berlin(Date.now());
   return `${b.jahr}-${String(b.monat).padStart(2, "0")}-${String(b.tag).padStart(2, "0")}`;
 }
+
+const kurzFmt = new Intl.DateTimeFormat("de-DE", { timeZone: ZONE, weekday: "short", day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" });
+/** "Do., 12.11., 07:00" kompakt als "Do 12.11. 07:00" */
+export const kurzTermin = (iso: string) => {
+  const p = Object.fromEntries(kurzFmt.formatToParts(new Date(iso)).map((x) => [x.type, x.value]));
+  return `${p.weekday.replace(".", "")} ${p.day}.${p.month}. ${p.hour}:${p.minute}`;
+};

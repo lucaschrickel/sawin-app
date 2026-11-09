@@ -13,6 +13,7 @@ import { ladeBenutzerAuswahl, ladeZumKunden } from "@/lib/anfragen";
 import { ANFRAGE_STATUS_TEXT, ANFRAGE_STATUS_TON, type AnfrageStatus } from "@/lib/anfragen-status";
 import { pruefeSitzung } from "@/lib/auth/sitzung";
 import { ladeAufgabenZu } from "@/lib/aufgaben";
+import { AUFTRAG_PHASE_TEXT, AUFTRAG_PHASE_TON, type AuftragPhase } from "@/lib/status";
 import { AufgabenKarte } from "../../aufgaben/ui";
 import { datum } from "@/lib/format";
 import { heuteBerlin, tag } from "@/lib/zeit";
@@ -59,10 +60,11 @@ export default async function KundePage({ params }: PageProps<"/kunden/[id]">) {
             {zum.auftraege.length ? (
               <ul className="flex flex-col">
                 {zum.auftraege.map((a) => (
-                  <li key={a.id} className="flex items-baseline gap-3 border-t border-line-soft py-2 first:border-t-0">
-                    <span className="font-mono text-[13px]">{a.nummer}</span>
+                  <li key={a.id} className="flex items-center gap-3 border-t border-line-soft py-2 first:border-t-0">
+                    <Link href={`/auftraege/${a.id}`} className="font-mono text-[13px] font-medium hover:underline">{a.nummer}</Link>
                     <span className="flex-1">{a.titel}</span>
-                    <span className="text-xs text-muted-2">angelegt {tag(a.created_at)}</span>
+                    <Badge tone={AUFTRAG_PHASE_TON[a.phase as AuftragPhase]} dot>{AUFTRAG_PHASE_TEXT[a.phase as AuftragPhase]}</Badge>
+                    <span className="text-xs text-muted-2 max-sm:hidden">angelegt {tag(a.created_at)}</span>
                   </li>
                 ))}
               </ul>

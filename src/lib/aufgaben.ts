@@ -65,11 +65,12 @@ export async function ladeAufgaben(f: AufgabenFilter) {
 }
 
 /** Offene und zuletzt erledigte Aufgaben zu einem Kunden oder einer Anfrage (Detailseiten) */
-export async function ladeAufgabenZu(bezug: { kunde_id?: string; anfrage_id?: string }) {
+export async function ladeAufgabenZu(bezug: { kunde_id?: string; anfrage_id?: string; auftrag_id?: string }) {
   const { supabase } = await pruefeSitzung();
   let a = supabase.from("aufgabe").select(FELDER);
   if (bezug.kunde_id) a = a.eq("kunde_id", bezug.kunde_id);
   if (bezug.anfrage_id) a = a.eq("anfrage_id", bezug.anfrage_id);
+  if (bezug.auftrag_id) a = a.eq("auftrag_id", bezug.auftrag_id);
   const { data } = await a.order("status").order("faellig", { ascending: true, nullsFirst: false }).limit(100).returns<Roh[]>();
   return (data ?? []).map(zuAufgabe);
 }

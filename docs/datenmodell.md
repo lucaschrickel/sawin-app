@@ -87,7 +87,7 @@ Sonderregeln per Trigger (RLS kann Spaltenänderungen nicht prüfen):
 |---|---|
 | `anfrage` | Nummer, Kurzbezeichnung, Kunde (optional) oder Name/Telefon/E-Mail, Objekt, Beschreibung, Herkunft, Produkte, geschätzter Wert, Zuständig, Wiedervorlage, Aufmaß-Termin, interne Notiz, Status (neu, in_klaerung, aufmass, angebot_erstellen, angebot_versendet), Archiv (gewonnen/verloren) mit Grund, `nachtrag_zu` (Auftrag), entstandener Auftrag |
 | `anfrage_auftrag_anlegen()` | Funktion (Übergang bis zum Beleg-Modul): Auftrag aus einer Anfrage, Nummer aus dem AB-Nummernkreis, Anfrage wird „gewonnen“; nur einmal je Anfrage. Ein Aufmaß-Termin stellt eine neue Anfrage auf „Aufmaß“. Kunde ist Pflicht, „Zuständig“ ist ein Benutzer. |
-| `auftrag` | Nummer = AB-Nummer (eindeutig), Kunde, Anfrage, `nachtrag_zu`, Titel, Objekt, Phase (bestellung, montage, abnahme, baustelle_fertig, reklamation, abgeschlossen), Montagestatus, Herkunft, Zuständig, Produkte, Bemerkung, Liefertermin, „Noch nicht bestellt“, `warten_auf_kunde`, `stufe_datum` je Stufe (Lieferung, Abschlag bezahlt, Warten auf Kunde), Prüfhinweis, OneDrive-Ordner |
+| `auftrag` | Nummer = AB-Nummer (eindeutig), Kunde, Anfrage, `nachtrag_zu`, Titel, Objekt, Phase (bestellung, montage, abnahme, baustelle_fertig, reklamation, abgeschlossen), Montagestatus, Herkunft, Zuständig, Produkte, Bemerkung, Liefertermin, „Noch nicht bestellt“, `warten_auf_kunde`, `stufe_datum` je Stufe (Lieferung, Abschlag bezahlt, Warten auf Kunde), Prüfhinweis, OneDrive-Ordner, `abgeschlossen_am` (folgt der Phase). Löschen nur ohne Belege, Einsätze, Bestellzeilen, Zeitbuchungen, Service-Tickets und Nachträge; Bestellstatus, Montagetermin und Rechnungsstand werden abgeleitet |
 | `service_ticket` | Nummer `ST-JJ-NNNN`, Kunde, Ursprungsauftrag, Thema, Art, Abrechnung (garantie, kulanz, kostenpflichtig), Priorität, Problem, Wunschtermin, `vorab_datum`, Zuständig, Objekt, Status (neu, eingeplant, in_arbeit, erledigt, abgerechnet) |
 
 Bestellstatus, Liefer-KW, AB-Status und Pipeline-Stufe werden **abgeleitet**, nicht gespeichert (später als Views).
@@ -158,6 +158,8 @@ und danach wieder entfernt:
 5. **Soft Delete und Audit:** `DELETE` wird abgelehnt, `loeschen()` blendet die Zeile aus, das Audit-Log enthält
    Benutzer und Zeitpunkt jeder Änderung.
 6. **Konditionen:** ohne Recht leer, mit Recht lesbar.
+7. **Aufträge:** nur die Phasen aus CLAUDE.md, `abgeschlossen_am` folgt der Phase, Nummer unveränderlich, Löschen mit
+   Belegen oder Einsätzen gesperrt, ein leerer Auftrag wird nur markiert.
 
 ## Nicht in diesem Schritt
 

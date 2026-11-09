@@ -103,7 +103,7 @@ export async function anfrageLoeschen(id: string): Promise<Ergebnis> {
   redirect("/anfragen");
 }
 
-/** Notiz oder Telefonat in der Historie */
+/** Notiz oder Telefonat in der Historie einer Anfrage oder eines Auftrags */
 export async function notizAnlegen(_: Ergebnis, fd: FormData): Promise<Ergebnis> {
   const { supabase } = await pruefeSitzung();
   const inhalt = text(fd, "text");
@@ -111,7 +111,7 @@ export async function notizAnlegen(_: Ergebnis, fd: FormData): Promise<Ergebnis>
   const { error } = await supabase.from("historie_notiz").insert({
     art: text(fd, "art") === "telefonat" ? "telefonat" : "notiz",
     text: inhalt,
-    anfrage_id: text(fd, "anfrage_id"),
+    ...(text(fd, "auftrag_id") ? { auftrag_id: text(fd, "auftrag_id") } : { anfrage_id: text(fd, "anfrage_id") }),
   });
   if (error) return { fehler: "Die Notiz konnte nicht gespeichert werden." };
   refresh();

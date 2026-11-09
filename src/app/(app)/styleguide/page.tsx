@@ -12,7 +12,7 @@ import { Input } from "@/components/ui/field";
 import { Table, Td, Th, Tr } from "@/components/ui/table";
 import { resolveSlot } from "@/customers";
 import { eur } from "@/lib/format";
-import { AUFTRAG_STATUS, AUFTRAG_TONE, BELEG_STATUS_TONE } from "@/lib/status";
+import { AUFTRAG_PHASE_TEXT, AUFTRAG_PHASE_TON, AUFTRAG_PHASEN, BELEG_STATUS_TONE } from "@/lib/status";
 import { BestaetigenDemo, DialogDemo, FormDemo, FormularDialogDemo } from "./demo-interactive";
 
 export const metadata: Metadata = { title: "Designsystem" };
@@ -154,9 +154,9 @@ export default function StyleguidePage() {
         <Section title="Status" description="Auftragsstatus mit Punkt, Belegstatus ohne Punkt">
           <div className="flex flex-col gap-4">
             <div className="flex flex-wrap gap-2">
-              {AUFTRAG_STATUS.map((s) => (
-                <Badge key={s} tone={AUFTRAG_TONE[s]} dot>
-                  {s}
+              {AUFTRAG_PHASEN.map((s) => (
+                <Badge key={s} tone={AUFTRAG_PHASE_TON[s]} dot>
+                  {AUFTRAG_PHASE_TEXT[s]}
                 </Badge>
               ))}
             </div>

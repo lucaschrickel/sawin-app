@@ -52,7 +52,7 @@ const ALLE: NavGroup[] = [
     items: [
       { key: "belege", href: "/belege", label: "Alle Belege", icon: Files },
       { key: "angebote", href: "/belege/angebote", label: "Angebote", icon: FileText },
-      { key: "auftraege", href: "/auftraege", label: "Aufträge", icon: FileCheck2 },
+      { key: "auftraege", href: "/auftraege", label: "Aufträge", icon: FileCheck2, bereit: true },
       { key: "lieferscheine", href: "/belege/lieferscheine", label: "Lieferscheine", icon: Truck },
       { key: "abschlaege", href: "/belege/abschlaege", label: "Abschlagsrechnungen", icon: ReceiptText },
       { key: "rechnungen", href: "/belege/rechnungen", label: "Rechnungen", icon: Receipt },
