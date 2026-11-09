@@ -1,53 +1,15 @@
 "use client";
 
-import { Search, Trash2 } from "lucide-react";
-import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { useActionState, useEffect, useRef, useState, useTransition, type ReactNode } from "react";
+import { Trash2 } from "lucide-react";
+import { useActionState, useState, useTransition } from "react";
+import { ListenSuche, useListenParameter } from "@/components/app/listen-suche";
 import { Bestaetigen } from "@/components/ui/bestaetigen";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/field";
 import { konditionenSpeichern, kundeLoeschen, type Ergebnis } from "./aktionen";
 
-/** Ändert Suchparameter der Liste (ersetzt den Verlaufseintrag, Seite zurück auf 1). */
-function useListenParameter() {
-  const router = useRouter();
-  const pfad = usePathname();
-  const params = useSearchParams();
-  return (aenderung: Record<string, string>) => {
-    const neu = new URLSearchParams(params);
-    for (const [k, v] of Object.entries(aenderung)) {
-      if (v) neu.set(k, v);
-      else neu.delete(k);
-    }
-    neu.delete("seite");
-    const qs = neu.toString();
-    router.replace(qs ? `${pfad}?${qs}` : pfad, { scroll: false });
-  };
-}
-
 export function KundenSuche({ wert }: { wert: string }) {
-  const setze = useListenParameter();
-  const [q, setQ] = useState(wert);
-  const timer = useRef<number | undefined>(undefined);
-  useEffect(() => () => window.clearTimeout(timer.current), []);
-  return (
-    <label className="flex h-[42px] max-w-[380px] flex-[1_1_260px] items-center gap-2 rounded-full border border-line bg-surface px-3.5 text-muted-2">
-      <Search className="size-4" aria-hidden="true" />
-      <input
-        type="search"
-        aria-label="Kunden durchsuchen"
-        placeholder="Name, Nummer, Ort, Telefon …"
-        value={q}
-        onChange={(e) => {
-          const v = e.target.value;
-          setQ(v);
-          window.clearTimeout(timer.current);
-          timer.current = window.setTimeout(() => setze({ q: v.trim() }), 300);
-        }}
-        className="min-w-0 flex-1 bg-transparent text-ink outline-none"
-      />
-    </label>
-  );
+  return <ListenSuche wert={wert} label="Kunden durchsuchen" platzhalter="Name, Nummer, Ort, Telefon …" />;
 }
 
 export function HerkunftFilter({ wert, liste }: { wert: string; liste: string[] }) {
@@ -64,22 +26,6 @@ export function HerkunftFilter({ wert, liste }: { wert: string; liste: string[] 
         <option key={h} value={h}>{h}</option>
       ))}
     </select>
-  );
-}
-
-/** Tabellenzeile, die per Klick die Kundenseite öffnet (der Name ist zusätzlich ein Link für Tastatur und Screenreader). */
-export function KlickZeile({ href, children }: { href: string; children: ReactNode }) {
-  const router = useRouter();
-  return (
-    <tr
-      className="cursor-pointer hover:bg-surface-muted"
-      onClick={(e) => {
-        if ((e.target as HTMLElement).closest("a")) return;
-        router.push(href);
-      }}
-    >
-      {children}
-    </tr>
   );
 }
 

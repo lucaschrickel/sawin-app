@@ -5,7 +5,7 @@ import { redirect } from "next/navigation";
 import { getCustomer } from "@/customers";
 import { pruefeSitzung } from "@/lib/auth/sitzung";
 
-export type Ergebnis = { fehler?: string; ok?: boolean; felder?: Record<string, string> };
+export type Ergebnis = { fehler?: string; ok?: boolean; felder?: Record<string, string>; id?: string; name?: string };
 
 const text = (fd: FormData, n: string) => String(fd.get(n) ?? "").trim();
 const EMAIL = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
@@ -54,6 +54,8 @@ export async function kundeSpeichern(_: Ergebnis, fd: FormData): Promise<Ergebni
 
   const { data, error } = await supabase.rpc("kunde_speichern", { p_id: id, p_kunde: kunde, p_lieferadressen: lieferadressen });
   if (error || !data) return { fehler: "Der Kunde konnte nicht gespeichert werden. Bitte erneut versuchen." };
+  // Aus einem anderen Dialog heraus (z. B. Anfrage): neuen Kunden zurückgeben statt zur Kundenseite zu springen
+  if (!id && fd.get("_rueckgabe") === "1") return { ok: true, id: String(data), name: kunde.name };
   if (!id) redirect(`/kunden/${data}`);
   refresh();
   return { ok: true };

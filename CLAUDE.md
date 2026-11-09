@@ -62,6 +62,9 @@ Eine Codebasis, je Kunde eine eigene Instanz. Diese Datei gilt für jede Arbeit 
     Verweis `nachtrag_zu` und wird nach Annahme ein eigener Auftrag mit Verweis auf den Ursprungsauftrag.
   - **Auftragsnummer = AB-Nummer.** Der Auftrag entsteht ausschließlich beim Fertigstellen der AB und übernimmt
     deren Nummer. Es gibt keine eigenen Auftragsnummern mehr. Ein Auftrag hat genau eine AB.
+    **Übergang bis zum Beleg-Modul (Entscheidung 10.11.2026):** An der Anfrage legt „Gewonnen – Auftrag anlegen“ den
+    Auftrag an; er bekommt seine Nummer schon jetzt aus dem AB-Nummernkreis, und die spätere AB dieses Auftrags
+    übernimmt genau diese Nummer. Mit dem Beleg-Modul ersetzt „Auftragsbestätigung erstellen“ diesen Knopf.
   - **Belegketten:** Jedes Angebot beginnt eine Kette (`kette_id` = ID des ersten Belegs). Folgebelege übernehmen
     die `kette_id` ihres Vorgängers (`vorgaenger_id` in der App). Belege ohne Angebot (z. B. Rechnung am Ticket)
     bilden eine eigene Kette. Zwischen Lexware-Belegen (Rechnung → Gutschrift) setzt die App zusätzlich
@@ -219,13 +222,15 @@ Die Monteur-App kommt in Version 2.
 ### Anfragen
 
 - Werden händisch erfasst, nichts automatisch.
-- Felder: Kurzbezeichnung (Pflicht), Bestandskunde oder Name, Telefon und E-Mail, Objekt / Lieferadresse,
-  Beschreibung, Herkunft, Produkte, geschätzter Wert, Zuständig, Wiedervorlage, Aufmaß-Termin, interne Notiz, Status.
+- Felder: Kurzbezeichnung (Pflicht), **Kunde (Pflicht)**, Objekt / Lieferadresse (Auswahl aus den Adressen des Kunden,
+  freie Eingabe möglich), Beschreibung, Herkunft (aus dem Kunden vorbelegt), Produkte, geschätzter Wert, Zuständig
+  (Benutzer, vorbelegt mit dem Erfassenden), Wiedervorlage, Aufmaß-Termin, interne Notiz, Status.
   Ein gesetzter Aufmaß-Termin stellt eine neue Anfrage auf „Aufmaß“ und erscheint im Kalender als Termin der Art
   Aufmaß (Dauer 90 Minuten). Die Anfrageseite zeigt die Termine der Anfrage.
-- Eine Anfrage ohne Bestandskunden bekommt ihren Kunden, sobald aus ihr ein Angebot entsteht (z. B. „In Angebot
-  übernehmen“ am Aufmaß): Die App legt ihn aus Name, Telefon, E-Mail und Objekt der Anfrage an (Typ Privat) und
-  vermerkt das in der Historie.
+- Jede Anfrage gehört zu einem Kunden (Entscheidung 10.11.2026). Ein neuer Interessent wird direkt im Anfrage-Dialog
+  über „Neuer Kunde“ angelegt (Kundenmaske als Dialog).
+- „Zuständig“ ist in Anfragen, Aufgaben, Aufträgen und Service-Tickets ein Benutzer (Büro), kein Mitarbeiter.
+- Eine Anfrage mit Auftrag oder Belegen lässt sich nicht löschen; eine gewonnene Anfrage mit Auftrag nicht zurücksetzen.
 - Ablauf: Anfrage → Aufmaß/Besichtigung → ein oder mehrere Angebote (Varianten) → Kunde nimmt an →
   „Auftragsbestätigung erstellen“ → AB fertigstellen → **Auftrag entsteht** (Nummer = AB-Nummer).
   Ein Angebot fertigzustellen legt nie einen Auftrag an.

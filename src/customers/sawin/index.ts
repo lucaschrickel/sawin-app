@@ -8,6 +8,7 @@ export const sawin: CustomerConfig = {
   brandTagline: "Bauelemente",
   Logo: SawinLogo,
   locale: "de-DE",
+  produkte: ["Haustür", "Fenster", "Garagentor", "Rollläden", "Insektenschutz"],
   herkunft: ["Website", "Google", "Empfehlung", "Instagram", "Persönliches Netzwerk", "Direktansprache", "Sonstiges"],
   // Sonderkomponenten: hier Basis-Bausteine gezielt ersetzen, z. B.
   // overrides: { PipelineCard: SawinPipelineCard },

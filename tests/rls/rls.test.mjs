@@ -306,6 +306,56 @@ describe("Kunden", () => {
   });
 });
 
+describe("Anfragen", () => {
+  let anfrage;
+  it("ein Aufmaß-Termin stellt eine neue Anfrage auf „Aufmaß“", async () => {
+    const { data, error } = await buero.client
+      .from("anfrage")
+      .insert({ titel: `RLS-Anfrage ${lauf}`, kunde_id: daten.kunde.id, aufmass_termin: new Date(Date.now() + 864e5).toISOString() })
+      .select()
+      .single();
+    assert.ifError(error);
+    angelegt.push(["anfrage", data.id]);
+    assert.equal(data.status, "aufmass");
+    assert.equal(data.created_by, buero.id);
+    anfrage = data;
+  });
+
+  it("ohne Kunde gibt es keine Anfrage", async () => {
+    const { error } = await buero.client.from("anfrage").insert({ titel: "ohne Kunde" });
+    assert.ok(error, "Anfrage ohne Kunde angelegt");
+  });
+
+  it("verloren nur mit Grund", async () => {
+    const { error } = await buero.client.from("anfrage").update({ archiv: "verloren" }).eq("id", anfrage.id);
+    assert.ok(error, "verloren ohne Grund möglich");
+  });
+
+  it("Gewonnen – Auftrag anlegen: AB-Nummer, Anfrage gewonnen, nur einmal", async () => {
+    const { data: auftragId, error } = await buero.client.rpc("anfrage_auftrag_anlegen", { p_anfrage_id: anfrage.id });
+    assert.ifError(error);
+    angelegt.push(["auftrag", auftragId]);
+    const { data: a } = await service.from("auftrag").select("nummer, kunde_id, anfrage_id, titel, created_by").eq("id", auftragId).single();
+    assert.match(a.nummer, /^AB2\d{2}\d{4}$/, `Auftragsnummer aus dem AB-Nummernkreis: ${a.nummer}`);
+    assert.equal(a.kunde_id, daten.kunde.id);
+    assert.equal(a.titel, anfrage.titel);
+    assert.equal(a.created_by, buero.id);
+    const { data: q } = await service.from("anfrage").select("archiv, archiviert_am").eq("id", anfrage.id).single();
+    assert.equal(q.archiv, "gewonnen");
+    assert.ok(q.archiviert_am);
+    const zweiter = await buero.client.rpc("anfrage_auftrag_anlegen", { p_anfrage_id: anfrage.id });
+    assert.equal(zweiter.error?.code, "23505");
+  });
+
+  it("eine gewonnene Anfrage mit Auftrag lässt sich weder zurücksetzen noch löschen", async () => {
+    const zurueck = await buero.client.from("anfrage").update({ archiv: null }).eq("id", anfrage.id);
+    assert.ok(zurueck.error, "gewonnene Anfrage zurückgesetzt");
+    const loeschen = await buero.client.rpc("loeschen", { p_tabelle: "anfrage", p_id: anfrage.id });
+    assert.equal(loeschen.error?.code, "23503");
+    assert.match(loeschen.error.message, /Auftrag/);
+  });
+});
+
 describe("Soft Delete und Audit-Log", () => {
   let aufgabe;
   it("echtes Löschen ist gesperrt", async () => {

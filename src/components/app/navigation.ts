@@ -44,7 +44,7 @@ const ALLE: NavGroup[] = [
     label: "Kunden & Anfragen",
     items: [
       { key: "kunden", href: "/kunden", label: "Kunden", icon: Users, bereit: true },
-      { key: "anfragen", href: "/anfragen", label: "Anfragen", icon: Inbox },
+      { key: "anfragen", href: "/anfragen", label: "Anfragen", icon: Inbox, bereit: true },
     ],
   },
   {

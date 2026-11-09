@@ -1,12 +1,20 @@
 import type { Metadata } from "next";
 import { Lock } from "lucide-react";
 import { notFound } from "next/navigation";
-import type { ReactNode } from "react";
+import Link from "next/link";
+import { KlickZeile } from "@/components/app/klick-zeile";
 import { PageHeader } from "@/components/app/page-header";
+import { Angabe, Karte } from "@/components/app/info-karte";
 import { Shell } from "@/components/app/shell";
 import { Badge } from "@/components/ui/badge";
+import { Table, Td, Th } from "@/components/ui/table";
 import { getCustomer } from "@/customers";
+import { ladeBenutzerAuswahl, ladeZumKunden } from "@/lib/anfragen";
+import { ANFRAGE_STATUS_TEXT, ANFRAGE_STATUS_TON, type AnfrageStatus } from "@/lib/anfragen-status";
+import { pruefeSitzung } from "@/lib/auth/sitzung";
 import { datum } from "@/lib/format";
+import { tag } from "@/lib/zeit";
+import { AnfrageDialog } from "../../anfragen/anfrage-dialog";
 import { adresseText, ladeKunde } from "@/lib/kunden";
 import { KundeDialog } from "../kunde-dialog";
 import { KonditionenFormular, KundeLoeschen } from "../ui";
@@ -15,8 +23,9 @@ export const metadata: Metadata = { title: "Kunde" };
 
 export default async function KundePage({ params }: PageProps<"/kunden/[id]">) {
   const { id } = await params;
-  const daten = await ladeKunde(id);
+  const [daten, zum, benutzer, { benutzer: ich }] = await Promise.all([ladeKunde(id), ladeZumKunden(id), ladeBenutzerAuswahl(), pruefeSitzung()]);
   if (!daten) notFound();
+  const c = getCustomer();
   const { kunde: k, lieferadressen, konditionen } = daten;
   const aktiv = lieferadressen.filter((la) => !la.alt_seit);
   const alt = lieferadressen.filter((la) => la.alt_seit);
@@ -35,7 +44,8 @@ export default async function KundePage({ params }: PageProps<"/kunden/[id]">) {
         }
         actions={
           <>
-            <KundeDialog kunde={k} lieferadressen={lieferadressen} herkunftListe={getCustomer().herkunft} />
+            <AnfrageDialog kunde={{ id: k.id, name: k.name }} benutzer={benutzer} ichId={ich.id} herkunftListe={c.herkunft} produkteListe={c.produkte} />
+            <KundeDialog kunde={k} lieferadressen={lieferadressen} herkunftListe={c.herkunft} />
             <KundeLoeschen id={k.id} name={k.name} />
           </>
         }
@@ -43,9 +53,52 @@ export default async function KundePage({ params }: PageProps<"/kunden/[id]">) {
 
       <div className="grid items-start gap-4 lg:grid-cols-[minmax(0,1fr)_360px]">
         <div className="flex min-w-0 flex-col gap-4">
-          <Bereich titel="Aufträge" leer="Noch keine Aufträge. Ein Auftrag entsteht mit dem Fertigstellen einer Auftragsbestätigung." />
+          <Karte titel="Aufträge" rechts={<span className="text-sm text-muted-2 tabular">{zum.auftraege.length}</span>}>
+            {zum.auftraege.length ? (
+              <ul className="flex flex-col">
+                {zum.auftraege.map((a) => (
+                  <li key={a.id} className="flex items-baseline gap-3 border-t border-line-soft py-2 first:border-t-0">
+                    <span className="font-mono text-[13px]">{a.nummer}</span>
+                    <span className="flex-1">{a.titel}</span>
+                    <span className="text-xs text-muted-2">angelegt {tag(a.created_at)}</span>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p className="text-sm text-muted">Noch keine Aufträge.</p>
+            )}
+          </Karte>
           <Bereich titel="Belege" leer="Noch keine Belege." />
-          <Bereich titel="Anfragen" leer="Noch keine Anfragen." />
+          <Karte titel="Anfragen" rechts={<span className="text-sm text-muted-2 tabular">{zum.anfragen.length}</span>}>
+            {zum.anfragen.length ? (
+              <Table>
+                <thead>
+                  <tr>
+                    <Th>Anfrage</Th>
+                    <Th>Status</Th>
+                    <Th>Eingang</Th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {zum.anfragen.map((q) => (
+                    <KlickZeile key={q.id} href={`/anfragen/${q.id}`}>
+                      <Td><Link href={`/anfragen/${q.id}`} className="font-medium hover:underline">{q.titel}</Link></Td>
+                      <Td>
+                        {q.archiv ? (
+                          <Badge tone={q.archiv === "gewonnen" ? "green" : "red"}>{q.archiv === "gewonnen" ? "Gewonnen" : "Verloren"}</Badge>
+                        ) : (
+                          <Badge tone={ANFRAGE_STATUS_TON[q.status as AnfrageStatus]} dot>{ANFRAGE_STATUS_TEXT[q.status as AnfrageStatus]}</Badge>
+                        )}
+                      </Td>
+                      <Td className="whitespace-nowrap">{tag(q.eingang)}</Td>
+                    </KlickZeile>
+                  ))}
+                </tbody>
+              </Table>
+            ) : (
+              <p className="text-sm text-muted">Noch keine Anfragen.</p>
+            )}
+          </Karte>
           <Bereich titel="Service-Tickets" leer="Noch keine Service-Tickets." />
         </div>
 
@@ -110,31 +163,11 @@ export default async function KundePage({ params }: PageProps<"/kunden/[id]">) {
   );
 }
 
-function Karte({ titel, rechts, children }: { titel: string; rechts?: ReactNode; children: ReactNode }) {
-  return (
-    <section className="rounded-lg border border-line-soft bg-surface px-5 py-4">
-      <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-        <h2 className="text-lg font-semibold tracking-[-0.01em]">{titel}</h2>
-        {rechts}
-      </div>
-      {children}
-    </section>
-  );
-}
 
 function Bereich({ titel, leer }: { titel: string; leer: string }) {
   return (
     <Karte titel={titel} rechts={<span className="text-sm text-muted-2 tabular">0</span>}>
       <p className="text-sm text-muted">{leer}</p>
     </Karte>
-  );
-}
-
-function Angabe({ name, children }: { name: string; children: ReactNode }) {
-  return (
-    <div>
-      <dt className="text-xs font-medium text-muted-2">{name}</dt>
-      <dd className="mt-0.5">{children}</dd>
-    </div>
   );
 }

@@ -15,7 +15,8 @@
     "auth:push": "node scripts/supabase-config.mjs push",
     "admin:einladen": "node scripts/admin-einladen.mjs",
     "test:anmeldung": "node tests/e2e/anmeldung.e2e.mjs",
-    "test:kunden": "node tests/e2e/kunden.e2e.mjs"
+    "test:kunden": "node tests/e2e/kunden.e2e.mjs",
+    "test:anfragen": "node tests/e2e/anfragen.e2e.mjs"
   },
   "dependencies": {
     "@fontsource-variable/inter": "^5.3.0",

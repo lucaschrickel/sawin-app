@@ -90,6 +90,7 @@ Prüfung im Browser (nur gegen Staging; App vorher bauen und starten):
 npm run build && npx next start -p 3100
 APP_URL=http://localhost:3100 npm run test:anmeldung
 APP_URL=http://localhost:3100 npm run test:kunden     # Modul Kunden mit vorübergehendem Test-Admin
+APP_URL=http://localhost:3100 npm run test:anfragen   # Modul Anfragen
 ```
 
 **Vor der Einladung von Mitarbeitern:** Der eingebaute E-Mail-Versand von Supabase schickt nur an Mitglieder der

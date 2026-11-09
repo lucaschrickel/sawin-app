@@ -23,7 +23,7 @@ try {
   pruefe("Anmeldung führt zur Kundenliste", await b.warte("location.pathname === '/kunden'"), await b.pfad());
   await b.enthaelt("Kunden");
   const nav = await b.js("[...document.querySelectorAll('aside a[href]')].map((a) => a.getAttribute('href'))");
-  pruefe("Navigation zeigt nur fertige Module", nav.includes("/kunden") && nav.includes("/einstellungen") && !nav.includes("/anfragen") && !nav.includes("/montageplan"), nav.join(" "));
+  pruefe("Navigation zeigt nur fertige Module", nav.includes("/kunden") && nav.includes("/einstellungen") && !nav.includes("/montageplan") && !nav.includes("/belege"), nav.join(" "));
 
   // 1. Anlegen mit Lieferadresse
   await b.klickText("button", "Neuer Kunde");

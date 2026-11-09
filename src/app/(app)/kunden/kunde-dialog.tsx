@@ -22,10 +22,18 @@ const zuZeile = (la: Lieferadresse): LaZeile => ({
   alt: !!la.alt_seit,
 });
 
-type Props = { kunde?: Kunde; lieferadressen?: Lieferadresse[]; herkunftListe: string[] };
+type Props = {
+  kunde?: Kunde;
+  lieferadressen?: Lieferadresse[];
+  herkunftListe: string[];
+  /** Neuer Kunde aus einem anderen Dialog heraus: wird zurückgegeben statt zur Kundenseite zu springen */
+  onAngelegt?: (k: { id: string; name: string }) => void;
+  /** eigener Auslöser statt der Standard-Knöpfe */
+  ausloeser?: ReactNode;
+};
 
 /** Kunde anlegen oder bearbeiten (Kundenmaske als Dialog, auch für den Beleg-Editor gedacht). */
-export function KundeDialog({ kunde, lieferadressen = [], herkunftListe }: Props) {
+export function KundeDialog({ kunde, lieferadressen = [], herkunftListe, onAngelegt, ausloeser }: Props) {
   const [offen, setOffen] = useState(false);
   const [geaendert, setGeaendert] = useState(false);
   const [nachfrage, setNachfrage] = useState(false);
@@ -48,7 +56,7 @@ export function KundeDialog({ kunde, lieferadressen = [], herkunftListe }: Props
   return (
     <Dialog open={offen} onOpenChange={oeffnenAendern}>
       <DialogTrigger asChild>
-        {kunde ? (
+        {ausloeser ?? (kunde ? (
           <Button>
             <Pencil className="size-[15px]" />
             Bearbeiten
@@ -58,7 +66,7 @@ export function KundeDialog({ kunde, lieferadressen = [], herkunftListe }: Props
             <Plus className="size-[15px]" strokeWidth={2.2} />
             Neuer Kunde
           </Button>
-        )}
+        ))}
       </DialogTrigger>
       <DialogContent title={kunde ? "Kunde bearbeiten" : "Neuer Kunde"} wide>
         {nachfrage && (
@@ -74,7 +82,11 @@ export function KundeDialog({ kunde, lieferadressen = [], herkunftListe }: Props
           lieferadressen={lieferadressen}
           herkunftListe={herkunftListe}
           onAenderung={() => setGeaendert(true)}
-          onGespeichert={schliessen}
+          onGespeichert={(e) => {
+            if (e.id && onAngelegt) onAngelegt({ id: e.id, name: e.name ?? "" });
+            schliessen();
+          }}
+          rueckgabe={!!onAngelegt}
           onAbbrechen={() => oeffnenAendern(false)}
         />
       </DialogContent>
@@ -89,7 +101,8 @@ function KundeFormular({
   onAenderung,
   onGespeichert,
   onAbbrechen,
-}: Props & { lieferadressen: Lieferadresse[]; onAenderung: () => void; onGespeichert: () => void; onAbbrechen: () => void }) {
+  rueckgabe,
+}: Props & { lieferadressen: Lieferadresse[]; onAenderung: () => void; onGespeichert: (e: Ergebnis) => void; onAbbrechen: () => void; rueckgabe: boolean }) {
   const [z, aktion, laeuft] = useActionState<Ergebnis, FormData>(kundeSpeichern, {});
   const [typ, setTyp] = useState<"privat" | "firma">(kunde?.typ ?? "privat");
   const [zeilen, setZeilen] = useState<LaZeile[]>(() => lieferadressen.map(zuZeile));
@@ -97,7 +110,7 @@ function KundeFormular({
   const f = z.felder ?? {};
 
   useEffect(() => {
-    if (z.ok) onGespeichert();
+    if (z.ok) onGespeichert(z);
   }, [z, onGespeichert]);
 
   const aktiv = zeilen.filter((r) => !r.alt);
@@ -143,6 +156,7 @@ function KundeFormular({
   return (
     <form action={aktion} onInput={onAenderung} className="flex flex-col gap-4">
       {kunde && <input type="hidden" name="id" value={kunde.id} />}
+      {rueckgabe && <input type="hidden" name="_rueckgabe" value="1" />}
       {z.fehler && <p role="alert" className="rounded-md bg-tone-red-bg px-3.5 py-2.5 text-sm text-tone-red-fg">{z.fehler}</p>}
 
       <Zeile>

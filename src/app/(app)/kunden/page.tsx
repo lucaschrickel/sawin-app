@@ -7,7 +7,8 @@ import { getCustomer } from "@/customers";
 import { cn } from "@/lib/cn";
 import { KUNDEN_JE_SEITE, ladeKundenListe, type ListenFilter } from "@/lib/kunden";
 import { KundeDialog } from "./kunde-dialog";
-import { HerkunftFilter, KlickZeile, KundenSuche } from "./ui";
+import { KlickZeile } from "@/components/app/klick-zeile";
+import { HerkunftFilter, KundenSuche } from "./ui";
 
 export const metadata: Metadata = { title: "Kunden" };
 
