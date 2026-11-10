@@ -58,7 +58,7 @@ try {
   await b.tippe("[role=dialog] [name=taetigkeit]", "Fenster eingesetzt");
   pruefe("Dialog rechnet 8,5 h (7–16 Uhr, 30 min Pause)", await b.warte(`document.querySelector('[role=dialog]')?.innerText.includes("8,5 h")`));
   await b.klickText("[role=dialog] button", "Eintragen");
-  pruefe("Montage ohne Auftrag abgelehnt", await b.warte(`document.querySelector('[role=dialog] [role=alert]')?.innerText.includes("Auftrag wählen")`));
+  pruefe("Montage ohne Auftrag abgelehnt", await b.warte(`document.querySelector("[role=dialog] [role=alert]")?.innerText.includes("Auftrag oder ein Ticket wählen")`));
   pruefe("Eingaben bleiben nach dem Fehler erhalten", (await b.js(`${sichtbar("[role=dialog] [name=taetigkeit]")}.value`)) === "Fenster eingesetzt" && (await b.js(`${sichtbar("[role=dialog] [name=datum]")}.value`)) === WOCHE);
   await b.tippe("[role=dialog] input[aria-label='Auftrag suchen']", `Zeitkunde ${lauf}`);
   await b.klickText("#auftrag-treffer button span", auftrag.nummer);

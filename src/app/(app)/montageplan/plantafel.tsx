@@ -57,7 +57,7 @@ type Props = {
   /** zusätzliche Zeilen oberhalb der Monteure (z. B. „Terminierbar“ im Service-Plan) */
   planungszeilen?: (hilfen: { breite: number; n: number; neuerEinsatz: (v: DialogVorlage) => void; setMeldung: (e: Ergebnis) => void }) => ReactNode;
   /** Ziel für das Ablegen aus einer Planungszeile auf eine Monteur-Zeile */
-  beiAblegen?: (daten: string, monteurId: string, slot: number) => void;
+  beiAblegen?: (daten: string, monteurId: string, slot: number) => Promise<Ergebnis | void>;
 };
 
 export function Plantafel(p: Props) {
@@ -358,7 +358,12 @@ export function Plantafel(p: Props) {
                       ? (ev) => {
                           ev.preventDefault();
                           setAblageZiel(null);
-                          p.beiAblegen!(ev.dataTransfer.getData("text/plain"), m.id, slotBei(ev.clientX, ev.currentTarget));
+                          const daten = ev.dataTransfer.getData("text/plain");
+                          const slot = slotBei(ev.clientX, ev.currentTarget);
+                          starten(async () => {
+                            const r = await p.beiAblegen!(daten, m.id, slot);
+                            if (r) setMeldung(r.fehler ? { fehler: r.fehler } : r.warnung ? { warnung: r.warnung } : {});
+                          });
                         }
                       : undefined
                   }

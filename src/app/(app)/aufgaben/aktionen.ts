@@ -26,6 +26,7 @@ export async function aufgabeSpeichern(_: Ergebnis, fd: FormData): Promise<Ergeb
     kunde_id: bezugArt === "kunde" ? bezugId : null,
     anfrage_id: bezugArt === "anfrage" ? bezugId : null,
     auftrag_id: bezugArt === "auftrag" ? bezugId : null,
+    ticket_id: bezugArt === "ticket" ? bezugId : null,
   };
   const felder: Record<string, string> = {};
   if (!daten.titel) felder.titel = "Bitte beschreiben, was zu tun ist.";
@@ -59,19 +60,21 @@ export async function aufgabeLoeschen(id: string): Promise<Ergebnis> {
   return { ok: true };
 }
 
-/** Bezug suchen: Kunden (Name), Anfragen (Titel), Aufträge (Nummer, Titel) – je höchstens fünf */
+/** Bezug suchen: Kunden (Name), Anfragen (Titel), Aufträge (Nummer, Titel), Service-Tickets (Nummer, Thema) – je höchstens fünf */
 export async function bezugSuchen(q: string): Promise<Bezug[]> {
   const { supabase } = await pruefeSitzung();
   const s = suchbegriff(q);
   if (s.length < 2) return [];
-  const [k, a, au] = await Promise.all([
+  const [k, a, au, st] = await Promise.all([
     supabase.from("kunde").select("id, name").or(`name.ilike.%${s}%,nummer.ilike.%${s}%`).order("name").limit(5),
     supabase.from("anfrage").select("id, titel").ilike("titel", `%${s}%`).order("eingang", { ascending: false }).limit(5),
     supabase.from("auftrag").select("id, nummer, titel").or(`nummer.ilike.%${s}%,titel.ilike.%${s}%`).order("created_at", { ascending: false }).limit(5),
+    supabase.from("service_ticket").select("id, nummer, thema").or(`nummer.ilike.%${s}%,thema.ilike.%${s}%`).order("nummer", { ascending: false }).limit(5),
   ]);
   return [
     ...(k.data ?? []).map((x) => ({ art: "kunde" as const, id: x.id, text: x.name })),
     ...(a.data ?? []).map((x) => ({ art: "anfrage" as const, id: x.id, text: x.titel })),
     ...(au.data ?? []).map((x) => ({ art: "auftrag" as const, id: x.id, text: `${x.nummer} · ${x.titel}` })),
+    ...(st.data ?? []).map((x) => ({ art: "ticket" as const, id: x.id, text: `${x.nummer} · ${x.thema}` })),
   ];
 }

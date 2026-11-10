@@ -13,7 +13,7 @@ import type { Monteur, Plan, TafelEinsatz, TafelFahrzeug } from "@/lib/montagepl
 import { bezugHref } from "@/lib/montageplan-text";
 import { auftraegeSuchen, einsatzLoeschen, einsatzSpeichern, monteurSpeichern, ticketsSuchen, type AuftragTreffer, type Ergebnis } from "./aktionen";
 
-export type AuftragWahl = { id: string; nummer: string; titel: string; kunde: string };
+export type AuftragWahl = { id: string; nummer: string; titel: string; kunde: string; phase?: string };
 /** Gewählter Bezug eines Einsatzes: Auftrag (Montageplan) oder Service-Ticket (Service-Plan) */
 export type BezugWahl = AuftragWahl & { art: "auftrag" | "ticket" };
 export type DialogVorlage = { einsatz: TafelEinsatz } | { beginn: string; ende: string; monteure: string[]; bezug?: BezugWahl };

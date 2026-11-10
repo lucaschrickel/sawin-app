@@ -63,8 +63,8 @@ export const NAVIGATION: NavGroup[] = [
     label: "Montage & Service",
     items: [
       { key: "montageplan", href: "/montageplan", label: "Montageplan", icon: Calendar, bereit: true },
-      { key: "service", href: "/service", label: "Service-Tickets", icon: Wrench, zaehler: "service" },
-      { key: "serviceplan", href: "/serviceplan", label: "Service-Plan", icon: Calendar },
+      { key: "service", href: "/service", label: "Service-Tickets", icon: Wrench, bereit: true, zaehler: "service" },
+      { key: "serviceplan", href: "/serviceplan", label: "Service-Plan", icon: Calendar, bereit: true },
     ],
   },
   {

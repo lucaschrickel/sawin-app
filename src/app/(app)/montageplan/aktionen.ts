@@ -91,7 +91,7 @@ export async function einsatzLoeschen(id: string): Promise<Ergebnis> {
   return { ok: true };
 }
 
-export type AuftragTreffer = { id: string; nummer: string; titel: string; kunde: string };
+export type AuftragTreffer = { id: string; nummer: string; titel: string; kunde: string; phase?: string };
 
 /** Auftragssuche (Einsatz- und Zeit-Dialog): Nummer, Titel, Objekt oder Kunde; abgeschlossene nur auf Wunsch */
 export async function auftraegeSuchen(q: string, auchAbgeschlossene = false): Promise<AuftragTreffer[]> {
@@ -101,14 +101,14 @@ export async function auftraegeSuchen(q: string, auchAbgeschlossene = false): Pr
   const { data: kunden } = await supabase.from("kunde").select("id").ilike("name", `%${s}%`).limit(50);
   const bedingungen = ["nummer", "titel", "objekt"].map((f) => `${f}.ilike.%${s}%`);
   if (kunden?.length) bedingungen.push(`kunde_id.in.(${kunden.map((k) => k.id).join(",")})`);
-  let a = supabase.from("auftrag").select("id, nummer, titel, kunde:kunde_id(name)");
+  let a = supabase.from("auftrag").select("id, nummer, titel, phase, kunde:kunde_id(name)");
   if (!auchAbgeschlossene) a = a.neq("phase", "abgeschlossen");
   const { data } = await a
     .or(bedingungen.join(","))
     .order("nummer", { ascending: false })
     .limit(8)
-    .returns<{ id: string; nummer: string; titel: string; kunde: { name: string } | null }[]>();
-  return (data ?? []).map((a) => ({ id: a.id, nummer: a.nummer, titel: a.titel, kunde: a.kunde?.name ?? "" }));
+    .returns<{ id: string; nummer: string; titel: string; phase: string; kunde: { name: string } | null }[]>();
+  return (data ?? []).map((a) => ({ id: a.id, nummer: a.nummer, titel: a.titel, kunde: a.kunde?.name ?? "", phase: a.phase }));
 }
 
 /** Ticketsuche im Einsatz-Dialog des Service-Plans: Nummer, Thema, Objekt oder Kunde; nur offene Tickets */

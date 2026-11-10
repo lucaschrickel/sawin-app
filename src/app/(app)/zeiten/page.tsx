@@ -25,19 +25,24 @@ export default async function ZeitenPage({ searchParams }: PageProps<"/zeiten">)
   const zr = zeitraumAus(eins(sp.zeitraum), eins(sp.ab), heute);
   const mitarbeiter = UUID.test(eins(sp.mitarbeiter)) ? eins(sp.mitarbeiter) : "";
   const auftrag = UUID.test(eins(sp.auftrag)) ? eins(sp.auftrag) : "";
+  const ticket = UUID.test(eins(sp.ticket)) ? eins(sp.ticket) : "";
   const freigabe = eins(sp.freigabe) === "offen" ? "offen" : eins(sp.freigabe) === "freigegeben" ? "freigegeben" : "";
   const { supabase } = await pruefeSitzung();
   const [liste, dialog, alleMitarbeiter, auftragInfo] = await Promise.all([
-    ladeBuchungen({ von: zr.von, bis: zr.bis, mitarbeiter, auftrag, freigabe }),
+    ladeBuchungen({ von: zr.von, bis: zr.bis, mitarbeiter, auftrag, ticket, freigabe }),
     ladeZeitDialogDaten(),
     supabase.from("mitarbeiter").select("id, name").order("name"),
-    auftrag ? supabase.from("auftrag").select("id, nummer, kunde:kunde_id(name)").eq("id", auftrag).maybeSingle<{ id: string; nummer: string; kunde: { name: string } | null }>() : Promise.resolve({ data: null }),
+    auftrag
+      ? supabase.from("auftrag").select("id, nummer, kunde:kunde_id(name)").eq("id", auftrag).maybeSingle<{ id: string; nummer: string; kunde: { name: string } | null }>()
+      : ticket
+        ? supabase.from("service_ticket").select("id, nummer, kunde:kunde_id(name)").eq("id", ticket).maybeSingle<{ id: string; nummer: string; kunde: { name: string } | null }>()
+        : Promise.resolve({ data: null }),
   ]);
   const daten = { ...dialog, heute };
 
   const href = (aenderung: Record<string, string>) => {
     const p = new URLSearchParams();
-    const werte = { ansicht: ansicht === "buchungen" ? "" : ansicht, zeitraum: zr.art === "woche" ? "" : zr.art, ab: eins(sp.ab), mitarbeiter, auftrag, freigabe, ...aenderung };
+    const werte = { ansicht: ansicht === "buchungen" ? "" : ansicht, zeitraum: zr.art === "woche" ? "" : zr.art, ab: eins(sp.ab), mitarbeiter, auftrag, ticket, freigabe, ...aenderung };
     for (const [k, v] of Object.entries(werte)) if (v) p.set(k, v);
     const qs = p.toString();
     return qs ? `/zeiten?${qs}` : "/zeiten";
@@ -84,8 +89,8 @@ export default async function ZeitenPage({ searchParams }: PageProps<"/zeiten">)
             <Link replace scroll={false} href={href({ freigabe: "freigegeben" })} className={chip(freigabe === "freigegeben")}>Freigegeben</Link>
           </nav>
           {auftragInfo.data && (
-            <Link replace scroll={false} href={href({ auftrag: "" })} className="flex items-center gap-1.5 rounded-full bg-surface-sunken px-3 py-1.5 text-sm" aria-label="Auftragsfilter entfernen">
-              Auftrag <span className="font-mono">{auftragInfo.data.nummer}</span> {auftragInfo.data.kunde?.name}
+            <Link replace scroll={false} href={href({ auftrag: "", ticket: "" })} className="flex items-center gap-1.5 rounded-full bg-surface-sunken px-3 py-1.5 text-sm" aria-label="Auftragsfilter entfernen">
+              {ticket ? "Ticket" : "Auftrag"} <span className="font-mono">{auftragInfo.data.nummer}</span> {auftragInfo.data.kunde?.name}
               <X className="size-3.5" />
             </Link>
           )}
@@ -145,7 +150,7 @@ export default async function ZeitenPage({ searchParams }: PageProps<"/zeiten">)
             <Table className="min-w-[760px]">
               <thead>
                 <tr>
-                  <Th className="pl-4">Auftrag</Th>
+                  <Th className="pl-4">Auftrag / Ticket</Th>
                   <Th className="text-right">Stunden</Th>
                   <Th className="pr-4">nach Mitarbeiter</Th>
                 </tr>
@@ -156,7 +161,7 @@ export default async function ZeitenPage({ searchParams }: PageProps<"/zeiten">)
                     <Td className="pl-4">
                       {a.auftrag ? (
                         <>
-                          <Link href={`/auftraege/${a.auftrag.id}`} className="font-mono font-medium hover:underline">{a.auftrag.nummer}</Link>
+                          <Link href={a.auftrag.art === "auftrag" ? `/auftraege/${a.auftrag.id}` : `/service/${a.auftrag.id}`} className="font-mono font-medium hover:underline">{a.auftrag.nummer}</Link>
                           <div className="text-sm text-muted">{[a.auftrag.kunde, a.auftrag.titel].filter(Boolean).join(" · ")}</div>
                         </>
                       ) : (
@@ -164,7 +169,7 @@ export default async function ZeitenPage({ searchParams }: PageProps<"/zeiten">)
                       )}
                     </Td>
                     <Td className="text-right font-mono text-[13px] font-semibold">
-                      {a.auftrag ? <Link href={href({ ansicht: "", auftrag: a.auftrag.id })} className="hover:underline">{stundenText(a.stunden)}</Link> : stundenText(a.stunden)}
+                      {a.auftrag ? <Link href={href({ ansicht: "", auftrag: a.auftrag.art === "auftrag" ? a.auftrag.id : "", ticket: a.auftrag.art === "ticket" ? a.auftrag.id : "" })} className="hover:underline">{stundenText(a.stunden)}</Link> : stundenText(a.stunden)}
                     </Td>
                     <Td className="pr-4 text-sm text-ink-3">{a.jeMitarbeiter.map((m) => `${m.name} ${stundenText(m.stunden)}`).join(" · ")}</Td>
                   </tr>

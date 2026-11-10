@@ -354,7 +354,7 @@ function BezugAuswahl({ onWahl, fehler }: { onWahl: (b: Bezug) => void; fehler?:
   const suchen = (wert: string) => {
     setQ(wert);
     window.clearTimeout(timer.current);
-    timer.current = window.setTimeout(async () => setTreffer(wert.trim().length >= 2 ? await bezugSuchen(wert) : []), 250);
+    timer.current = window.setTimeout(async () => setTreffer(wert.trim().length >= 2 ? (await bezugSuchen(wert)).filter((b) => b.art !== "ticket") : []), 250);
   };
   return (
     <div className="relative">

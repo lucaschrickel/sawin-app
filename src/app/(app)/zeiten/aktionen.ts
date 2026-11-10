@@ -20,6 +20,7 @@ export async function zeitSpeichern(_: Ergebnis, fd: FormData): Promise<Ergebnis
   const daten = {
     mitarbeiter_id: text(fd, "mitarbeiter_id"),
     auftrag_id: text(fd, "auftrag_id") || null,
+    ticket_id: text(fd, "ticket_id") || null,
     datum: text(fd, "datum"),
     beginn: text(fd, "beginn"),
     ende: text(fd, "ende"),
@@ -33,8 +34,9 @@ export async function zeitSpeichern(_: Ergebnis, fd: FormData): Promise<Ergebnis
   if (!ZEIT.test(daten.beginn)) felder.beginn = "Uhrzeit HH:MM.";
   if (!ZEIT.test(daten.ende)) felder.ende = "Uhrzeit HH:MM.";
   if (!(ZEIT_ARTEN as readonly string[]).includes(art)) felder.art = "Bitte eine Art wählen.";
-  if (daten.auftrag_id && !UUID.test(daten.auftrag_id)) felder.auftrag = "Bitte einen Auftrag wählen.";
-  if (ZEIT_ART_MIT_BEZUG.includes(art) && !daten.auftrag_id) felder.auftrag = "Bei Montage, Aufmaß und Service bitte einen Auftrag wählen.";
+  if ((daten.auftrag_id && !UUID.test(daten.auftrag_id)) || (daten.ticket_id && !UUID.test(daten.ticket_id))) felder.auftrag = "Bitte einen Auftrag oder ein Ticket aus der Liste wählen.";
+  if (daten.auftrag_id && daten.ticket_id) felder.auftrag = "Bitte entweder einen Auftrag oder ein Ticket wählen.";
+  if (ZEIT_ART_MIT_BEZUG.includes(art) && !daten.auftrag_id && !daten.ticket_id) felder.auftrag = "Bei Montage, Aufmaß und Service bitte einen Auftrag oder ein Ticket wählen.";
   if (!Number.isInteger(daten.pause_min) || daten.pause_min < 0) felder.pause_min = "Pause in ganzen Minuten.";
   if (!felder.beginn && !felder.ende && daten.ende <= daten.beginn) felder.ende = "Das Ende muss nach dem Beginn liegen.";
   if (!felder.ende && !felder.pause_min && stunden(daten.beginn, daten.ende, daten.pause_min) <= 0) felder.pause_min = "Die Pause ist länger als die Arbeitszeit.";

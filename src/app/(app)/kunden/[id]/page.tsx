@@ -13,7 +13,9 @@ import { ladeBenutzerAuswahl, ladeZumKunden } from "@/lib/anfragen";
 import { ANFRAGE_STATUS_TEXT, ANFRAGE_STATUS_TON, type AnfrageStatus } from "@/lib/anfragen-status";
 import { pruefeSitzung } from "@/lib/auth/sitzung";
 import { ladeAufgabenZu } from "@/lib/aufgaben";
-import { AUFTRAG_PHASE_TEXT, AUFTRAG_PHASE_TON, type AuftragPhase } from "@/lib/status";
+import { AUFTRAG_PHASE_TEXT, AUFTRAG_PHASE_TON, TICKET_STATUS_TEXT, TICKET_STATUS_TON, type AuftragPhase } from "@/lib/status";
+import { ladeTicketsZu } from "@/lib/service";
+import { TicketDialog } from "../../service/ui";
 import { AufgabenKarte } from "../../aufgaben/ui";
 import { datum } from "@/lib/format";
 import { heuteBerlin, tag } from "@/lib/zeit";
@@ -26,7 +28,7 @@ export const metadata: Metadata = { title: "Kunde" };
 
 export default async function KundePage({ params }: PageProps<"/kunden/[id]">) {
   const { id } = await params;
-  const [daten, zum, benutzer, { benutzer: ich }, aufgaben] = await Promise.all([ladeKunde(id), ladeZumKunden(id), ladeBenutzerAuswahl(), pruefeSitzung(), ladeAufgabenZu({ kunde_id: id })]);
+  const [daten, zum, benutzer, { benutzer: ich }, aufgaben, tickets] = await Promise.all([ladeKunde(id), ladeZumKunden(id), ladeBenutzerAuswahl(), pruefeSitzung(), ladeAufgabenZu({ kunde_id: id }), ladeTicketsZu({ kunde_id: id })]);
   if (!daten) notFound();
   const c = getCustomer();
   const { kunde: k, lieferadressen, konditionen } = daten;
@@ -70,6 +72,21 @@ export default async function KundePage({ params }: PageProps<"/kunden/[id]">) {
               </ul>
             ) : (
               <p className="text-sm text-muted">Noch keine Aufträge.</p>
+            )}
+          </Karte>
+          <Karte titel="Service-Tickets" rechts={<TicketDialog benutzer={benutzer} ichId={ich.id} herkunftListe={c.herkunft} vorlage={{ kunde: { id: k.id, name: k.name } }} ausloeser={<button type="button" className="rounded-full border border-line px-3 py-1 text-sm font-medium hover:border-line-strong">Ticket</button>} />}>
+            {tickets.length ? (
+              <ul className="flex flex-col">
+                {tickets.map((t) => (
+                  <li key={t.id} className="flex items-center gap-3 border-t border-line-soft py-2 text-sm first:border-t-0">
+                    <Link href={`/service/${t.id}`} className="font-mono text-[13px] font-medium hover:underline">{t.nummer}</Link>
+                    <span className="flex-1">{t.thema}</span>
+                    <Badge tone={TICKET_STATUS_TON[t.status]} dot>{TICKET_STATUS_TEXT[t.status]}</Badge>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p className="text-sm text-muted">Keine Service-Tickets.</p>
             )}
           </Karte>
           <Bereich titel="Belege" leer="Noch keine Belege." />

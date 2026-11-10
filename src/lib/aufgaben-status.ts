@@ -22,6 +22,7 @@ export type Prioritaet = (typeof PRIORITAET)[number];
 export const PRIORITAET_TEXT: Record<Prioritaet, string> = { hoch: "Hoch", normal: "Normal", niedrig: "Niedrig" };
 
 /** Bezug einer Aufgabe (höchstens einer) */
-export type Bezug = { art: "kunde" | "anfrage" | "auftrag"; id: string; text: string };
-export const BEZUG_ART_TEXT: Record<Bezug["art"], string> = { kunde: "Kunde", anfrage: "Anfrage", auftrag: "Auftrag" };
-export const bezugHref = (b: Bezug) => (b.art === "kunde" ? `/kunden/${b.id}` : b.art === "anfrage" ? `/anfragen/${b.id}` : `/auftraege/${b.id}`);
+export type Bezug = { art: "kunde" | "anfrage" | "auftrag" | "ticket"; id: string; text: string };
+export const BEZUG_ART_TEXT: Record<Bezug["art"], string> = { kunde: "Kunde", anfrage: "Anfrage", auftrag: "Auftrag", ticket: "Ticket" };
+export const bezugHref = (b: Bezug) =>
+  b.art === "kunde" ? `/kunden/${b.id}` : b.art === "anfrage" ? `/anfragen/${b.id}` : b.art === "ticket" ? `/service/${b.id}` : `/auftraege/${b.id}`;

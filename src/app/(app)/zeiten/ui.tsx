@@ -60,7 +60,7 @@ export function BuchungenTabelle({ zeilen, daten, summen }: { zeilen: Zeile[]; d
                   </Td>
                   <Td>
                     {z.auftrag ? (
-                      <Link href={`/auftraege/${z.auftrag.id}`} className="hover:underline">
+                      <Link href={z.auftrag.art === "auftrag" ? `/auftraege/${z.auftrag.id}` : `/service/${z.auftrag.id}`} className="hover:underline">
                         <span className="font-mono text-[13px]">{z.auftrag.nummer}</span> <span className="text-sm text-muted">{z.auftrag.kunde}</span>
                       </Link>
                     ) : (

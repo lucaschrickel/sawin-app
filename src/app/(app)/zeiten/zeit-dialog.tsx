@@ -9,7 +9,7 @@ import { Formular } from "@/components/ui/formular";
 import { FormularDialog, type FormularSteuerung } from "@/components/ui/formular-dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { stunden, stundenText, ZEIT_ART_MIT_BEZUG, ZEIT_ART_TEXT, ZEIT_ARTEN, type ZeitArt } from "@/lib/team";
-import { AuftragSuche, type AuftragWahl } from "../montageplan/einsatz-dialog";
+import { BezugSuche, type BezugWahl } from "../montageplan/einsatz-dialog";
 import { zeitLoeschen, zeitSpeichern, type Ergebnis } from "./aktionen";
 
 export type ZeitDialogDaten = { mitarbeiter: { id: string; name: string }[]; beginn: string; ende: string; heute: string };
@@ -22,7 +22,8 @@ export type ZeitBuchung = {
   art: ZeitArt;
   taetigkeit: string | null;
   mitarbeiter: { id: string; name: string };
-  auftrag: AuftragWahl | null;
+  /** Auftrag oder Service-Ticket */
+  auftrag: BezugWahl | null;
 };
 
 type Props = {
@@ -30,11 +31,14 @@ type Props = {
   /** Bearbeiten einer offenen Buchung */
   buchung?: ZeitBuchung;
   /** Vorbelegung beim Eintragen (z. B. von Auftrags- oder Mitarbeiterseite) */
-  vorlage?: { mitarbeiter_id?: string; auftrag?: AuftragWahl };
+  vorlage?: { mitarbeiter_id?: string; auftrag?: BezugWahl };
   /** Auslöser; ohne Auslöser ist der Dialog beim Einblenden offen */
   ausloeser?: ReactNode;
   beiSchliessen?: () => void;
 };
+
+/** Service-Arbeiten werden meist auf ein Ticket gebucht */
+const art_vorbelegt = (a?: ZeitArt) => (a === "service" ? "ticket" : "auftrag");
 
 /** Zeit eintragen oder bearbeiten */
 export function ZeitDialog(p: Props) {
@@ -68,7 +72,8 @@ function ZeitFormular({ daten, buchung: z, vorlage, s }: Props & { s: FormularSt
   const [loeschFehler, setLoeschFehler] = useState<string>();
   const [loescht, loeschen] = useTransition();
   const [art, setArt] = useState<ZeitArt>(z?.art ?? "montage");
-  const [auftrag, setAuftrag] = useState<AuftragWahl | null>(z?.auftrag ?? vorlage?.auftrag ?? null);
+  const [auftrag, setAuftrag] = useState<BezugWahl | null>(z?.auftrag ?? vorlage?.auftrag ?? null);
+  const [suchArt, setSuchArt] = useState<"auftrag" | "ticket">(art_vorbelegt(z?.art));
   const [beginn, setBeginn] = useState(z?.beginn ?? daten.beginn);
   const [ende, setEnde] = useState(z?.ende ?? daten.ende);
   const [pause, setPause] = useState(String(z?.pause_min ?? 30));
@@ -81,7 +86,8 @@ function ZeitFormular({ daten, buchung: z, vorlage, s }: Props & { s: FormularSt
   return (
     <Formular aktion={aktion} onInput={s.aenderung} className="flex flex-col gap-4">
       {z && <input type="hidden" name="id" value={z.id} />}
-      <input type="hidden" name="auftrag_id" value={auftrag?.id ?? ""} />
+      <input type="hidden" name="auftrag_id" value={auftrag?.art === "auftrag" ? auftrag.id : ""} />
+      <input type="hidden" name="ticket_id" value={auftrag?.art === "ticket" ? auftrag.id : ""} />
       {(e.fehler || loeschFehler) && <p role="alert" className="rounded-md bg-tone-red-bg px-3.5 py-2.5 text-sm text-tone-red-fg">{e.fehler ?? loeschFehler}</p>}
 
       <div className="grid grid-cols-2 gap-3 max-md:grid-cols-1">
@@ -104,7 +110,18 @@ function ZeitFormular({ daten, buchung: z, vorlage, s }: Props & { s: FormularSt
       </div>
 
       <div className="flex flex-col gap-1.5">
-        <span className="text-sm font-medium text-ink-3">Auftrag{pflicht ? " *" : " (optional)"}</span>
+        <span className="flex items-center justify-between gap-2 text-sm font-medium text-ink-3">
+          <span>{auftrag?.art === "ticket" ? "Service-Ticket" : "Auftrag oder Service-Ticket"}{pflicht ? " *" : " (optional)"}</span>
+          {!auftrag && (
+            <span role="group" aria-label="Bezug suchen in" className="flex gap-1 rounded-full bg-surface-sunken p-0.5 text-xs font-normal">
+              {(["auftrag", "ticket"] as const).map((a) => (
+                <button key={a} type="button" aria-pressed={suchArt === a} onClick={() => setSuchArt(a)} className={suchArt === a ? "rounded-full bg-surface px-2.5 py-1 font-medium text-ink shadow-card" : "rounded-full px-2.5 py-1 text-muted"}>
+                  {a === "auftrag" ? "Auftrag" : "Ticket"}
+                </button>
+              ))}
+            </span>
+          )}
+        </span>
         {auftrag ? (
           <div className="flex h-[42px] items-center justify-between gap-2 rounded-md border border-line bg-surface-muted px-[13px]">
             <span className="min-w-0 truncate">
@@ -114,7 +131,7 @@ function ZeitFormular({ daten, buchung: z, vorlage, s }: Props & { s: FormularSt
             <Button size="xs" variant="ghost" onClick={() => { setAuftrag(null); s.aenderung(); }}>Ändern</Button>
           </div>
         ) : (
-          <AuftragSuche auchAbgeschlossene onWahl={(a) => { setAuftrag(a); s.aenderung(); }} fehler={f.auftrag} />
+          <BezugSuche key={suchArt} art={suchArt} auchAbgeschlossene onWahl={(a) => { setAuftrag({ ...a, art: suchArt }); s.aenderung(); }} fehler={f.auftrag} />
         )}
         {!pflicht && !auftrag && <small className="text-xs text-muted-2">Lager / Werkstatt, Fahrt und Büro dürfen ohne Auftrag gebucht werden.</small>}
       </div>

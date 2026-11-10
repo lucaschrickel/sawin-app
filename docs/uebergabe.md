@@ -100,6 +100,7 @@ APP_URL=http://localhost:3100 npm run test:zeiten      # Modul Zeiterfassung
 APP_URL=http://localhost:3100 npm run test:abwesenheiten # Modul Abwesenheiten (Büro-Benutzer und Admin)
 APP_URL=http://localhost:3100 npm run test:seitenleiste  # Seitenleiste wie in der Demo (folgt, Zähler, Einklappen)
 APP_URL=http://localhost:3100 npm run test:team          # Fahrzeuge, Fahrzeug in der Plantafel, Kalender
+APP_URL=http://localhost:3100 npm run test:service       # Service-Tickets und Service-Plan
 ```
 
 **Vor der Einladung von Mitarbeitern:** Der eingebaute E-Mail-Versand von Supabase schickt nur an Mitglieder der

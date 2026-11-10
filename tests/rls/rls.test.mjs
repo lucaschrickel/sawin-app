@@ -661,6 +661,60 @@ describe("Fahrzeuge und Termine", () => {
   });
 });
 
+describe("Service-Tickets", () => {
+  let ticket, einsatz;
+  const t = (iso) => new Date(iso).toISOString();
+  const naechsterMontag = () => {
+    const h = new Date(new Intl.DateTimeFormat("sv-SE", { timeZone: "Europe/Berlin" }).format(new Date()) + "T12:00:00Z");
+    h.setUTCDate(h.getUTCDate() - ((h.getUTCDay() + 6) % 7) + 7);
+    return h.toISOString().slice(0, 10);
+  };
+  it("Nummer ST-JJ-NNNN, Tag in „Terminierbar“ = kommender Montag oder späterer Wunschtermin", async () => {
+    const { data, error } = await buero.client.from("service_ticket").insert({ kunde_id: daten.kunde.id, thema: `Rollladen klemmt ${lauf}`, zustaendig_id: buero.id }).select().single();
+    assert.ifError(error);
+    angelegt.push(["service_ticket", data.id]);
+    assert.match(data.nummer, /^ST-\d{2}-\d{4}$/);
+    assert.equal(data.vorab_datum, naechsterMontag());
+    assert.equal(data.status, "neu");
+    const { data: spaeter } = await buero.client.from("service_ticket").update({ wunschtermin: "2027-05-20" }).eq("id", data.id).select().single();
+    assert.equal(spaeter.vorab_datum, "2027-05-20");
+    ticket = data;
+  });
+
+  it("„Abgerechnet“ nicht von Hand", async () => {
+    const { error } = await buero.client.from("service_ticket").update({ status: "abgerechnet" }).eq("id", ticket.id);
+    assert.equal(error?.code, "42501");
+  });
+
+  it("Einplanen setzt „Eingeplant“, ohne Einsatz wieder „Neu“", async () => {
+    const { data, error } = await buero.client.rpc("einsatz_speichern", {
+      p_id: null, p_auftrag_id: null, p_ticket_id: ticket.id, p_beginn: t("2027-05-20T07:00:00Z"), p_ende: t("2027-05-20T09:00:00Z"),
+      p_monteure: [daten.monteur.id], p_fahrzeug_id: null, p_fest: false, p_hinweis: null,
+    });
+    assert.ifError(error);
+    einsatz = data;
+    angelegt.push(["einsatz", data]);
+    const { data: em } = await service.from("einsatz_monteur").select("id").eq("einsatz_id", data);
+    em.forEach((x) => angelegt.push(["einsatz_monteur", x.id]));
+    assert.equal((await service.from("service_ticket").select("status").eq("id", ticket.id).single()).data.status, "eingeplant");
+    const gesperrt = await buero.client.rpc("loeschen", { p_tabelle: "service_ticket", p_id: ticket.id });
+    assert.equal(gesperrt.error?.code, "23503");
+    assert.ifError((await buero.client.rpc("einsatz_loeschen", { p_id: einsatz })).error);
+    assert.equal((await service.from("service_ticket").select("status").eq("id", ticket.id).single()).data.status, "neu");
+  });
+
+  it("Zeit auf ein Ticket buchen; Ticket mit Zeiten nicht löschbar, ohne nur Markierung", async () => {
+    const { data: z, error } = await buero.client.from("zeitbuchung").insert({ mitarbeiter_id: daten.monteur.id, ticket_id: ticket.id, datum: "2027-05-20", beginn: "08:00", ende: "10:00", pause_min: 0, art: "service" }).select().single();
+    assert.ifError(error);
+    angelegt.push(["zeitbuchung", z.id]);
+    assert.equal((await buero.client.rpc("loeschen", { p_tabelle: "service_ticket", p_id: ticket.id })).error?.code, "23503");
+    const { data: zweites } = await buero.client.from("service_ticket").insert({ kunde_id: daten.kunde.id, thema: `Wartung ${lauf}`, art: "wartung" }).select().single();
+    angelegt.push(["service_ticket", zweites.id]);
+    assert.ifError((await buero.client.rpc("loeschen", { p_tabelle: "service_ticket", p_id: zweites.id })).error);
+    assert.ok((await service.from("service_ticket").select("deleted_at").eq("id", zweites.id).single()).data.deleted_at);
+  });
+});
+
 describe("Soft Delete und Audit-Log", () => {
   let aufgabe;
   it("echtes Löschen ist gesperrt", async () => {

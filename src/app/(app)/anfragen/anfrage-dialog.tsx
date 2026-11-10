@@ -169,7 +169,7 @@ function AnfrageFormular({ anfrage: a, kunde, objekte = [], benutzer, ichId, her
 }
 
 /** Kunden suchen (ab zwei Zeichen) oder neu anlegen */
-function KundenAuswahl({ onWahl, herkunftListe, fehler }: { onWahl: (k: { id: string; name: string }) => void; herkunftListe: string[]; fehler?: string }) {
+export function KundenAuswahl({ onWahl, herkunftListe, fehler }: { onWahl: (k: { id: string; name: string }) => void; herkunftListe: string[]; fehler?: string }) {
   const [q, setQ] = useState("");
   const [treffer, setTreffer] = useState<KundeTreffer[]>([]);
   const timer = useRef<number | undefined>(undefined);

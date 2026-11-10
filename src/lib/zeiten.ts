@@ -15,7 +15,8 @@ export type Buchung = {
   freigabe: "offen" | "freigegeben";
   stunden: number;
   mitarbeiter: { id: string; name: string; kuerzel: string };
-  auftrag: { id: string; nummer: string; titel: string; kunde: string } | null;
+  /** Bezug: Auftrag oder Service-Ticket */
+  auftrag: { art: "auftrag" | "ticket"; id: string; nummer: string; titel: string; kunde: string } | null;
 };
 
 export type Zeitraum = { art: "woche" | "monat" | "gesamt"; von: string | null; bis: string | null; text: string; zurueck: string | null; vor: string | null };
@@ -37,29 +38,37 @@ export function zeitraumAus(art: string, ab: string, heute: string): Zeitraum {
   return { art: "woche", von: montag, bis: plusTage(montag, 6), text: `KW ${kalenderwoche(montag)} · ${tag(montag)} – ${tag(plusTage(montag, 6))}`, zurueck: plusTage(montag, -7), vor: plusTage(montag, 7) };
 }
 
-export type ZeitenFilter = { von: string | null; bis: string | null; mitarbeiter?: string; auftrag?: string; freigabe?: "offen" | "freigegeben" | "" };
+export type ZeitenFilter = { von: string | null; bis: string | null; mitarbeiter?: string; auftrag?: string; ticket?: string; freigabe?: "offen" | "freigegeben" | "" };
 
-type Roh = Omit<Buchung, "stunden" | "auftrag"> & { auftrag: { id: string; nummer: string; titel: string; kunde: { name: string } | null } | null };
+type Roh = Omit<Buchung, "stunden" | "auftrag"> & {
+  auftrag: { id: string; nummer: string; titel: string; kunde: { name: string } | null } | null;
+  ticket: { id: string; nummer: string; thema: string; kunde: { name: string } | null } | null;
+};
 
 /** Buchungen im Zeitraum, neueste zuerst; Stunden berechnet */
 export async function ladeBuchungen(f: ZeitenFilter): Promise<Buchung[]> {
   const { supabase } = await pruefeSitzung();
   let a = supabase
     .from("zeitbuchung")
-    .select("id, datum, beginn, ende, pause_min, art, taetigkeit, freigabe, mitarbeiter:mitarbeiter_id(id, name, kuerzel), auftrag:auftrag_id(id, nummer, titel, kunde:kunde_id(name))");
+    .select("id, datum, beginn, ende, pause_min, art, taetigkeit, freigabe, mitarbeiter:mitarbeiter_id(id, name, kuerzel), auftrag:auftrag_id(id, nummer, titel, kunde:kunde_id(name)), ticket:ticket_id(id, nummer, thema, kunde:kunde_id(name))");
   if (f.von) a = a.gte("datum", f.von);
   if (f.bis) a = a.lte("datum", f.bis);
   if (f.mitarbeiter) a = a.eq("mitarbeiter_id", f.mitarbeiter);
   if (f.auftrag) a = a.eq("auftrag_id", f.auftrag);
+  if (f.ticket) a = a.eq("ticket_id", f.ticket);
   if (f.freigabe) a = a.eq("freigabe", f.freigabe);
   const { data, error } = await a.order("datum", { ascending: false }).order("beginn", { ascending: false }).limit(2000).returns<Roh[]>();
   if (error) throw new Error(`Zeiten konnten nicht geladen werden: ${error.message}`);
-  return (data ?? []).map((z) => ({
+  return (data ?? []).map(({ ticket, ...z }) => ({
     ...z,
     beginn: z.beginn.slice(0, 5),
     ende: z.ende.slice(0, 5),
     stunden: stunden(z.beginn, z.ende, z.pause_min),
-    auftrag: z.auftrag ? { id: z.auftrag.id, nummer: z.auftrag.nummer, titel: z.auftrag.titel, kunde: z.auftrag.kunde?.name ?? "" } : null,
+    auftrag: z.auftrag
+      ? { art: "auftrag" as const, id: z.auftrag.id, nummer: z.auftrag.nummer, titel: z.auftrag.titel, kunde: z.auftrag.kunde?.name ?? "" }
+      : ticket
+        ? { art: "ticket" as const, id: ticket.id, nummer: ticket.nummer, titel: ticket.thema, kunde: ticket.kunde?.name ?? "" }
+        : null,
   }));
 }
 
@@ -80,7 +89,7 @@ export function summeJeMitarbeiter(liste: Buchung[]) {
 export function summeJeAuftrag(liste: Buchung[]) {
   const m = new Map<string, { auftrag: Buchung["auftrag"]; stunden: number; jeMitarbeiter: Map<string, { name: string; stunden: number }> }>();
   for (const z of liste) {
-    const k = z.auftrag?.id ?? "ohne";
+    const k = z.auftrag ? `${z.auftrag.art}:${z.auftrag.id}` : "ohne";
     const e = m.get(k) ?? { auftrag: z.auftrag, stunden: 0, jeMitarbeiter: new Map() };
     e.stunden += z.stunden;
     const mm = e.jeMitarbeiter.get(z.mitarbeiter.id) ?? { name: z.mitarbeiter.name, stunden: 0 };

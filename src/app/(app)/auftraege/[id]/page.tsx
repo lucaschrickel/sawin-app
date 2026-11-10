@@ -13,7 +13,9 @@ import { ladeAuftrag } from "@/lib/auftraege";
 import { stundenText } from "@/lib/team";
 import { ladeBuchungen, ladeZeitDialogDaten, summeJeAuftrag } from "@/lib/zeiten";
 import { cn } from "@/lib/cn";
-import { AUFTRAG_PHASE_TEXT, AUFTRAG_PHASE_TON, MONTAGESTATUS_TEXT } from "@/lib/status";
+import { AUFTRAG_PHASE_TEXT, AUFTRAG_PHASE_TON, MONTAGESTATUS_TEXT, TICKET_STATUS_TEXT, TICKET_STATUS_TON } from "@/lib/status";
+import { ladeTicketsZu } from "@/lib/service";
+import { TicketDialog } from "../../service/ui";
 import { montagVon } from "@/lib/woche";
 import { heuteBerlin, kurzTermin, tag, utcNachBerlinLokal, zeitpunkt } from "@/lib/zeit";
 import { NotizFormular } from "../../anfragen/ui";
@@ -29,11 +31,12 @@ const uhrzeit = (iso: string) => kurzTermin(iso).split(" ").at(-1);
 export default async function AuftragPage({ params, searchParams }: PageProps<"/auftraege/[id]">) {
   const { id } = await params;
   const reiter = eins((await searchParams).reiter) === "historie" ? "historie" : "uebersicht";
-  const [daten, benutzer, { benutzer: ich }, aufgaben, zeiten, zeitDialog] = await Promise.all([
+  const [daten, benutzer, { benutzer: ich }, aufgaben, tickets, zeiten, zeitDialog] = await Promise.all([
     ladeAuftrag(id),
     ladeBenutzerAuswahl(),
     pruefeSitzung(),
     ladeAufgabenZu({ auftrag_id: id }),
+    ladeTicketsZu({ auftrag_id: id }),
     ladeBuchungen({ von: null, bis: null, auftrag: id }).catch(() => []),
     ladeZeitDialogDaten(),
   ]);
@@ -56,6 +59,7 @@ export default async function AuftragPage({ params, searchParams }: PageProps<"/
               {k ? <Link href={`/kunden/${k.id}`} className="hover:underline">{k.name}</Link> : "–"}
             </h1>
             <Badge tone={AUFTRAG_PHASE_TON[a.phase]} dot>{AUFTRAG_PHASE_TEXT[a.phase]}</Badge>
+            {tickets.some((t) => !["erledigt", "abgerechnet"].includes(t.status)) && <Badge tone="amber" data-offenes-ticket>offenes Ticket</Badge>}
             {ursprung && <Link href={`/auftraege/${ursprung.id}`}><Badge tone="gray">Nachtrag zu {ursprung.nummer}</Badge></Link>}
           </div>
           <p className="text-[14.5px] text-muted">
@@ -151,7 +155,7 @@ export default async function AuftragPage({ params, searchParams }: PageProps<"/
                 rechts={
                   <ZeitDialog
                     daten={{ ...zeitDialog, heute }}
-                    vorlage={{ auftrag: { id: a.id, nummer: a.nummer, titel: a.titel, kunde: k?.name ?? "" } }}
+                    vorlage={{ auftrag: { art: "auftrag", id: a.id, nummer: a.nummer, titel: a.titel, kunde: k?.name ?? "" } }}
                     ausloeser={<button type="button" className="rounded-full border border-line px-3 py-1 text-sm font-medium hover:border-line-strong">Zeit eintragen</button>}
                   />
                 }
@@ -190,6 +194,21 @@ export default async function AuftragPage({ params, searchParams }: PageProps<"/
                   </Angabe>
                   {a.abgeschlossen_am && <Angabe name="Abgeschlossen am">{tag(a.abgeschlossen_am)}</Angabe>}
                 </dl>
+              </Karte>
+              <Karte titel="Service-Tickets" rechts={<TicketDialog benutzer={benutzer} ichId={ich.id} herkunftListe={c.herkunft} vorlage={{ kunde: k ? { id: k.id, name: k.name } : undefined, auftrag: { id: a.id, nummer: a.nummer, titel: a.titel, kunde: k?.name ?? "", phase: a.phase } }} ausloeser={<button type="button" className="rounded-full border border-line px-3 py-1 text-sm font-medium hover:border-line-strong">Ticket</button>} />}>
+                {tickets.length ? (
+                  <ul className="flex flex-col">
+                    {tickets.map((t) => (
+                      <li key={t.id} className="flex items-center gap-3 border-t border-line-soft py-2 text-sm first:border-t-0">
+                        <Link href={`/service/${t.id}`} className="font-mono text-[13px] font-medium hover:underline">{t.nummer}</Link>
+                        <span className="flex-1">{t.thema}</span>
+                        <Badge tone={TICKET_STATUS_TON[t.status]} dot>{TICKET_STATUS_TEXT[t.status]}</Badge>
+                      </li>
+                    ))}
+                  </ul>
+                ) : (
+                  <p className="text-sm text-muted">Keine Service-Tickets.</p>
+                )}
               </Karte>
               {nachtraege.length > 0 && (
                 <Karte titel="Nachträge">
