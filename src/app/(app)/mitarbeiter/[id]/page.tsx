@@ -5,9 +5,11 @@ import { Angabe, Karte } from "@/components/app/info-karte";
 import { Shell } from "@/components/app/shell";
 import { Badge } from "@/components/ui/badge";
 import { ladeMitarbeiter } from "@/lib/mitarbeiter";
-import { ABWESENHEIT_STATUS_TEXT, ABWESENHEIT_STATUS_TON, ABWESENHEIT_TEXT, ABWESENHEIT_TON, arbeitstageImJahr, arbeitstageText, arbeitstageZwischen } from "@/lib/team";
-import { lokalKurz, montagVon } from "@/lib/woche";
-import { tag } from "@/lib/zeit";
+import { stundenText, ZEIT_ART_TEXT, ABWESENHEIT_STATUS_TEXT, ABWESENHEIT_STATUS_TON, ABWESENHEIT_TEXT, ABWESENHEIT_TON, arbeitstageImJahr, arbeitstageText, arbeitstageZwischen } from "@/lib/team";
+import { kalenderwoche, lokalKurz, montagVon, plusTage } from "@/lib/woche";
+import { heuteBerlin, tag } from "@/lib/zeit";
+import { ladeBuchungen, ladeZeitDialogDaten } from "@/lib/zeiten";
+import { ZeitDialog } from "../../zeiten/zeit-dialog";
 import { MitarbeiterAktionen, MitarbeiterDialog } from "../ui";
 
 export const metadata: Metadata = { title: "Mitarbeiter" };
@@ -16,7 +18,8 @@ export default async function MitarbeiterSeite({ params }: PageProps<"/mitarbeit
   const { id } = await params;
   const daten = await ladeMitarbeiter(id);
   if (!daten) notFound();
-  const { mitarbeiter: m, einsaetze, abwesenheiten, benutzer, anspruchStandard, jahr } = daten;
+  const { mitarbeiter: m, einsaetze, abwesenheiten, benutzer, anspruchStandard, jahr, montag } = daten;
+  const [zeiten, zeitDialog] = await Promise.all([ladeBuchungen({ von: montag, bis: plusTage(montag, 6), mitarbeiter: m.id }), ladeZeitDialogDaten()]);
   const anspruch = m.urlaubsanspruch_tage ?? anspruchStandard;
   const urlaub = abwesenheiten.filter((a) => a.art === "urlaub");
   const genehmigt = urlaub.filter((a) => a.status === "genehmigt").reduce((s, a) => s + arbeitstageImJahr(a.von, a.bis, jahr), 0);
@@ -72,6 +75,38 @@ export default async function MitarbeiterSeite({ params }: PageProps<"/mitarbeit
             ) : (
               <p className="text-sm text-muted">{m.ist_monteur ? "Keine Einsätze in diesen zwei Wochen." : "Nur Monteure werden eingeplant."}</p>
             )}
+          </Karte>
+
+          <Karte
+            titel={`Zeiten KW ${kalenderwoche(montag)}`}
+            rechts={
+              <span className="flex items-center gap-3">
+                <b className="font-mono text-sm" data-stunden-woche>{stundenText(zeiten.reduce((x, z) => x + z.stunden, 0))}</b>
+                {m.aktiv && (
+                  <ZeitDialog
+                    daten={{ ...zeitDialog, heute: heuteBerlin() }}
+                    vorlage={{ mitarbeiter_id: m.id }}
+                    ausloeser={<button type="button" className="rounded-full border border-line px-3 py-1 text-sm font-medium hover:border-line-strong">Zeit eintragen</button>}
+                  />
+                )}
+              </span>
+            }
+          >
+            {zeiten.length ? (
+              <ul className="flex flex-col">
+                {zeiten.map((z) => (
+                  <li key={z.id} className="flex flex-wrap items-baseline gap-x-3 gap-y-1 border-t border-line-soft py-2 text-sm first:border-t-0">
+                    <span className="w-[86px] tabular">{tag(z.datum)}</span>
+                    <span className="font-mono text-[13px]">{z.beginn}–{z.ende}</span>
+                    <span className="text-muted">{ZEIT_ART_TEXT[z.art]}{z.auftrag ? ` · ${z.auftrag.nummer} ${z.auftrag.kunde}` : ""}</span>
+                    <span className="ml-auto font-mono text-[13px]">{stundenText(z.stunden)}</span>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p className="text-sm text-muted">Keine Zeiten in dieser Woche.</p>
+            )}
+            <Link href={`/zeiten?mitarbeiter=${m.id}`} className="mt-2 inline-block text-sm text-accent-text hover:underline">In der Zeiterfassung öffnen</Link>
           </Karte>
 
           <Karte titel={`Abwesenheiten ${jahr}`}>

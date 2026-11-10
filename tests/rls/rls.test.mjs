@@ -538,6 +538,48 @@ describe("Mitarbeiter", () => {
   });
 });
 
+describe("Zeiterfassung", () => {
+  let buchung;
+  const basis = () => ({ mitarbeiter_id: daten.monteur.id, datum: "2026-11-03", beginn: "07:00", ende: "15:30", pause_min: 30 });
+  it("Montage, Aufmaß und Service nur mit Auftrag; Lager, Fahrt, Büro auch ohne Bezug", async () => {
+    const ohne = await buero.client.from("zeitbuchung").insert({ ...basis(), art: "montage" });
+    assert.equal(ohne.error?.code, "23514");
+    const { data: lager, error } = await buero.client.from("zeitbuchung").insert({ ...basis(), art: "lager" }).select().single();
+    assert.ifError(error);
+    angelegt.push(["zeitbuchung", lager.id]);
+    const { data, error: mit } = await buero.client.from("zeitbuchung").insert({ ...basis(), art: "montage", auftrag_id: daten.auftrag.id }).select().single();
+    assert.ifError(mit);
+    angelegt.push(["zeitbuchung", data.id]);
+    buchung = data;
+  });
+
+  it("Ende vor Beginn oder zu lange Pause abgelehnt", async () => {
+    assert.ok((await buero.client.from("zeitbuchung").insert({ ...basis(), art: "fahrt", ende: "06:00" })).error);
+    assert.ok((await buero.client.from("zeitbuchung").insert({ ...basis(), art: "fahrt", pause_min: 600 })).error);
+  });
+
+  it("Freigabe hält fest, wer und wann; freigegebene Buchung ist gesperrt", async () => {
+    const { data: frei, error } = await buero.client.from("zeitbuchung").update({ freigabe: "freigegeben" }).eq("id", buchung.id).select().single();
+    assert.ifError(error);
+    assert.equal(frei.freigegeben_von, buero.id);
+    assert.ok(frei.freigegeben_am);
+    const aendern = await buero.client.from("zeitbuchung").update({ ende: "16:00" }).eq("id", buchung.id);
+    assert.equal(aendern.error?.code, "42501");
+    const loeschen = await buero.client.rpc("loeschen", { p_tabelle: "zeitbuchung", p_id: buchung.id });
+    assert.ok(loeschen.error, "freigegebene Buchung gelöscht");
+  });
+
+  it("Freigabe zurücknehmen entsperrt; Löschen nur als Markierung", async () => {
+    const { data: offen, error } = await buero.client.from("zeitbuchung").update({ freigabe: "offen" }).eq("id", buchung.id).select().single();
+    assert.ifError(error);
+    assert.equal(offen.freigegeben_von, null);
+    assert.ifError((await buero.client.from("zeitbuchung").update({ ende: "16:00" }).eq("id", buchung.id)).error);
+    assert.ifError((await buero.client.rpc("loeschen", { p_tabelle: "zeitbuchung", p_id: buchung.id })).error);
+    const { data: roh } = await service.from("zeitbuchung").select("deleted_at").eq("id", buchung.id).single();
+    assert.ok(roh.deleted_at);
+  });
+});
+
 describe("Soft Delete und Audit-Log", () => {
   let aufgabe;
   it("echtes Löschen ist gesperrt", async () => {

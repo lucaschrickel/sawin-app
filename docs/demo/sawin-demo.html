@@ -2829,7 +2829,11 @@ PAGES.zeiten = () => {
 <div class="stack">
 <div class="card"><div class="tblwrap"><table class="tbl" style="min-width:820px"><thead><tr><th>Datum</th><th>Mitarbeiter</th><th>Bezug</th><th>Zeit</th><th class="r">Pause</th><th class="r">Stunden</th><th>Art</th><th>Freigabe</th></tr></thead><tbody>
 ${l.map(z => `<tr><td class="nw">${WD[parse(z.start).getDay()]} ${fD(z.start)}</td><td>${av(z.ma)} ${esc(ma(z.ma).name.split(' ')[0])}</td><td>${z.auftragId && objOf(z.auftragId) ? `<a class="link" href="${hrefOf(objOf(z.auftragId))}">${z.auftragId}</a> <span class="k">${esc(kName(objOf(z.auftragId).kundeId))}</span>` : `<span class="muted">${esc(z.text || 'ohne Bezug')}</span>`}</td><td class="mono nw">${fT(z.start)}–${fT(z.ende)}</td><td class="r">${z.pause} min</td><td class="r mono">${hoursFmt(h(z))}</td><td>${esc(z.art)}</td><td>${z.freigabe === 'Offen' ? `<button type="button" class="btn xs" data-act="freigabe" data-id="${z.id}">Freigeben</button>` : pill('Freigegeben', 'green')}</td></tr>`).join('') || `<tr><td colspan="8">${empty('Keine Zeiten.')}</td></tr>`}</tbody></table></div><p class="hint" style="margin:10px 16px">Summe KW ${kw(mon)}: ${week.filter(w => w.h > 0).map(w => esc(w.m.name.split(' ')[0]) + ' ' + hoursFmt(w.h)).join(' · ') || 'noch keine Zeiten'}</p></div></div>`;
-  return { crumbs: [['Team und Ressourcen', '#/kalender'], ['Zeiterfassung']], html };
+  /* Stand 10.11.2026: Summe der Stunden je Auftrag (alle Buchungen) */
+  const proA = {}; DB.zeiten.forEach(z => { if (z.auftragId) proA[z.auftragId] = (proA[z.auftragId] || 0) + h(z); });
+  const zeileA = ([id, std]) => { const o = objOf(id); return `<tr><td>${o ? `<a class="link" href="${hrefOf(o)}">${id}</a>` : id}</td><td>${o ? esc(kName(o.kundeId)) : ''}</td><td class="r mono">${hoursFmt(std)}</td></tr>`; };
+  const jeAuftrag = Object.keys(proA).length ? `<section class="card pad" style="margin-top:16px"><h2 class="h2">Stunden je Auftrag</h2><div class="tblwrap" style="margin-top:10px"><table class="tbl" style="min-width:520px"><thead><tr><th>Auftrag</th><th>Kunde</th><th class="r">Stunden</th></tr></thead><tbody>${Object.entries(proA).sort((x, y) => y[1] - x[1]).map(zeileA).join('')}</tbody></table></div></section>` : '';
+  return { crumbs: [['Team und Ressourcen', '#/kalender'], ['Zeiterfassung']], html: html + jeAuftrag };
 };
 
 /* ================= Mitarbeiter ================= */

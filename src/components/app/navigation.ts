@@ -80,7 +80,7 @@ const ALLE: NavGroup[] = [
       { key: "kalender", href: "/kalender", label: "Kalender", icon: CalendarDays },
       { key: "mitarbeiter", href: "/mitarbeiter", label: "Mitarbeiter", icon: BookUser, bereit: true },
       { key: "fahrzeuge", href: "/fahrzeuge", label: "Fahrzeuge", icon: Van },
-      { key: "zeiten", href: "/zeiten", label: "Zeiterfassung", icon: Clock },
+      { key: "zeiten", href: "/zeiten", label: "Zeiterfassung", icon: Clock, bereit: true },
       { key: "abwesenheiten", href: "/abwesenheiten", label: "Abwesenheiten", icon: UserX },
     ],
   },

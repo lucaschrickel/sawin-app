@@ -76,18 +76,17 @@ export async function einsatzLoeschen(id: string): Promise<Ergebnis> {
 
 export type AuftragTreffer = { id: string; nummer: string; titel: string; kunde: string };
 
-/** Auftragssuche im Einsatz-Dialog: Nummer, Titel, Objekt oder Kunde; abgeschlossene Aufträge nicht */
-export async function auftraegeSuchen(q: string): Promise<AuftragTreffer[]> {
+/** Auftragssuche (Einsatz- und Zeit-Dialog): Nummer, Titel, Objekt oder Kunde; abgeschlossene nur auf Wunsch */
+export async function auftraegeSuchen(q: string, auchAbgeschlossene = false): Promise<AuftragTreffer[]> {
   const { supabase } = await pruefeSitzung();
   const s = suchbegriff(q);
   if (s.length < 2) return [];
   const { data: kunden } = await supabase.from("kunde").select("id").ilike("name", `%${s}%`).limit(50);
   const bedingungen = ["nummer", "titel", "objekt"].map((f) => `${f}.ilike.%${s}%`);
   if (kunden?.length) bedingungen.push(`kunde_id.in.(${kunden.map((k) => k.id).join(",")})`);
-  const { data } = await supabase
-    .from("auftrag")
-    .select("id, nummer, titel, kunde:kunde_id(name)")
-    .neq("phase", "abgeschlossen")
+  let a = supabase.from("auftrag").select("id, nummer, titel, kunde:kunde_id(name)");
+  if (!auchAbgeschlossene) a = a.neq("phase", "abgeschlossen");
+  const { data } = await a
     .or(bedingungen.join(","))
     .order("nummer", { ascending: false })
     .limit(8)

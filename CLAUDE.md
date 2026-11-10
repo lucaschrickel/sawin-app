@@ -576,12 +576,17 @@ Die Monteur-App kommt in Version 2.
   TÜV/HU, Service, UVV-Prüfung mit Ampel (überfällig, in 30 Tagen fällig). Fällige Termine erscheinen in der Glocke
   und im Montage-Dashboard. Werkstatttermine eintragen.
 - **Zeiterfassung:** Das Büro trägt Zeiten ein.
-  - Bezug: Auftrag, Service-Ticket oder ohne Bezug (Lager, Fahrt, Büro).
+  - Bezug: Auftrag, Service-Ticket oder ohne Bezug (Lager, Fahrt, Büro). Die Arten Montage, Aufmaß und Service
+    brauchen immer einen Auftrag bzw. ein Ticket (Entscheidung 10.11.2026).
   - Felder: Mitarbeiter, Bezug, Datum, Beginn, Ende, Pause in Minuten, Art, Tätigkeit (Freitext).
     Die Stunden werden berechnet, Ende muss nach Beginn liegen.
   - Arten: Montage, Aufmaß, Service, Lager / Werkstatt, Fahrt, Büro.
   - Die Wochensumme je Mitarbeiter für die laufende Kalenderwoche steht als Zeile unter der Liste.
-  - Freigabe-Stufe: Jede Buchung ist „Offen“ oder „Freigegeben“, das Büro gibt frei.
+  - Freigabe-Stufe: Jede Buchung ist „Offen“ oder „Freigegeben“, das Büro gibt frei (einzeln oder gesammelt für den
+    gefilterten Zeitraum). Freigegebene Buchungen sind gesperrt, bis jemand die Freigabe zurücknimmt.
+  - Auswertung (Entscheidung 10.11.2026): Summe der Stunden je Mitarbeiter und je Auftrag für Woche, Monat oder
+    gesamt. Die Auftragsseite zeigt die Stunden des Auftrags, die Mitarbeiterseite die der laufenden Woche; beide mit
+    „Zeit eintragen“ (Bezug vorbelegt).
 - **Abwesenheiten:** Anträge trägt in Version 1 das Büro ein.
   - Arten: Urlaub, Krank, Schulung, Überstundenabbau, Sonstiges.
   - Status: Beantragt, Genehmigt, Abgelehnt. Genehmigen, Ablehnen und „Direkt genehmigen“ beim Eintragen nur durch

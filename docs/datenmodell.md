@@ -61,7 +61,7 @@ Sonderregeln per Trigger (RLS kann Spaltenänderungen nicht prüfen):
 | `fahrzeug` | Kennzeichen, Typ, Kolonne, km-Stand, Hinweise, TÜV/HU, Service, UVV |
 | `fahrzeug_werkstatt` | Fahrzeug, von, bis, Notiz |
 | `abwesenheit` | Mitarbeiter, Art (urlaub, krank, schulung, ueberstunden, sonstiges), von, bis, Status (beantragt, genehmigt, abgelehnt), Notiz, entschieden von/am |
-| `zeitbuchung` | Mitarbeiter, Auftrag **oder** Ticket **oder** ohne Bezug, Datum, Beginn, Ende (`ende > beginn`), Pause (min), Art (montage, aufmass, service, lager, fahrt, buero), Tätigkeit, Freigabe (offen/freigegeben) |
+| `zeitbuchung` | Mitarbeiter, Auftrag **oder** Ticket **oder** ohne Bezug, Datum, Beginn, Ende (`ende > beginn`), Pause (min), Art (montage, aufmass, service, lager, fahrt, buero), Tätigkeit, Freigabe (offen/freigegeben). Montage, Aufmaß und Service brauchen einen Auftrag oder ein Ticket; freigegebene Buchungen sind gesperrt (Trigger `zeitbuchung_regeln`) |
 
 ### Stammdaten und Einstellungen
 
@@ -166,6 +166,9 @@ und danach wieder entfernt:
    Arbeitszeit nur in vollen Stunden.
 9. **Mitarbeiter:** Kürzel eindeutig, Urlaubsanspruch 0 bis 366, mit Einsätzen oder Abwesenheiten nicht löschbar
    (nur deaktivierbar), ohne Geschichte nur als gelöscht markiert.
+10. **Zeiterfassung:** Montage, Aufmaß und Service nur mit Auftrag, Lager, Fahrt und Büro auch ohne; Ende vor Beginn
+    und zu lange Pause abgelehnt; Freigabe hält Benutzer und Zeitpunkt fest; freigegebene Buchungen gesperrt (auch
+    gegen Löschen), bis die Freigabe zurückgenommen ist.
 
 ## Nicht in diesem Schritt
 

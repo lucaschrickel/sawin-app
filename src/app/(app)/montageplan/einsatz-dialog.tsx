@@ -141,7 +141,8 @@ function EinsatzFormular({ vorlage, monteure, s, beiErgebnis }: { vorlage: Dialo
   );
 }
 
-function AuftragSuche({ onWahl, fehler }: { onWahl: (a: AuftragWahl) => void; fehler?: string }) {
+/** Auftrag suchen (ab zwei Zeichen) und wählen; auch in der Zeiterfassung genutzt */
+export function AuftragSuche({ onWahl, fehler, auchAbgeschlossene }: { onWahl: (a: AuftragWahl) => void; fehler?: string; auchAbgeschlossene?: boolean }) {
   const [q, setQ] = useState("");
   const [treffer, setTreffer] = useState<AuftragTreffer[]>([]);
   const timer = useRef<number | undefined>(undefined);
@@ -149,7 +150,7 @@ function AuftragSuche({ onWahl, fehler }: { onWahl: (a: AuftragWahl) => void; fe
   const suchen = (wert: string) => {
     setQ(wert);
     window.clearTimeout(timer.current);
-    timer.current = window.setTimeout(async () => setTreffer(wert.trim().length >= 2 ? await auftraegeSuchen(wert) : []), 250);
+    timer.current = window.setTimeout(async () => setTreffer(wert.trim().length >= 2 ? await auftraegeSuchen(wert, auchAbgeschlossene) : []), 250);
   };
   return (
     <div className="relative">
@@ -185,7 +186,7 @@ function AuftragSuche({ onWahl, fehler }: { onWahl: (a: AuftragWahl) => void; fe
           ))}
         </ul>
       )}
-      {q.trim().length >= 2 && treffer.length === 0 && <small className="mt-1 block text-xs text-muted-2">Kein offener Auftrag gefunden.</small>}
+      {q.trim().length >= 2 && treffer.length === 0 && <small className="mt-1 block text-xs text-muted-2">{auchAbgeschlossene ? "Kein Auftrag gefunden." : "Kein offener Auftrag gefunden."}</small>}
     </div>
   );
 }

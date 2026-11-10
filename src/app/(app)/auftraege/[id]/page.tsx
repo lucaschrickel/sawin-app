@@ -10,12 +10,15 @@ import { ladeBenutzerAuswahl } from "@/lib/anfragen";
 import { pruefeSitzung } from "@/lib/auth/sitzung";
 import { ladeAufgabenZu } from "@/lib/aufgaben";
 import { ladeAuftrag } from "@/lib/auftraege";
+import { stundenText } from "@/lib/team";
+import { ladeBuchungen, ladeZeitDialogDaten, summeJeAuftrag } from "@/lib/zeiten";
 import { cn } from "@/lib/cn";
 import { AUFTRAG_PHASE_TEXT, AUFTRAG_PHASE_TON, MONTAGESTATUS_TEXT } from "@/lib/status";
 import { montagVon } from "@/lib/woche";
 import { heuteBerlin, kurzTermin, tag, utcNachBerlinLokal, zeitpunkt } from "@/lib/zeit";
 import { NotizFormular } from "../../anfragen/ui";
 import { AufgabenKarte } from "../../aufgaben/ui";
+import { ZeitDialog } from "../../zeiten/zeit-dialog";
 import { AuftragDialog, AuftragLoeschen, LieferungFormular, PhaseAuswahl, Phasenleiste, PruefhinweisEntfernen } from "../ui";
 
 export const metadata: Metadata = { title: "Auftrag" };
@@ -26,7 +29,14 @@ const uhrzeit = (iso: string) => kurzTermin(iso).split(" ").at(-1);
 export default async function AuftragPage({ params, searchParams }: PageProps<"/auftraege/[id]">) {
   const { id } = await params;
   const reiter = eins((await searchParams).reiter) === "historie" ? "historie" : "uebersicht";
-  const [daten, benutzer, { benutzer: ich }, aufgaben] = await Promise.all([ladeAuftrag(id), ladeBenutzerAuswahl(), pruefeSitzung(), ladeAufgabenZu({ auftrag_id: id })]);
+  const [daten, benutzer, { benutzer: ich }, aufgaben, zeiten, zeitDialog] = await Promise.all([
+    ladeAuftrag(id),
+    ladeBenutzerAuswahl(),
+    pruefeSitzung(),
+    ladeAufgabenZu({ auftrag_id: id }),
+    ladeBuchungen({ von: null, bis: null, auftrag: id }).catch(() => []),
+    ladeZeitDialogDaten(),
+  ]);
   if (!daten) notFound();
   const { auftrag: a, kunde: k, anfrage, einsaetze, ursprung, nachtraege, historie } = daten;
   const c = getCustomer();
@@ -135,6 +145,30 @@ export default async function AuftragPage({ params, searchParams }: PageProps<"/
                 <p className="text-sm text-muted">
                   Noch keine Belege. Die Belegkette (Angebot, AB, Lieferschein, Rechnungen) erscheint hier mit dem Beleg-Modul.
                 </p>
+              </Karte>
+              <Karte
+                titel="Stunden"
+                rechts={
+                  <ZeitDialog
+                    daten={{ ...zeitDialog, heute }}
+                    vorlage={{ auftrag: { id: a.id, nummer: a.nummer, titel: a.titel, kunde: k?.name ?? "" } }}
+                    ausloeser={<button type="button" className="rounded-full border border-line px-3 py-1 text-sm font-medium hover:border-line-strong">Zeit eintragen</button>}
+                  />
+                }
+              >
+                {zeiten.length ? (
+                  <>
+                    <p className="text-2xl font-semibold tabular" data-stunden-auftrag>{stundenText(zeiten.reduce((x, z) => x + z.stunden, 0))}</p>
+                    <ul className="mt-2 flex flex-col gap-1 text-sm text-ink-3">
+                      {summeJeAuftrag(zeiten)[0]?.jeMitarbeiter.map((m) => (
+                        <li key={m.name} className="flex justify-between gap-2"><span>{m.name}</span><span className="font-mono text-[13px]">{stundenText(m.stunden)}</span></li>
+                      ))}
+                    </ul>
+                    <Link href={`/zeiten?zeitraum=gesamt&auftrag=${a.id}`} className="mt-2 inline-block text-sm text-accent-text hover:underline">Alle Buchungen</Link>
+                  </>
+                ) : (
+                  <p className="text-sm text-muted">Noch keine Zeiten gebucht.</p>
+                )}
               </Karte>
               <Karte titel="Kunde & Herkunft">
                 <dl className="flex flex-col gap-3 text-[14.5px]">
