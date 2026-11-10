@@ -451,7 +451,7 @@ describe("Montageplan", () => {
 
   it("Einsatz mit zwei Monteuren in einem Schritt anlegen", async () => {
     const { data, error } = await buero.client.rpc("einsatz_speichern", {
-      p_id: null, p_auftrag_id: daten.auftrag.id, p_beginn: t("2026-12-02T06:00:00Z"), p_ende: t("2026-12-02T15:00:00Z"),
+      p_id: null, p_auftrag_id: daten.auftrag.id, p_ticket_id: null, p_fahrzeug_id: null, p_beginn: t("2026-12-02T06:00:00Z"), p_ende: t("2026-12-02T15:00:00Z"),
       p_monteure: [daten.monteur.id, zweiter.id], p_fest: false, p_hinweis: "Seiteneingang",
     });
     assert.ifError(error);
@@ -469,7 +469,7 @@ describe("Montageplan", () => {
     assert.ok(eigene.some((k) => k.art === "abwesend" && k.mitarbeiter_id === daten.monteur.id && k.detail === "urlaub:beantragt"), "Abwesenheit fehlt");
     assert.ok(!eigene.some((k) => k.mitarbeiter_id === zweiter.id), "zweiter Monteur ohne Konflikt");
     const { data: zweiterEinsatz } = await buero.client.rpc("einsatz_speichern", {
-      p_id: null, p_auftrag_id: daten.auftrag.id, p_beginn: t("2026-12-02T12:00:00Z"), p_ende: t("2026-12-02T14:00:00Z"),
+      p_id: null, p_auftrag_id: daten.auftrag.id, p_ticket_id: null, p_fahrzeug_id: null, p_beginn: t("2026-12-02T12:00:00Z"), p_ende: t("2026-12-02T14:00:00Z"),
       p_monteure: [zweiter.id], p_fest: true, p_hinweis: null,
     });
     angelegt.push(["einsatz", zweiterEinsatz]);
@@ -482,7 +482,7 @@ describe("Montageplan", () => {
 
   it("Monteur tauschen: der entfernte wird nur markiert", async () => {
     const { error } = await buero.client.rpc("einsatz_speichern", {
-      p_id: einsatzId, p_auftrag_id: daten.auftrag.id, p_beginn: t("2026-12-02T06:00:00Z"), p_ende: t("2026-12-03T15:00:00Z"),
+      p_id: einsatzId, p_auftrag_id: daten.auftrag.id, p_ticket_id: null, p_fahrzeug_id: null, p_beginn: t("2026-12-02T06:00:00Z"), p_ende: t("2026-12-03T15:00:00Z"),
       p_monteure: [zweiter.id], p_fest: null, p_hinweis: "Seiteneingang",
     });
     assert.ifError(error);
@@ -495,7 +495,7 @@ describe("Montageplan", () => {
   });
 
   it("ohne Monteur, mit Ende vor Beginn oder mit Nicht-Monteur abgelehnt", async () => {
-    const basis = { p_id: null, p_auftrag_id: daten.auftrag.id, p_beginn: t("2026-12-09T06:00:00Z"), p_ende: t("2026-12-09T15:00:00Z"), p_fest: false, p_hinweis: null };
+    const basis = { p_id: null, p_auftrag_id: daten.auftrag.id, p_ticket_id: null, p_fahrzeug_id: null, p_beginn: t("2026-12-09T06:00:00Z"), p_ende: t("2026-12-09T15:00:00Z"), p_fest: false, p_hinweis: null };
     assert.equal((await buero.client.rpc("einsatz_speichern", { ...basis, p_monteure: [] })).error?.code, "23514");
     assert.equal((await buero.client.rpc("einsatz_speichern", { ...basis, p_ende: basis.p_beginn, p_monteure: [zweiter.id] })).error?.code, "23514");
     const buerokraft = await svcInsert("mitarbeiter", { kuerzel: "Q" + lauf.replace(/[^a-z]/g, "").toUpperCase().padEnd(3, "Z").slice(0, 3), name: `Bürokraft ${lauf}` });
@@ -595,6 +595,69 @@ describe("Zeiterfassung", () => {
     assert.ifError((await buero.client.rpc("loeschen", { p_tabelle: "zeitbuchung", p_id: buchung.id })).error);
     const { data: roh } = await service.from("zeitbuchung").select("deleted_at").eq("id", buchung.id).single();
     assert.ok(roh.deleted_at);
+  });
+});
+
+describe("Fahrzeuge und Termine", () => {
+  let fahrzeug, einsatz;
+  const t = (iso) => new Date(iso).toISOString();
+  it("Kennzeichen eindeutig", async () => {
+    const { data, error } = await buero.client.from("fahrzeug").insert({ kennzeichen: `T-${lauf}`, typ: "Transporter", tuev_am: "2027-03-01" }).select().single();
+    assert.ifError(error);
+    angelegt.push(["fahrzeug", data.id]);
+    fahrzeug = data;
+    const doppelt = await buero.client.from("fahrzeug").insert({ kennzeichen: `T-${lauf}` });
+    assert.equal(doppelt.error?.code, "23505");
+  });
+
+  it("Einsatz mit Fahrzeug; Werkstatttermin im Zeitraum ist ein Konflikt des ganzen Einsatzes", async () => {
+    const { data, error } = await buero.client.rpc("einsatz_speichern", {
+      p_id: null, p_auftrag_id: daten.auftrag.id, p_ticket_id: null, p_beginn: t("2027-03-10T06:00:00Z"), p_ende: t("2027-03-10T15:00:00Z"),
+      p_monteure: [daten.monteur.id], p_fahrzeug_id: fahrzeug.id, p_fest: true, p_hinweis: null,
+    });
+    assert.ifError(error);
+    einsatz = data;
+    angelegt.push(["einsatz", data]);
+    const { data: em } = await service.from("einsatz_monteur").select("id").eq("einsatz_id", data);
+    em.forEach((x) => angelegt.push(["einsatz_monteur", x.id]));
+    const { data: w } = await buero.client.from("fahrzeug_werkstatt").insert({ fahrzeug_id: fahrzeug.id, von: "2027-03-10", bis: "2027-03-11", notiz: "Inspektion" }).select().single();
+    angelegt.push(["fahrzeug_werkstatt", w.id]);
+    const { data: k } = await buero.client.rpc("einsatz_konflikte", { p_von: t("2027-03-08T00:00:00Z"), p_bis: t("2027-03-13T00:00:00Z") });
+    assert.ok(k.some((x) => x.einsatz_id === einsatz && x.art === "werkstatt" && x.mitarbeiter_id === null && x.detail === `T-${lauf}:Inspektion`));
+  });
+
+  it("Einsatz braucht genau einen Bezug (Auftrag oder Ticket)", async () => {
+    const basis = { p_id: null, p_beginn: t("2027-03-15T06:00:00Z"), p_ende: t("2027-03-15T15:00:00Z"), p_monteure: [daten.monteur.id], p_fahrzeug_id: null, p_fest: false, p_hinweis: null };
+    assert.equal((await buero.client.rpc("einsatz_speichern", { ...basis, p_auftrag_id: null, p_ticket_id: null })).error?.code, "23502");
+  });
+
+  it("Fahrzeug mit künftigem Einsatz nicht löschbar, sonst nur Markierung", async () => {
+    const gesperrt = await buero.client.rpc("loeschen", { p_tabelle: "fahrzeug", p_id: fahrzeug.id });
+    assert.equal(gesperrt.error?.code, "23503");
+    const { data: zweites } = await buero.client.from("fahrzeug").insert({ kennzeichen: `T2-${lauf}` }).select().single();
+    angelegt.push(["fahrzeug", zweites.id]);
+    assert.ifError((await buero.client.rpc("loeschen", { p_tabelle: "fahrzeug", p_id: zweites.id })).error);
+    const { data: roh } = await service.from("fahrzeug").select("deleted_at").eq("id", zweites.id).single();
+    assert.ok(roh.deleted_at);
+  });
+
+  it("Termin mit Mitarbeitern speichern, ändern (entfernter nur markiert) und löschen", async () => {
+    const zeile = { p_titel: `Beratung ${lauf}`, p_art: "beratung", p_datum: "2027-03-12", p_beginn: "10:00", p_ende: "11:00", p_kunde_id: daten.kunde.id, p_anfrage_id: null, p_auftrag_id: null, p_ort: null, p_notiz: null };
+    const { data: id, error } = await buero.client.rpc("termin_speichern", { p_id: null, ...zeile, p_mitarbeiter: [daten.monteur.id] });
+    assert.ifError(error);
+    angelegt.push(["termin", id]);
+    const { data: tm } = await service.from("termin_mitarbeiter").select("id").eq("termin_id", id);
+    tm.forEach((x) => angelegt.push(["termin_mitarbeiter", x.id]));
+    assert.ifError((await buero.client.rpc("termin_speichern", { p_id: id, ...zeile, p_mitarbeiter: [] })).error);
+    const { data: team } = await buero.client.from("termin_mitarbeiter").select("id").eq("termin_id", id);
+    assert.equal(team.length, 0);
+    const { data: roh } = await service.from("termin_mitarbeiter").select("deleted_at").eq("termin_id", id);
+    assert.ok(roh.every((x) => x.deleted_at));
+    assert.ok((await buero.client.rpc("termin_speichern", { p_id: null, ...zeile, p_titel: " ", p_mitarbeiter: [] })).error, "leerer Titel");
+    assert.ok((await buero.client.rpc("termin_speichern", { p_id: null, ...zeile, p_ende: "09:00", p_mitarbeiter: [] })).error, "Ende vor Beginn");
+    assert.ifError((await buero.client.rpc("termin_loeschen", { p_id: id })).error);
+    const { data: weg } = await service.from("termin").select("deleted_at").eq("id", id).single();
+    assert.ok(weg.deleted_at);
   });
 });
 

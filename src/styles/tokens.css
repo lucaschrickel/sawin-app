@@ -80,6 +80,20 @@
   --plan-9: #e8c9dc;
   --plan-10: #dad7d2;
 
+  /* Terminarten im Kalender (Text/Punkt und Fläche); Kontrast der Schrift auf der Fläche mind. 4,5:1 über --ink */
+  --cal-montage: #c29470;
+  --cal-montage-bg: #f5ede6;
+  --cal-service: #4f8a63;
+  --cal-service-bg: #e6f0ea;
+  --cal-aufmass: #6e7a88;
+  --cal-aufmass-bg: #eceff2;
+  --cal-beratung: #8670b0;
+  --cal-beratung-bg: #efeaf6;
+  --cal-intern: #8a8f96;
+  --cal-intern-bg: #f0f0ef;
+  --cal-abw: #c0675a;
+  --cal-abw-bg: #f8e7e3;
+
   /* Fokus: deckende Farbe, mind. 3:1 gegen --surface und --canvas */
   --focus-ring: #171717;
 
@@ -156,6 +170,19 @@
   --plan-8: #355955;
   --plan-9: #664559;
   --plan-10: #4f4c47;
+
+  --cal-montage: #d9a985;
+  --cal-montage-bg: #3a2f27;
+  --cal-service: #7dba92;
+  --cal-service-bg: #1d3327;
+  --cal-aufmass: #9aa6b4;
+  --cal-aufmass-bg: #262c33;
+  --cal-beratung: #ae9ad6;
+  --cal-beratung-bg: #2e2840;
+  --cal-intern: #a9aeb5;
+  --cal-intern-bg: #2b2b2b;
+  --cal-abw: #e58c80;
+  --cal-abw-bg: #43251f;
 
   --focus-ring: #e9e6e2;
 

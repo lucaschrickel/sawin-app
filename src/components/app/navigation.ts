@@ -77,9 +77,9 @@ export const NAVIGATION: NavGroup[] = [
   {
     label: "Team und Ressourcen",
     items: [
-      { key: "kalender", href: "/kalender", label: "Kalender", icon: Grid3x3 },
+      { key: "kalender", href: "/kalender", label: "Kalender", icon: Grid3x3, bereit: true },
       { key: "mitarbeiter", href: "/mitarbeiter", label: "Mitarbeiter", icon: User, bereit: true },
-      { key: "fahrzeuge", href: "/fahrzeuge", label: "Fahrzeuge", icon: Truck, zaehler: "fahrzeuge" },
+      { key: "fahrzeuge", href: "/fahrzeuge", label: "Fahrzeuge", icon: Truck, bereit: true, zaehler: "fahrzeuge" },
       { key: "zeiten", href: "/zeiten", label: "Zeiterfassung", icon: Clock, bereit: true },
       { key: "abwesenheiten", href: "/abwesenheiten", label: "Abwesenheiten", icon: Sun, bereit: true, zaehler: "abwesenheiten" },
     ],

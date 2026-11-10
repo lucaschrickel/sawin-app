@@ -58,7 +58,7 @@ Sonderregeln per Trigger (RLS kann Spaltenänderungen nicht prüfen):
 | `kolonne` | Name, Stammfahrzeug, Reihenfolge |
 | `kolonne_mitglied` | Kolonne, Mitarbeiter (nur Monteure), Reihenfolge; ein Monteur kann in mehreren Kolonnen sein |
 | `ressource` | weitere Zeilen der Plantafel (Selbstabholer, Lager …), Notiz, Reihenfolge |
-| `fahrzeug` | Kennzeichen, Typ, Kolonne, km-Stand, Hinweise, TÜV/HU, Service, UVV |
+| `fahrzeug` | Kennzeichen, Typ, Kolonne, km-Stand, Hinweise, TÜV/HU, Service, UVV. Löschen nur ohne künftige Einsätze |
 | `fahrzeug_werkstatt` | Fahrzeug, von, bis, Notiz |
 | `abwesenheit` | Mitarbeiter, Art (urlaub, krank, schulung, ueberstunden, sonstiges), von, bis, Status (beantragt, genehmigt, abgelehnt), Notiz, entschieden von/am. Entschiedene Abwesenheiten (außer Krankmeldungen) löscht nur ein Admin (Trigger `abwesenheit_loeschen_pruefen`) |
 | `zeitbuchung` | Mitarbeiter, Auftrag **oder** Ticket **oder** ohne Bezug, Datum, Beginn, Ende (`ende > beginn`), Pause (min), Art (montage, aufmass, service, lager, fahrt, buero), Tätigkeit, Freigabe (offen/freigegeben). Montage, Aufmaß und Service brauchen einen Auftrag oder ein Ticket; freigegebene Buchungen sind gesperrt (Trigger `zeitbuchung_regeln`) |
@@ -113,9 +113,9 @@ Wahl der Rechnung). Höchstens eine Zahlungsbestätigung je Zahlung. Höchstens 
 |---|---|
 | `einsatz` | Auftrag **oder** Ticket, Beginn, Ende (`ende > beginn`), Fahrzeug, Ressource, `fest` (freigegeben), Farbe (Paletten-Token `plan-1` … `plan-10` oder `#RRGGBB`, geprüft) |
 | `einsatz_monteur` | Einsatz, Mitarbeiter (mehrere Monteure je Einsatz) |
-| `einsatz_speichern()`, `einsatz_loeschen()`, `einsatz_konflikte()` | Funktionen (SECURITY INVOKER): Einsatz samt Team in einem Schritt speichern (mindestens ein Monteur, entfernte Monteure nur markiert), Einsatz samt Team als gelöscht markieren, Konflikte im Zeitraum (Monteur gleichzeitig in einem anderen Einsatz oder abwesend, beantragt oder genehmigt). Die Arbeitszeit in `einstellung` ist auf volle Stunden beschränkt (Stundenraster der Plantafel). |
+| `einsatz_speichern()`, `einsatz_loeschen()`, `einsatz_konflikte()` | Funktionen (SECURITY INVOKER): Einsatz zu genau einem Auftrag oder Ticket samt Team und Fahrzeug in einem Schritt speichern (mindestens ein Monteur, entfernte Monteure nur markiert), Einsatz samt Team als gelöscht markieren, Konflikte im Zeitraum (Monteur gleichzeitig in einem anderen Einsatz oder abwesend, beantragt oder genehmigt; Werkstatttermin des Fahrzeugs ohne Mitarbeiter-Bezug). Feiertage prüft die App selbst (`src/lib/feiertage.ts`). Die Arbeitszeit in `einstellung` ist auf volle Stunden beschränkt (Stundenraster der Plantafel). |
 | `aufgabe` | Titel, Zuständig (Benutzer), fällig, Priorität, Status (offen, in_arbeit, wartet_zulieferer, wartet_kunde, erledigt), erledigt am (Trigger), Notiz, optional Kunde, Anfrage, Auftrag oder Ticket (höchstens einer) |
-| `termin` | Titel, Art (beratung, intern), Datum, Beginn, Ende, optional Kunde/Anfrage/Auftrag, Ort, Notiz |
+| `termin` | Titel, Art (beratung, intern), Datum, Beginn, Ende, optional Kunde/Anfrage/Auftrag, Ort, Notiz. Speichern samt Mitarbeitern über `termin_speichern()`, Löschen über `termin_loeschen()` |
 | `termin_mitarbeiter` | Termin, Mitarbeiter |
 | `formular` | Typ (aufmass, montageprotokoll, servicebericht, uebergabeprotokoll), Anfrage (nur Aufmaß), Auftrag oder Ticket, Datum, Status, Hinweise, PDF- und Scan-Pfad |
 | `aufmass_zeile` | Formular, Raum, Element, Breite/Höhe mm, Anzahl, Anschlag, Bemerkung |
@@ -169,6 +169,9 @@ und danach wieder entfernt:
 10. **Zeiterfassung:** Montage, Aufmaß und Service nur mit Auftrag, Lager, Fahrt und Büro auch ohne; Ende vor Beginn
     und zu lange Pause abgelehnt; Freigabe hält Benutzer und Zeitpunkt fest; freigegebene Buchungen gesperrt (auch
     gegen Löschen), bis die Freigabe zurückgenommen ist.
+12. **Fahrzeuge und Termine:** Kennzeichen eindeutig, Werkstatttermin als Konflikt des ganzen Einsatzes, Einsatz braucht
+    genau einen Bezug, Fahrzeug mit künftigem Einsatz nicht löschbar, Termin mit Mitarbeitern speichern, ändern und als
+    gelöscht markieren.
 11. **Abwesenheiten löschen:** eine entschiedene Abwesenheit löscht nur ein Admin (nur als Markierung), einen Antrag
     und eine Krankmeldung jeder Benutzer.
 

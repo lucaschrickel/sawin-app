@@ -8,25 +8,47 @@ import { Button } from "@/components/ui/button";
 import { Field, Input, Textarea } from "@/components/ui/field";
 import { FormularDialog, type FormularSteuerung } from "@/components/ui/formular-dialog";
 import { Formular } from "@/components/ui/formular";
-import type { Monteur, TafelEinsatz } from "@/lib/montageplan";
-import { auftraegeSuchen, einsatzLoeschen, einsatzSpeichern, monteurSpeichern, type AuftragTreffer, type Ergebnis } from "./aktionen";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import type { Monteur, Plan, TafelEinsatz, TafelFahrzeug } from "@/lib/montageplan";
+import { bezugHref } from "@/lib/montageplan-text";
+import { auftraegeSuchen, einsatzLoeschen, einsatzSpeichern, monteurSpeichern, ticketsSuchen, type AuftragTreffer, type Ergebnis } from "./aktionen";
 
 export type AuftragWahl = { id: string; nummer: string; titel: string; kunde: string };
-export type DialogVorlage = { einsatz: TafelEinsatz } | { beginn: string; ende: string; monteure: string[]; auftrag?: AuftragWahl };
+/** Gewählter Bezug eines Einsatzes: Auftrag (Montageplan) oder Service-Ticket (Service-Plan) */
+export type BezugWahl = AuftragWahl & { art: "auftrag" | "ticket" };
+export type DialogVorlage = { einsatz: TafelEinsatz } | { beginn: string; ende: string; monteure: string[]; bezug?: BezugWahl };
 
-/** Termin-Dialog: Einsatz anlegen oder ändern (Auftrag, Zeitraum, Monteure, Freigabe, Hinweis), löschen */
-export function EinsatzDialog({ vorlage, monteure, beiSchliessen, beiErgebnis }: { vorlage: DialogVorlage; monteure: Monteur[]; beiSchliessen: () => void; beiErgebnis: (r: Ergebnis) => void }) {
-  const e = "einsatz" in vorlage ? vorlage.einsatz : null;
+
+/** Prüftermine, die heute oder früher fällig waren (Hinweis im Termin-Dialog) */
+function ueberfaellig(f: TafelFahrzeug, heute: string) {
+  const termine: [string, string | null][] = [
+    ["TÜV/HU", f.tuev_am],
+    ["Service", f.service_am],
+    ["UVV", f.uvv_am],
+  ];
+  return termine.filter(([, d]) => d && d < heute).map(([l]) => l);
+}
+
+type DialogProps = { plan: Plan; vorlage: DialogVorlage; monteure: Monteur[]; fahrzeuge: TafelFahrzeug[]; heute: string; beiSchliessen: () => void; beiErgebnis: (r: Ergebnis) => void };
+
+/** Termin-Dialog: Einsatz anlegen oder ändern (Auftrag bzw. Ticket, Zeitraum, Monteure, Fahrzeug, Freigabe, Hinweis), löschen */
+export function EinsatzDialog(p: DialogProps) {
+  const e = "einsatz" in p.vorlage ? p.vorlage.einsatz : null;
   return (
-    <FormularDialog titel={e ? "Einsatz" : "Einsatz planen"} breit beiSchliessen={beiSchliessen}>
-      {(s) => <EinsatzFormular vorlage={vorlage} monteure={monteure} s={s} beiErgebnis={beiErgebnis} />}
+    <FormularDialog titel={e ? "Einsatz" : "Einsatz planen"} breit beiSchliessen={p.beiSchliessen}>
+      {(s) => <EinsatzFormular {...p} s={s} />}
     </FormularDialog>
   );
 }
 
-function EinsatzFormular({ vorlage, monteure, s, beiErgebnis }: { vorlage: DialogVorlage; monteure: Monteur[]; s: FormularSteuerung; beiErgebnis: (r: Ergebnis) => void }) {
+const OHNE = "ohne";
+
+function EinsatzFormular({ plan, vorlage, monteure, fahrzeuge, heute, s, beiErgebnis }: DialogProps & { s: FormularSteuerung }) {
   const e = "einsatz" in vorlage ? vorlage.einsatz : null;
-  const [auftrag, setAuftrag] = useState<AuftragWahl | null>(e?.auftrag ?? ("auftrag" in vorlage ? (vorlage.auftrag ?? null) : null));
+  const art = plan === "montage" ? "auftrag" : "ticket";
+  const [auftrag, setAuftrag] = useState<BezugWahl | null>(e?.bezug ?? ("bezug" in vorlage ? (vorlage.bezug ?? null) : null));
+  const [fahrzeugId, setFahrzeugId] = useState(e?.fahrzeug_id ?? OHNE);
+  const fz = fahrzeuge.find((f) => f.id === fahrzeugId);
   const [beginn, setBeginn] = useState(e?.beginn ?? ("beginn" in vorlage ? vorlage.beginn : ""));
   const [ende, setEnde] = useState(e?.ende ?? ("ende" in vorlage ? vorlage.ende : ""));
   const [team, setTeam] = useState<string[]>(e?.monteure ?? ("monteure" in vorlage ? vorlage.monteure : []));
@@ -40,7 +62,18 @@ function EinsatzFormular({ vorlage, monteure, s, beiErgebnis }: { vorlage: Dialo
 
   const speichern = () =>
     starten(async () => {
-      const r = await einsatzSpeichern({ id: e?.id ?? null, auftrag_id: auftrag?.id ?? "", beginn, ende, monteure: team, fest, hinweis });
+      const bezugArt = auftrag?.art ?? art;
+      const r = await einsatzSpeichern({
+        id: e?.id ?? null,
+        auftrag_id: bezugArt === "auftrag" ? (auftrag?.id ?? "") : null,
+        ticket_id: bezugArt === "ticket" ? (auftrag?.id ?? "") : null,
+        fahrzeug_id: fahrzeugId === OHNE ? null : fahrzeugId,
+        beginn,
+        ende,
+        monteure: team,
+        fest,
+        hinweis,
+      });
       if (r.ok) {
         beiErgebnis(r);
         s.fertig();
@@ -52,7 +85,7 @@ function EinsatzFormular({ vorlage, monteure, s, beiErgebnis }: { vorlage: Dialo
       {fehler.fehler && <p role="alert" className="rounded-md bg-tone-red-bg px-3.5 py-2.5 text-sm text-tone-red-fg">{fehler.fehler}</p>}
 
       <div className="flex flex-col gap-1.5">
-        <span className="text-sm font-medium text-ink-3">Auftrag *</span>
+        <span className="text-sm font-medium text-ink-3">{(auftrag?.art ?? art) === "auftrag" ? "Auftrag *" : "Service-Ticket *"}</span>
         {auftrag ? (
           <div className="flex h-[42px] items-center justify-between gap-2 rounded-md border border-line bg-surface-muted px-[13px]">
             <span className="min-w-0 truncate">
@@ -61,13 +94,13 @@ function EinsatzFormular({ vorlage, monteure, s, beiErgebnis }: { vorlage: Dialo
             </span>
             <span className="flex shrink-0 items-center gap-1">
               {e && (
-                <Link href={`/auftraege/${auftrag.id}`} className="rounded-sm px-2 py-1 text-sm text-accent-text hover:underline">Auftrag öffnen</Link>
+                <Link href={bezugHref(auftrag)} className="rounded-sm px-2 py-1 text-sm text-accent-text hover:underline">{auftrag.art === "auftrag" ? "Auftrag öffnen" : "Ticket öffnen"}</Link>
               )}
               {!e && <Button size="xs" variant="ghost" onClick={() => aendern(setAuftrag)(null)}>Ändern</Button>}
             </span>
           </div>
         ) : (
-          <AuftragSuche onWahl={aendern(setAuftrag)} fehler={fehler.felder?.auftrag} />
+          <BezugSuche art={art} onWahl={(a) => aendern(setAuftrag)({ ...a, art })} fehler={fehler.felder?.auftrag} />
         )}
       </div>
 
@@ -99,6 +132,23 @@ function EinsatzFormular({ vorlage, monteure, s, beiErgebnis }: { vorlage: Dialo
         </div>
         {fehler.felder?.monteure && <small className="text-xs text-tone-red-fg">{fehler.felder.monteure}</small>}
       </fieldset>
+
+      <Field label="Fahrzeug" error={fehler.felder?.fahrzeug} hint="Höchstens ein Fahrzeug je Einsatz">
+        {(p) => (
+          <Select value={fahrzeugId} onValueChange={(v) => aendern(setFahrzeugId)(v)}>
+            <SelectTrigger id={p.id} aria-label="Fahrzeug"><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value={OHNE}>– ohne Fahrzeug –</SelectItem>
+              {fahrzeuge.map((f) => <SelectItem key={f.id} value={f.id}>{f.kennzeichen}{f.typ ? " · " + f.typ : ""}</SelectItem>)}
+            </SelectContent>
+          </Select>
+        )}
+      </Field>
+      {fz && ueberfaellig(fz, heute).length > 0 && (
+        <p role="alert" data-pruefung className="-mt-2 rounded-md bg-tone-amber-bg px-3.5 py-2 text-sm text-tone-amber-fg">
+          {fz.kennzeichen}: {ueberfaellig(fz, heute).join(", ")} überfällig.
+        </p>
+      )}
 
       <Field label="Hinweis für die Monteure">{(p) => <Textarea {...p} value={hinweis} onChange={(x) => aendern(setHinweis)(x.target.value)} placeholder="z. B. Schlüssel beim Nachbarn" />}</Field>
 
@@ -142,7 +192,12 @@ function EinsatzFormular({ vorlage, monteure, s, beiErgebnis }: { vorlage: Dialo
 }
 
 /** Auftrag suchen (ab zwei Zeichen) und wählen; auch in der Zeiterfassung genutzt */
-export function AuftragSuche({ onWahl, fehler, auchAbgeschlossene }: { onWahl: (a: AuftragWahl) => void; fehler?: string; auchAbgeschlossene?: boolean }) {
+export function AuftragSuche(p: { onWahl: (a: AuftragWahl) => void; fehler?: string; auchAbgeschlossene?: boolean }) {
+  return <BezugSuche art="auftrag" {...p} />;
+}
+
+/** Auftrag oder Service-Ticket suchen (ab zwei Zeichen) und wählen */
+export function BezugSuche({ art, onWahl, fehler, auchAbgeschlossene }: { art: "auftrag" | "ticket"; onWahl: (a: AuftragWahl) => void; fehler?: string; auchAbgeschlossene?: boolean }) {
   const [q, setQ] = useState("");
   const [treffer, setTreffer] = useState<AuftragTreffer[]>([]);
   const timer = useRef<number | undefined>(undefined);
@@ -150,20 +205,20 @@ export function AuftragSuche({ onWahl, fehler, auchAbgeschlossene }: { onWahl: (
   const suchen = (wert: string) => {
     setQ(wert);
     window.clearTimeout(timer.current);
-    timer.current = window.setTimeout(async () => setTreffer(wert.trim().length >= 2 ? await auftraegeSuchen(wert, auchAbgeschlossene) : []), 250);
+    timer.current = window.setTimeout(async () => setTreffer(wert.trim().length >= 2 ? await (art === "auftrag" ? auftraegeSuchen(wert, auchAbgeschlossene) : ticketsSuchen(wert)) : []), 250);
   };
   return (
     <div className="relative">
       <label className={`flex h-[42px] items-center gap-2 rounded-md border bg-surface px-[13px] ${fehler ? "border-tone-red-fg" : "border-line"}`}>
         <Search className="size-4 text-muted-2" aria-hidden="true" />
         <input
-          aria-label="Auftrag suchen"
+          aria-label={art === "auftrag" ? "Auftrag suchen" : "Ticket suchen"}
           role="combobox"
           aria-expanded={treffer.length > 0}
           aria-controls="auftrag-treffer"
           value={q}
           onChange={(x) => suchen(x.target.value)}
-          placeholder="Auftragsnummer, Kunde oder Titel …"
+          placeholder={art === "auftrag" ? "Auftragsnummer, Kunde oder Titel …" : "Ticketnummer, Kunde oder Thema …"}
           className="min-w-0 flex-1 bg-transparent outline-none"
         />
         {q && (
@@ -186,7 +241,7 @@ export function AuftragSuche({ onWahl, fehler, auchAbgeschlossene }: { onWahl: (
           ))}
         </ul>
       )}
-      {q.trim().length >= 2 && treffer.length === 0 && <small className="mt-1 block text-xs text-muted-2">{auchAbgeschlossene ? "Kein Auftrag gefunden." : "Kein offener Auftrag gefunden."}</small>}
+      {q.trim().length >= 2 && treffer.length === 0 && <small className="mt-1 block text-xs text-muted-2">{art === "ticket" ? "Kein offenes Ticket gefunden." : auchAbgeschlossene ? "Kein Auftrag gefunden." : "Kein offener Auftrag gefunden."}</small>}
     </div>
   );
 }

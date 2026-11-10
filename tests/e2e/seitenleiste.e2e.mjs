@@ -17,7 +17,7 @@ const DEMO = [
   ["Team und Ressourcen", ["Kalender", "Mitarbeiter", "Fahrzeuge", "Zeiterfassung", "Abwesenheiten"]],
   ["System", ["Einstellungen"]],
 ];
-const FERTIG = ["Aufgaben", "Kunden", "Anfragen", "Aufträge", "Montageplan", "Mitarbeiter", "Zeiterfassung", "Abwesenheiten", "Einstellungen"];
+const FERTIG = ["Aufgaben", "Kunden", "Anfragen", "Aufträge", "Montageplan", "Kalender", "Mitarbeiter", "Fahrzeuge", "Zeiterfassung", "Abwesenheiten", "Einstellungen"];
 const ZUSATZ = (process.env.FERTIG_ZUSATZ ?? "").split(",").filter(Boolean); // später gebaute Module
 
 try {

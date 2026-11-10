@@ -2,20 +2,27 @@
 
 import { AlertTriangle, Pencil, Plus, UserMinus } from "lucide-react";
 import { usePathname, useRouter } from "next/navigation";
-import { useEffect, useRef, useState, useTransition, type MouseEvent as ReactMouseEvent, type PointerEvent as ReactPointerEvent } from "react";
+import { useEffect, useRef, useState, useTransition, type MouseEvent as ReactMouseEvent, type PointerEvent as ReactPointerEvent, type ReactNode } from "react";
 import { Bestaetigen } from "@/components/ui/bestaetigen";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/cn";
-import type { Monteur, TafelAbwesenheit, TafelEinsatz } from "@/lib/montageplan";
-import { ABWESENHEIT_TEXT, konfliktText, type Konflikt } from "@/lib/montageplan-text";
+import type { Monteur, Plan, TafelAbwesenheit, TafelEinsatz, TafelFahrzeug } from "@/lib/montageplan";
+import { ABWESENHEIT_TEXT, bezugHref, konfliktText, type Konflikt } from "@/lib/montageplan-text";
 import { lokalAus, lokalKurz, slotAus, slotsGesamt, stundenJeTag, tagKurz, type Raster } from "@/lib/woche";
 import { einsatzSpeichern, monteurDeaktivieren, type Ergebnis } from "./aktionen";
-import { EinsatzDialog, MonteurDialog, type AuftragWahl, type DialogVorlage } from "./einsatz-dialog";
+import { EinsatzDialog, MonteurDialog, type BezugWahl, type DialogVorlage } from "./einsatz-dialog";
 
 /** Breite einer Stunde und Höhe einer Spur in Pixeln */
-const SLOT = 26;
+export const SLOT = 26;
 const SPUR = 44;
-const LABEL = 200;
+export const LABEL = 200;
+
+/** Feste Klassen je Planungsfarbe (Tailwind erkennt nur vollständige Klassennamen) */
+const FARBE = {
+  auftrag: { fest: "bg-(--plan-1) text-ink", vorgeplant: "border-(--plan-1)" },
+  service: { fest: "bg-(--plan-2) text-ink", vorgeplant: "border-(--plan-2)" },
+  reklamation: { fest: "bg-(--plan-5) text-ink", vorgeplant: "border-(--plan-5)" },
+} as const;
 
 type Zug = {
   id: string;
@@ -32,17 +39,25 @@ type Zug = {
   px: number;
   py: number;
 };
-type Balken = { e: TafelEinsatz; s: number; en: number; abgeschnitten: boolean; spur: number };
+type Balken = { e: TafelEinsatz; s: number; en: number; abgeschnitten: boolean; spur: number; belegt: boolean };
 
 type Props = {
+  /** Montageplan (Einsätze zu Aufträgen) oder Service-Plan (Einsätze zu Tickets); der andere Plan erscheint als „belegt“ */
+  plan: Plan;
   raster: Raster;
   heute: string;
   monteure: Monteur[];
   einsaetze: TafelEinsatz[];
   abwesenheiten: TafelAbwesenheit[];
   konflikte: Konflikt[];
-  /** Aus „Montage planen“ am Auftrag: Dialog für einen neuen Einsatz zu diesem Auftrag öffnen */
-  auftragVorlage: AuftragWahl | null;
+  fahrzeuge: TafelFahrzeug[];
+  feiertage: { datum: string; name: string }[];
+  /** Aus „Montage planen“ bzw. „Einsatz planen“: Dialog für einen neuen Einsatz zu diesem Auftrag bzw. Ticket öffnen */
+  bezugVorlage: BezugWahl | null;
+  /** zusätzliche Zeilen oberhalb der Monteure (z. B. „Terminierbar“ im Service-Plan) */
+  planungszeilen?: (hilfen: { breite: number; n: number; neuerEinsatz: (v: DialogVorlage) => void; setMeldung: (e: Ergebnis) => void }) => ReactNode;
+  /** Ziel für das Ablegen aus einer Planungszeile auf eine Monteur-Zeile */
+  beiAblegen?: (daten: string, monteurId: string, slot: number) => void;
 };
 
 export function Plantafel(p: Props) {
@@ -51,6 +66,7 @@ export function Plantafel(p: Props) {
   const gesamt = slotsGesamt(raster);
   const router = useRouter();
   const pfad = usePathname();
+  const eigeneArt = p.plan === "montage" ? "auftrag" : "ticket";
 
   // Optimistische Kopie der Einsätze; neue Daten vom Server ersetzen sie (Muster „State aus Props ableiten“)
   const [quelle, setQuelle] = useState(p.einsaetze);
@@ -69,11 +85,12 @@ export function Plantafel(p: Props) {
   const zugEnde = useRef(0);
   const [meldung, setMeldung] = useState<Ergebnis>({});
   const [markiert, setMarkiert] = useState<string | null>(null);
-  const [dialog, setDialog] = useState<DialogVorlage | null>(() => {
-    if (!p.auftragVorlage) return null;
-    const tag = raster.tage.find((t) => t >= p.heute) ?? raster.tage[0];
-    return { beginn: `${tag}T${String(raster.von).padStart(2, "0")}:00`, ende: `${tag}T${String(raster.bis).padStart(2, "0")}:00`, monteure: [], auftrag: p.auftragVorlage };
-  });
+  const [ablageZiel, setAblageZiel] = useState<string | null>(null);
+  const tagStandard = raster.tage.find((t) => t >= p.heute) ?? raster.tage[0];
+  const stunde = (h: number) => String(h).padStart(2, "0");
+  const [dialog, setDialog] = useState<DialogVorlage | null>(() =>
+    p.bezugVorlage ? { beginn: `${tagStandard}T${stunde(raster.von)}:00`, ende: `${tagStandard}T${stunde(raster.bis)}:00`, monteure: [], bezug: p.bezugVorlage } : null,
+  );
   const [, starten] = useTransition();
   const scroller = useRef<HTMLDivElement>(null);
 
@@ -83,12 +100,19 @@ export function Plantafel(p: Props) {
     if (scroller.current && i > 0) scroller.current.scrollLeft = Math.max(0, i * n * SLOT - SLOT);
   }, [raster.tage, p.heute, n]);
 
-  const konfliktVon = (einsatzId: string, monteurId: string) => p.konflikte.filter((k) => k.einsatz_id === einsatzId && k.mitarbeiter_id === monteurId);
   const name = new Map(p.monteure.map((m) => [m.id, m.name]));
+  const feiertag = new Map(p.feiertage.map((f) => [f.datum, f.name]));
+  const fahrzeug = new Map(p.fahrzeuge.map((f) => [f.id, f]));
+  /** Konflikte eines Einsatzes in einer Zeile: eigene des Monteurs, solche des ganzen Einsatzes (Werkstatt) und Feiertage */
+  const konfliktVon = (e: TafelEinsatz, monteurId: string): Konflikt[] => {
+    const ks = p.konflikte.filter((k) => k.einsatz_id === e.id && (k.mitarbeiter_id === monteurId || k.mitarbeiter_id === null));
+    for (const f of p.feiertage) if (e.beginn.slice(0, 10) <= f.datum && e.ende.slice(0, 10) >= f.datum) ks.push({ einsatz_id: e.id, mitarbeiter_id: null, art: "feiertag", detail: f.name });
+    return ks;
+  };
 
   const dialogSchliessen = () => {
     setDialog(null);
-    if (p.auftragVorlage) router.replace(`${pfad}?woche=${raster.tage[0]}`, { scroll: false });
+    if (p.bezugVorlage) router.replace(`${pfad}?woche=${raster.tage[0]}`, { scroll: false });
   };
 
   // ---------- Ziehen, Verlängern, Verkürzen ----------
@@ -122,7 +146,7 @@ export function Plantafel(p: Props) {
     if (!z) return;
     zugEnde.current = ev.timeStamp;
     const e = listeRef.current.find((x) => x.id === z.id);
-    if (!e?.auftrag) return;
+    if (!e?.bezug) return;
     if (!z.bewegt) {
       // Ein Klick auf den Balken öffnet den Termin-Dialog, ein Klick auf den Griff nicht
       if (z.art === "verschieben") setDialog({ einsatz: e });
@@ -142,8 +166,19 @@ export function Plantafel(p: Props) {
     const vorher = listeRef.current;
     setListe((l) => l.map((x) => (x.id === e.id ? { ...x, beginn, ende, monteure } : x)));
     setMeldung({});
+    const bezug = e.bezug;
     starten(async () => {
-      const r = await einsatzSpeichern({ id: e.id, auftrag_id: e.auftrag!.id, beginn, ende, monteure, fest: null, hinweis: e.hinweis });
+      const r = await einsatzSpeichern({
+        id: e.id,
+        auftrag_id: bezug.art === "auftrag" ? bezug.id : null,
+        ticket_id: bezug.art === "ticket" ? bezug.id : null,
+        fahrzeug_id: e.fahrzeug_id,
+        beginn,
+        ende,
+        monteure,
+        fest: null,
+        hinweis: e.hinweis,
+      });
       if (r.fehler) {
         setListe(vorher);
         setMeldung({ fehler: r.fehler });
@@ -152,7 +187,7 @@ export function Plantafel(p: Props) {
   };
 
   const greifen = (ev: ReactPointerEvent, b: Balken, monteur: string, art: Zug["art"]) => {
-    if (ev.button !== 0) return;
+    if (ev.button !== 0 || b.belegt) return;
     ev.preventDefault();
     ev.stopPropagation();
     // Einsätze, die über den sichtbaren Zeitraum hinausgehen, werden nur per Dialog geändert
@@ -174,7 +209,7 @@ export function Plantafel(p: Props) {
       const s = imZug ? zug.s : slotAus(e.beginn, raster, "beginn");
       const en = imZug ? zug.en : slotAus(e.ende, raster, "ende");
       if (en <= s) continue;
-      roh.push({ e, s, en, abgeschnitten: e.beginn.slice(0, 10) < raster.tage[0] || e.ende.slice(0, 10) > raster.tage.at(-1)! });
+      roh.push({ e, s, en, abgeschnitten: e.beginn.slice(0, 10) < raster.tage[0] || e.ende.slice(0, 10) > raster.tage.at(-1)!, belegt: e.bezug?.art !== eigeneArt });
     }
     roh.sort((a, b) => a.s - b.s || b.en - a.en);
     const enden: number[] = [];
@@ -187,16 +222,28 @@ export function Plantafel(p: Props) {
     return { balken, spuren: Math.max(1, enden.length) };
   };
 
+  const slotBei = (clientX: number, el: HTMLElement) => Math.min(Math.max(Math.floor((clientX - el.getBoundingClientRect().left) / SLOT), 0), gesamt - 1);
   const neuInZelle = (ev: ReactMouseEvent<HTMLDivElement>, monteurId: string) => {
     if ((ev.target as HTMLElement).closest("[data-einsatz]") || ev.timeStamp - zugEnde.current < 400) return;
-    const rect = ev.currentTarget.getBoundingClientRect();
-    const slot = Math.min(Math.max(Math.floor((ev.clientX - rect.left) / SLOT), 0), gesamt - 1);
+    const slot = slotBei(ev.clientX, ev.currentTarget);
     const tagEnde = (Math.floor(slot / n) + 1) * n;
     setDialog({ beginn: lokalAus(slot, raster, "beginn"), ende: lokalAus(tagEnde, raster, "ende"), monteure: [monteurId] });
   };
 
-  const konflikteWoche = [...new Map(p.konflikte.map((k) => [`${k.einsatz_id}|${k.mitarbeiter_id}|${k.detail}`, k])).values()];
+  // Konflikte der Woche für die Liste oben (eigener Plan), Feiertage eingeschlossen
+  const konflikteWoche = liste
+    .filter((e) => e.bezug?.art === eigeneArt)
+    .flatMap((e) => (e.monteure.length ? e.monteure : [""]).flatMap((m) => konfliktVon(e, m).map((k) => ({ ...k, zeile: m }))))
+    .filter((k, i, alle) => alle.findIndex((x) => x.einsatz_id === k.einsatz_id && x.detail === k.detail && (x.mitarbeiter_id ?? "") === (k.mitarbeiter_id ?? "")) === i);
   const breite = gesamt * SLOT;
+  const rasterHintergrund = `repeating-linear-gradient(to right, transparent 0 ${SLOT - 1}px, var(--line-soft) ${SLOT - 1}px ${SLOT}px), repeating-linear-gradient(to right, var(--line) 0 1px, transparent 1px ${n * SLOT}px)`;
+  const tagesFlaechen = raster.tage.map((t, i) =>
+    feiertag.has(t) ? (
+      <div key={`f-${t}`} aria-hidden="true" data-feiertag={t} className="pointer-events-none absolute inset-y-0 bg-tone-red-bg/70" style={{ left: i * n * SLOT, width: n * SLOT }} />
+    ) : t === p.heute ? (
+      <div key={`h-${t}`} aria-hidden="true" className="pointer-events-none absolute inset-y-0 bg-tone-brand-bg/40" style={{ left: i * n * SLOT, width: n * SLOT }} />
+    ) : null,
+  );
 
   return (
     <div className="flex flex-col gap-3">
@@ -217,7 +264,8 @@ export function Plantafel(p: Props) {
               const e = liste.find((x) => x.id === k.einsatz_id);
               return (
                 <li key={`${k.einsatz_id}|${k.mitarbeiter_id}|${k.detail}`}>
-                  <b className="font-medium">{name.get(k.mitarbeiter_id) ?? "Monteur"}</b> · {e?.auftrag ? `${e.auftrag.nummer} ${e.auftrag.kunde}` : "Einsatz"} · {konfliktText(k)}
+                  {k.mitarbeiter_id && <><b className="font-medium">{name.get(k.mitarbeiter_id) ?? "Monteur"}</b> · </>}
+                  {e?.bezug ? `${e.bezug.nummer} ${e.bezug.kunde}` : "Einsatz"} · {konfliktText(k)}
                 </li>
               );
             })}
@@ -225,7 +273,7 @@ export function Plantafel(p: Props) {
         </details>
       )}
 
-      <div ref={scroller} className="overflow-x-scroll rounded-lg border border-line-soft bg-surface select-none" data-tafel>
+      <div ref={scroller} className="overflow-x-scroll rounded-lg border border-line-soft bg-surface select-none" data-tafel={p.plan}>
         <div style={{ width: LABEL + breite }}>
           {/* Kopf: Tage und Stunden */}
           <div className="sticky top-0 z-20 flex border-b border-line bg-surface">
@@ -237,11 +285,15 @@ export function Plantafel(p: Props) {
                 {raster.tage.map((t) => (
                   <div
                     key={t}
-                    className={cn("border-l border-line px-2 py-1.5 text-sm font-semibold", t === p.heute && "bg-tone-brand-bg text-tone-brand-fg")}
+                    title={feiertag.get(t)}
+                    className={cn(
+                      "truncate border-l border-line px-2 py-1.5 text-sm font-semibold",
+                      feiertag.has(t) ? "bg-tone-red-bg text-tone-red-fg" : t === p.heute && "bg-tone-brand-bg text-tone-brand-fg",
+                    )}
                     style={{ width: n * SLOT }}
                   >
                     {tagKurz(t)}
-                    {t === p.heute && <span className="ml-1.5 text-xs font-normal">heute</span>}
+                    {feiertag.has(t) ? <span className="ml-1.5 text-xs font-normal">{feiertag.get(t)}</span> : t === p.heute && <span className="ml-1.5 text-xs font-normal">heute</span>}
                   </div>
                 ))}
               </div>
@@ -257,11 +309,13 @@ export function Plantafel(p: Props) {
             </div>
           </div>
 
+          {p.planungszeilen?.({ breite, n, neuerEinsatz: setDialog, setMeldung })}
+
           {/* Zeilen je Monteur */}
           {p.monteure.map((m) => {
             const { balken, spuren } = balkenFuer(m.id);
             const abwesend = p.abwesenheiten.filter((a) => a.mitarbeiter_id === m.id);
-            const ziel = zug?.bewegt && zug.ziel === m.id && zug.ziel !== zug.monteur;
+            const ziel = (zug?.bewegt && zug.ziel === m.id && zug.ziel !== zug.monteur) || ablageZiel === m.id;
             return (
               <div key={m.id} className={cn("group/zeile flex border-b border-line-soft", markiert === m.id ? "bg-tone-brand-bg/60" : "hover:bg-surface-muted")} data-monteur-zeile={m.id}>
                 <div
@@ -297,16 +351,21 @@ export function Plantafel(p: Props) {
                 <div
                   data-zeile={m.id}
                   onClick={(ev) => neuInZelle(ev, m.id)}
+                  onDragOver={p.beiAblegen ? (ev) => { ev.preventDefault(); setAblageZiel(m.id); } : undefined}
+                  onDragLeave={p.beiAblegen ? () => setAblageZiel((x) => (x === m.id ? null : x)) : undefined}
+                  onDrop={
+                    p.beiAblegen
+                      ? (ev) => {
+                          ev.preventDefault();
+                          setAblageZiel(null);
+                          p.beiAblegen!(ev.dataTransfer.getData("text/plain"), m.id, slotBei(ev.clientX, ev.currentTarget));
+                        }
+                      : undefined
+                  }
                   className={cn("relative cursor-cell", ziel && "outline-2 -outline-offset-2 outline-dashed outline-line-strong")}
-                  style={{
-                    width: breite,
-                    height: spuren * SPUR + 8,
-                    backgroundImage: `repeating-linear-gradient(to right, transparent 0 ${SLOT - 1}px, var(--line-soft) ${SLOT - 1}px ${SLOT}px), repeating-linear-gradient(to right, var(--line) 0 1px, transparent 1px ${n * SLOT}px)`,
-                  }}
+                  style={{ width: breite, height: spuren * SPUR + 8, backgroundImage: rasterHintergrund }}
                 >
-                  {raster.tage.map((t, i) =>
-                    t === p.heute ? <div key={t} aria-hidden="true" className="pointer-events-none absolute inset-y-0 bg-tone-brand-bg/40" style={{ left: i * n * SLOT, width: n * SLOT }} /> : null,
-                  )}
+                  {tagesFlaechen}
                   {abwesend.flatMap((a) =>
                     raster.tage.flatMap((t, i) =>
                       t >= a.von && t <= a.bis
@@ -333,48 +392,70 @@ export function Plantafel(p: Props) {
                     ),
                   )}
                   {balken.map((b) => {
-                    const ks = konfliktVon(b.e.id, m.id);
-                    const reklamation = b.e.auftrag?.phase === "reklamation";
+                    const ks = b.belegt ? [] : konfliktVon(b.e, m.id);
+                    const reklamation = !!b.e.bezug?.reklamation;
+                    const service = b.e.bezug?.art === "ticket";
                     const schmal = (b.en - b.s) * SLOT < 110;
                     const aktiv = zug?.id === b.e.id && zug.bewegt;
+                    const fz = b.e.fahrzeug_id ? fahrzeug.get(b.e.fahrzeug_id) : undefined;
                     const titel = [
-                      `${b.e.auftrag?.nummer ?? ""} · ${b.e.auftrag?.kunde ?? ""}${b.e.auftrag?.titel ? ` · ${b.e.auftrag.titel}` : ""}`,
+                      b.belegt ? `Belegt (${service ? "Service-Plan" : "Montageplan"})` : "",
+                      `${b.e.bezug?.nummer ?? ""} · ${b.e.bezug?.kunde ?? ""}${b.e.bezug?.titel ? ` · ${b.e.bezug.titel}` : ""}`,
                       `${lokalKurz(b.e.beginn)} – ${lokalKurz(b.e.ende)}${b.e.fest ? "" : " · vorgeplant"}`,
                       `Team: ${b.e.monteure.map((x) => name.get(x) ?? "?").join(", ")}`,
+                      fz ? `Fahrzeug: ${fz.kennzeichen}` : "",
                       ...ks.map((k) => `Konflikt: ${konfliktText(k)}`),
                       b.e.hinweis ?? "",
                     ].filter(Boolean).join("\n");
+                    const farbe = FARBE[reklamation ? "reklamation" : service ? "service" : "auftrag"];
                     return (
                       <div
                         key={b.e.id}
                         role="button"
                         tabIndex={0}
                         data-einsatz={b.e.id}
+                        data-belegt={b.belegt ? "1" : undefined}
                         data-konflikt={ks.length ? "1" : undefined}
                         title={titel}
                         aria-label={titel.replace(/\n/g, ", ")}
                         onPointerDown={(ev) => greifen(ev, b, m.id, "verschieben")}
-                        onKeyDown={(ev) => { if (ev.key === "Enter" || ev.key === " ") { ev.preventDefault(); setDialog({ einsatz: b.e }); } }}
+                        onDoubleClick={() => { if (b.e.bezug) router.push(bezugHref(b.e.bezug)); }}
+                        onKeyDown={(ev) => {
+                          if (ev.key !== "Enter" && ev.key !== " ") return;
+                          ev.preventDefault();
+                          if (b.belegt && b.e.bezug) router.push(bezugHref(b.e.bezug));
+                          else setDialog({ einsatz: b.e });
+                        }}
                         className={cn(
-                          "group/balken absolute flex touch-none items-center gap-1.5 overflow-hidden rounded-md px-2 text-[12.5px] leading-tight shadow-card",
-                          b.abgeschnitten ? "cursor-pointer" : "cursor-grab active:cursor-grabbing",
-                          b.e.fest
-                            ? reklamation ? "bg-(--plan-5) text-ink" : "bg-(--plan-1) text-ink"
-                            : cn("border-2 border-dashed bg-surface text-ink-3", reklamation ? "border-(--plan-5)" : "border-(--plan-1)"),
+                          "group/balken absolute flex touch-none items-center gap-1.5 overflow-hidden rounded-md px-2 text-[12.5px] leading-tight",
+                          b.belegt
+                            ? "cursor-default border border-line-strong text-muted"
+                            : cn(
+                                "shadow-card",
+                                b.abgeschnitten ? "cursor-pointer" : "cursor-grab active:cursor-grabbing",
+                                b.e.fest ? farbe.fest : cn("border-2 border-dashed bg-surface text-ink-3", farbe.vorgeplant),
+                              ),
                           ks.length > 0 && "ring-2 ring-tone-red-fg",
                           aktiv && "z-10 opacity-90 shadow-hover",
                         )}
-                        style={{ left: b.s * SLOT + 1, width: (b.en - b.s) * SLOT - 2, top: 4 + b.spur * SPUR, height: SPUR - 4 }}
+                        style={{
+                          left: b.s * SLOT + 1,
+                          width: (b.en - b.s) * SLOT - 2,
+                          top: 4 + b.spur * SPUR,
+                          height: SPUR - 4,
+                          backgroundImage: b.belegt ? "repeating-linear-gradient(135deg, var(--surface-sunken) 0 5px, var(--surface) 5px 10px)" : undefined,
+                        }}
                       >
-                        {!b.abgeschnitten && (
+                        {!b.abgeschnitten && !b.belegt && (
                           <span data-griff="anfang" aria-hidden="true" onPointerDown={(ev) => greifen(ev, b, m.id, "anfang")} className="absolute inset-y-0 left-0 w-2 cursor-ew-resize rounded-l-md opacity-0 group-hover/balken:bg-ink/20 group-hover/balken:opacity-100" />
                         )}
                         {ks.length > 0 && <AlertTriangle className="size-3.5 shrink-0" aria-hidden="true" />}
                         <span className="min-w-0 truncate">
-                          <b className="font-semibold">{b.e.auftrag?.kunde || b.e.auftrag?.nummer}</b>
-                          {!schmal && <span className="ml-1.5 font-mono text-[11px] opacity-75">{b.e.auftrag?.nummer}</span>}
+                          {b.belegt && <span className="mr-1 text-[11px]">belegt ·</span>}
+                          <b className="font-semibold">{b.e.bezug?.kunde || b.e.bezug?.nummer}</b>
+                          {!schmal && <span className="ml-1.5 font-mono text-[11px] opacity-75">{b.e.bezug?.nummer}</span>}
                         </span>
-                        {!b.abgeschnitten && (
+                        {!b.abgeschnitten && !b.belegt && (
                           <span data-griff="ende" aria-hidden="true" onPointerDown={(ev) => greifen(ev, b, m.id, "ende")} className="absolute inset-y-0 right-0 w-2 cursor-ew-resize rounded-r-md opacity-0 group-hover/balken:bg-ink/20 group-hover/balken:opacity-100" />
                         )}
                       </div>
@@ -397,18 +478,20 @@ export function Plantafel(p: Props) {
 
       <div className="flex flex-wrap items-center justify-between gap-3">
         <ul aria-label="Legende" className="flex flex-wrap items-center gap-x-4 gap-y-2 text-xs text-muted">
-          <li className="flex items-center gap-1.5"><span className="h-3 w-5 rounded-xs bg-(--plan-1)" />Auftrag</li>
+          <li className="flex items-center gap-1.5"><span className={cn("h-3 w-5 rounded-xs", p.plan === "montage" ? "bg-(--plan-1)" : "bg-(--plan-2)")} />{p.plan === "montage" ? "Auftrag" : "Service"}</li>
           <li className="flex items-center gap-1.5"><span className="h-3 w-5 rounded-xs bg-(--plan-5)" />Reklamation</li>
-          <li className="flex items-center gap-1.5"><span className="h-3 w-5 rounded-xs border-2 border-dashed border-(--plan-1)" />Vorgeplant</li>
+          <li className="flex items-center gap-1.5"><span className="h-3 w-5 rounded-xs border border-line-strong" style={{ backgroundImage: "repeating-linear-gradient(135deg, var(--surface-sunken) 0 3px, var(--surface) 3px 6px)" }} />Belegt (anderer Plan)</li>
+          <li className="flex items-center gap-1.5"><span className={cn("h-3 w-5 rounded-xs border-2 border-dashed", p.plan === "montage" ? "border-(--plan-1)" : "border-(--plan-2)")} />Vorgeplant</li>
           <li className="flex items-center gap-1.5"><span className="h-3 w-5 rounded-xs bg-tone-gray-bg" />Abwesend</li>
           <li className="flex items-center gap-1.5"><span className="h-3 w-5 rounded-xs border border-dashed border-line-strong" style={{ backgroundImage: "repeating-linear-gradient(135deg, var(--tone-gray-bg) 0 3px, transparent 3px 6px)" }} />Beantragt</li>
+          <li className="flex items-center gap-1.5"><span className="h-3 w-5 rounded-xs bg-tone-red-bg" />Feiertag</li>
           <li className="flex items-center gap-1.5"><span className="h-3 w-5 rounded-xs ring-2 ring-tone-red-fg" />Konflikt</li>
         </ul>
-        <p className="text-xs text-muted-2">Klick in eine Stunde plant ein · Balken ziehen verschiebt, auch zu einem anderen Monteur · Enden ziehen ändert die Dauer</p>
+        <p className="text-xs text-muted-2">Klick in eine Stunde plant ein · Balken ziehen verschiebt, auch zu einem anderen Monteur · Enden ziehen ändert die Dauer · Doppelklick öffnet</p>
       </div>
 
       <div className="flex gap-2.5">
-        <Button size="sm" onClick={() => setDialog({ beginn: `${raster.tage.find((t) => t >= p.heute) ?? raster.tage[0]}T${String(raster.von).padStart(2, "0")}:00`, ende: `${raster.tage.find((t) => t >= p.heute) ?? raster.tage[0]}T${String(raster.bis).padStart(2, "0")}:00`, monteure: [] })}>
+        <Button size="sm" onClick={() => setDialog({ beginn: `${tagStandard}T${stunde(raster.von)}:00`, ende: `${tagStandard}T${stunde(raster.bis)}:00`, monteure: [] })}>
           <Plus className="size-[15px]" strokeWidth={2.2} />
           Einsatz
         </Button>
@@ -422,7 +505,17 @@ export function Plantafel(p: Props) {
         />
       </div>
 
-      {dialog && <EinsatzDialog vorlage={dialog} monteure={p.monteure} beiSchliessen={dialogSchliessen} beiErgebnis={(r) => setMeldung(r.warnung ? { warnung: r.warnung } : {})} />}
+      {dialog && (
+        <EinsatzDialog
+          plan={p.plan}
+          vorlage={dialog}
+          monteure={p.monteure}
+          fahrzeuge={p.fahrzeuge}
+          heute={p.heute}
+          beiSchliessen={dialogSchliessen}
+          beiErgebnis={(r) => setMeldung(r.warnung ? { warnung: r.warnung } : {})}
+        />
+      )}
     </div>
   );
 }

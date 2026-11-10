@@ -4,7 +4,8 @@ import { refresh } from "next/cache";
 import { pruefeSitzung } from "@/lib/auth/sitzung";
 import { suchbegriff } from "@/lib/kunden";
 import { konfliktText, type Konflikt } from "@/lib/montageplan-text";
-import { berlinNachUtc } from "@/lib/zeit";
+import { feiertageImZeitraum } from "@/lib/feiertage";
+import { berlinNachUtc, utcNachBerlinLokal } from "@/lib/zeit";
 
 export type Ergebnis = { fehler?: string; ok?: boolean; warnung?: string; felder?: Record<string, string> };
 
@@ -12,7 +13,10 @@ const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 export type EinsatzDaten = {
   id: string | null;
-  auftrag_id: string;
+  /** genau eins von beiden: Auftrag (Montageplan) oder Service-Ticket (Service-Plan) */
+  auftrag_id: string | null;
+  ticket_id: string | null;
+  fahrzeug_id: string | null;
   /** Ortszeit Berlin „YYYY-MM-DDTHH:MM“ */
   beginn: string;
   ende: string;
@@ -28,7 +32,10 @@ export async function einsatzSpeichern(d: EinsatzDaten): Promise<Ergebnis & { id
   const beginn = berlinNachUtc(d.beginn ?? "");
   const ende = berlinNachUtc(d.ende ?? "");
   const felder: Record<string, string> = {};
-  if (!UUID.test(d.auftrag_id ?? "")) felder.auftrag = "Bitte einen Auftrag wählen.";
+  const auftrag = UUID.test(d.auftrag_id ?? "") ? d.auftrag_id : null;
+  const ticket = UUID.test(d.ticket_id ?? "") ? d.ticket_id : null;
+  if (!auftrag && !ticket) felder.auftrag = d.ticket_id !== undefined && d.auftrag_id === null ? "Bitte ein Service-Ticket wählen." : "Bitte einen Auftrag wählen.";
+  if (d.fahrzeug_id && !UUID.test(d.fahrzeug_id)) felder.fahrzeug = "Bitte ein Fahrzeug aus der Liste wählen.";
   if (!beginn) felder.beginn = "Ungültiger Beginn.";
   if (!ende) felder.ende = "Ungültiges Ende.";
   if (beginn && ende && ende <= beginn) felder.ende = "Das Ende muss nach dem Beginn liegen.";
@@ -39,10 +46,12 @@ export async function einsatzSpeichern(d: EinsatzDaten): Promise<Ergebnis & { id
 
   const { data: id, error } = await supabase.rpc("einsatz_speichern", {
     p_id: d.id,
-    p_auftrag_id: d.auftrag_id,
+    p_auftrag_id: auftrag,
+    p_ticket_id: auftrag ? null : ticket,
     p_beginn: beginn!,
     p_ende: ende!,
     p_monteure: monteure,
+    p_fahrzeug_id: d.fahrzeug_id || null,
     p_fest: d.fest,
     p_hinweis: d.hinweis?.trim() || null,
   });
@@ -57,12 +66,20 @@ export async function einsatzSpeichern(d: EinsatzDaten): Promise<Ergebnis & { id
 /** Konflikte genau dieses Einsatzes als ein Satz, z. B. „Achtung: Max Muster: Urlaub (beantragt).“ */
 async function konfliktWarnung(id: string, beginn: string, ende: string) {
   const { supabase } = await pruefeSitzung();
-  const { data } = await supabase.rpc("einsatz_konflikte", { p_von: beginn, p_bis: ende });
+  const [{ data }, { data: einstellung }] = await Promise.all([
+    supabase.rpc("einsatz_konflikte", { p_von: beginn, p_bis: ende }),
+    supabase.from("einstellung").select("bundesland").maybeSingle(),
+  ]);
   const eigene = ((data as Konflikt[] | null) ?? []).filter((k) => k.einsatz_id === id);
+  // Feiertage im Zeitraum (Ortszeit Berlin) gelten ebenfalls als Konflikt (CLAUDE.md „Konfliktwarnung“)
+  for (const f of feiertageImZeitraum(utcNachBerlinLokal(beginn).slice(0, 10), utcNachBerlinLokal(ende).slice(0, 10), einstellung?.bundesland ?? "NI")) {
+    eigene.push({ einsatz_id: id, mitarbeiter_id: null, art: "feiertag", detail: `${f.name} (${f.datum.split("-").reverse().join(".")})` });
+  }
   if (!eigene.length) return undefined;
-  const { data: namen } = await supabase.from("mitarbeiter").select("id, name").in("id", [...new Set(eigene.map((k) => k.mitarbeiter_id))]);
+  const ids = [...new Set(eigene.map((k) => k.mitarbeiter_id).filter((x): x is string => !!x))];
+  const { data: namen } = ids.length ? await supabase.from("mitarbeiter").select("id, name").in("id", ids) : { data: [] };
   const name = new Map((namen ?? []).map((m) => [m.id, m.name]));
-  const texte = [...new Set(eigene.map((k) => `${name.get(k.mitarbeiter_id) ?? "Monteur"}: ${konfliktText(k)}`))];
+  const texte = [...new Set(eigene.map((k) => (k.mitarbeiter_id ? `${name.get(k.mitarbeiter_id) ?? "Monteur"}: ${konfliktText(k)}` : konfliktText(k))))];
   return `Achtung, Konflikt: ${texte.join("; ")}.`;
 }
 
@@ -92,6 +109,25 @@ export async function auftraegeSuchen(q: string, auchAbgeschlossene = false): Pr
     .limit(8)
     .returns<{ id: string; nummer: string; titel: string; kunde: { name: string } | null }[]>();
   return (data ?? []).map((a) => ({ id: a.id, nummer: a.nummer, titel: a.titel, kunde: a.kunde?.name ?? "" }));
+}
+
+/** Ticketsuche im Einsatz-Dialog des Service-Plans: Nummer, Thema, Objekt oder Kunde; nur offene Tickets */
+export async function ticketsSuchen(q: string): Promise<AuftragTreffer[]> {
+  const { supabase } = await pruefeSitzung();
+  const s = suchbegriff(q);
+  if (s.length < 2) return [];
+  const { data: kunden } = await supabase.from("kunde").select("id").ilike("name", `%${s}%`).limit(50);
+  const bedingungen = ["nummer", "thema", "objekt"].map((f) => `${f}.ilike.%${s}%`);
+  if (kunden?.length) bedingungen.push(`kunde_id.in.(${kunden.map((k) => k.id).join(",")})`);
+  const { data } = await supabase
+    .from("service_ticket")
+    .select("id, nummer, thema, kunde:kunde_id(name)")
+    .in("status", ["neu", "eingeplant", "in_arbeit"])
+    .or(bedingungen.join(","))
+    .order("nummer", { ascending: false })
+    .limit(8)
+    .returns<{ id: string; nummer: string; thema: string; kunde: { name: string } | null }[]>();
+  return (data ?? []).map((x) => ({ id: x.id, nummer: x.nummer, titel: x.thema, kunde: x.kunde?.name ?? "" }));
 }
 
 /** Monteur anlegen oder umbenennen (direkt in der Plantafel) */
