@@ -7,14 +7,13 @@ import type { ComponentType } from "react";
  */
 export type SlotName = "PipelineCard" | "DashboardHeader" | "SidebarFooter";
 
-export type LogoComponent = ComponentType<{ gap?: string; className?: string }>;
+/** Logo des Betriebs: „voll“ mit Wortmarke (Seitenleiste, Anmeldung, Belegköpfe), „symbol“ ohne (eingeklappte Seitenleiste). Strichfarbe über das Token --logo-ink. */
+export type LogoComponent = ComponentType<{ variante?: "voll" | "symbol"; className?: string }>;
 
 export type CustomerConfig = {
   /** muss dem Ordnernamen und dem data-customer-Attribut entsprechen */
   id: string;
   name: string;
-  brandWordmark: string;
-  brandTagline?: string;
   Logo: LogoComponent;
   locale: string;
   /** Auswahl „Herkunft“ bei Kunden und Anfragen (Daten der Instanz, kein Sonder-Code) */

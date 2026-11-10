@@ -11,7 +11,7 @@ import { Seitenleiste } from "./seitenleiste";
 type AppShellProps = {
   active: string;
   crumbs: { label: string; href?: string }[];
-  brand: { wordmark: string; tagline?: string; logo: ReactNode };
+  brand: { name: string; logo: ReactNode; symbol: ReactNode };
   user: { initials: string; name: string; role: string };
   /** Zahlen an den Menüpunkten */
   zaehler: Zaehler;

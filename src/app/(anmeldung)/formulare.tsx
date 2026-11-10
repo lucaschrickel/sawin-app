@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useActionState, useEffect, useRef, useState, type ReactNode } from "react";
 import { Button } from "@/components/ui/button";
-import { Field, Input } from "@/components/ui/field";
+import { Field, Input, PasswortInput } from "@/components/ui/field";
 import { Formular } from "@/components/ui/formular";
 import {
   anmelden,
@@ -75,7 +75,7 @@ export function AnmeldeFormular({ hinweis }: { hinweis?: string }) {
         {(a) => <Input {...a} name="email" type="email" autoComplete="username" defaultValue={z.email} required autoFocus />}
       </Field>
       <Field label="Passwort">
-        {(a) => <Input {...a} name="passwort" type="password" autoComplete="current-password" required />}
+        {(a) => <PasswortInput {...a} name="passwort" autoComplete="current-password" required />}
       </Field>
       <Button type="submit" variant="accent" disabled={laeuft} className="mt-1">
         {laeuft ? "Anmelden …" : "Weiter"}
@@ -182,10 +182,10 @@ export function PasswortFormular() {
     <Formular aktion={aktion} className="flex flex-col gap-4">
       {z.fehler && <Meldung art="fehler">{z.fehler}</Meldung>}
       <Field label="Neues Passwort" hint="Mindestens 12 Zeichen, Groß- und Kleinbuchstaben und eine Ziffer">
-        {(a) => <Input {...a} name="passwort" type="password" autoComplete="new-password" minLength={12} required autoFocus />}
+        {(a) => <PasswortInput {...a} name="passwort" autoComplete="new-password" minLength={12} required autoFocus />}
       </Field>
       <Field label="Passwort wiederholen">
-        {(a) => <Input {...a} name="passwort2" type="password" autoComplete="new-password" minLength={12} required />}
+        {(a) => <PasswortInput {...a} name="passwort2" autoComplete="new-password" minLength={12} required />}
       </Field>
       <Button type="submit" variant="accent" disabled={laeuft}>
         {laeuft ? "Speichern …" : "Passwort speichern"}

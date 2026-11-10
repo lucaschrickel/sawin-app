@@ -1,7 +1,8 @@
 "use client";
 
 import * as LabelPrimitive from "@radix-ui/react-label";
-import { useId, type ComponentProps, type ReactNode } from "react";
+import { Eye, EyeOff } from "lucide-react";
+import { useId, useState, type ComponentProps, type ReactNode } from "react";
 import { cn } from "@/lib/cn";
 
 const control =
@@ -9,6 +10,32 @@ const control =
 
 export function Input({ className, ...props }: ComponentProps<"input">) {
   return <input className={cn(control, "h-[42px]", className)} {...props} />;
+}
+
+/**
+ * Passwortfeld mit Augen-Symbol zum Ein- und Ausblenden. Standard: ausgeblendet.
+ * Der Knopf ist ein Umschalter (aria-pressed) mit fester Beschriftung „Passwort anzeigen“,
+ * per Tab erreichbar und mit Leertaste oder Enter bedienbar.
+ */
+export function PasswortInput({ className, ...props }: Omit<ComponentProps<"input">, "type">) {
+  const [sichtbar, setSichtbar] = useState(false);
+  return (
+    <div className="relative">
+      <Input {...props} type={sichtbar ? "text" : "password"} className={cn("pr-11", className)} />
+      <button
+        type="button"
+        onClick={() => setSichtbar((s) => !s)}
+        aria-label="Passwort anzeigen"
+        aria-pressed={sichtbar}
+        aria-controls={props.id}
+        title={sichtbar ? "Passwort verbergen" : "Passwort anzeigen"}
+        data-passwort-auge
+        className="absolute inset-y-0 right-0 inline-flex w-11 cursor-pointer items-center justify-center rounded-r-md text-muted hover:text-ink focus-visible:-outline-offset-2"
+      >
+        {sichtbar ? <EyeOff className="size-[18px]" aria-hidden="true" /> : <Eye className="size-[18px]" aria-hidden="true" />}
+      </button>
+    </div>
+  );
 }
 
 export function Textarea({ className, ...props }: ComponentProps<"textarea">) {

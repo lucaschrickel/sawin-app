@@ -13,6 +13,7 @@ function utc(tag, uhr) {
   const versatz = berlin.getTime() - new Date(probe.toLocaleString("en-US", { timeZone: "UTC" })).getTime();
   return new Date(probe.getTime() - versatz).toISOString();
 }
+// Der vorgeplante Einsatz läuft bis 23:30, damit er zu jeder Tageszeit noch „zur Freigabe“ steht (vergangene zählen nicht).
 const kunde = `Dashkunde ${lauf}`;
 const main = () => b.js("document.querySelector('main').innerText");
 
@@ -27,7 +28,7 @@ try {
   const kz = "D" + lauf.replace(/[^a-f]/g, "").toUpperCase().padEnd(3, "X").slice(0, 3);
   const { data: m } = await service.from("mitarbeiter").insert({ kuerzel: kz, name: `Dora Dash ${lauf}`, ist_monteur: true }).select("id").single();
   merken("mitarbeiter", m.id);
-  const { data: e } = await service.from("einsatz").insert({ auftrag_id: a.id, beginn: utc(heute, "07:00"), ende: utc(heute, "15:00"), fest: false }).select("id").single();
+  const { data: e } = await service.from("einsatz").insert({ auftrag_id: a.id, beginn: utc(heute, "07:00"), ende: utc(heute, "23:30"), fest: false }).select("id").single();
   merken("einsatz", e.id);
   const { data: em } = await service.from("einsatz_monteur").insert({ einsatz_id: e.id, mitarbeiter_id: m.id }).select("id").single();
   merken("einsatz_monteur", em.id);

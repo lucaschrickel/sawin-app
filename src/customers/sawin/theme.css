@@ -49,6 +49,8 @@
 
   --focus-ring: #8a6140;
   --frame-focus-ring: #d1b19a;
+  /* Logo: Konturen, „BAUELEMENTE“ und Linie anthrazit auf hellem Grund */
+  --logo-ink: #2e2b28;
 }
 
 /* Dunkles Theme (Anmeldeseite): Look der Website, Primäraktion in Sawin-Sand */
@@ -64,4 +66,6 @@
   --tone-brand-fg: #e0c9b2;
 
   --focus-ring: #d1b19a;
+  /* Logo auf dunklem Grund: Konturen weiß */
+  --logo-ink: #ffffff;
 }

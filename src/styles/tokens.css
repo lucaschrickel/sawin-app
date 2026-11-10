@@ -31,6 +31,11 @@
   --frame-muted: #9ca3af;
   --frame-line: rgb(255 255 255 / 0.08);
   --frame-focus-ring: #e9e6e2;
+  /* Logo-Konturen und Wortmarke auf der (immer dunklen) Seitenleiste */
+  --frame-logo-ink: #ffffff;
+
+  /* Logo-Konturen und Wortmarke auf hellem Grund (je Kunde überschreibbar) */
+  --logo-ink: #171717;
 
   /* Akzent: neutraler Standard, wird je Kunde überschrieben.
      Regel: --accent nur für Flächen. Text auf Akzent = --accent-ink.
@@ -185,6 +190,7 @@
   --cal-abw-bg: #43251f;
 
   --focus-ring: #e9e6e2;
+  --logo-ink: #ffffff;
 
   --shadow-card: none;
   --shadow-hover: none;

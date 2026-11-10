@@ -195,6 +195,7 @@ try {
   // Browser-Prüfung (minLength) abschalten, damit die Regel auf dem Server geprüft wird
   await warte("!!document.querySelector('form')");
   await js("document.querySelectorAll('form').forEach((f) => { f.noValidate = true; })");
+  pruefe("Passwort setzen: beide Felder ausgeblendet, je mit Augen-Symbol", await js("[...document.querySelectorAll('[name=passwort], [name=passwort2]')].every((i) => i.type === 'password' && i.parentElement.querySelector('[data-passwort-auge][aria-label=\"Passwort anzeigen\"]'))"));
   await formular({ passwort: "kurz", passwort2: "kurz" });
   await warte("document.body.innerText.includes('Mindestens 12')");
   pruefe("zu kurzes Passwort abgelehnt", (await text()).includes("Mindestens 12 Zeichen"));

@@ -25,7 +25,7 @@ const setzen = (wert: boolean) => {
 
 type Props = {
   active: string;
-  brand: { wordmark: string; tagline?: string; logo: ReactNode };
+  brand: { name: string; logo: ReactNode; symbol: ReactNode };
   user: { initials: string; name: string; role: string };
   zaehler: Zaehler;
   /** gemerkter Zustand (benutzer_einstellung.seitenleiste_eingeklappt) */
@@ -58,13 +58,16 @@ export function Seitenleiste({ active, brand, user, zaehler, eingeklappt, offen 
         offen ? "max-[960px]:translate-x-0 max-[960px]:shadow-[0_0_40px_rgb(0_0_0/0.3)]" : "max-[960px]:-translate-x-[105%]",
       )}
     >
-      <div className={cn("mb-2 flex items-center gap-2 border-b border-frame-line pt-1.5 pb-3.5", mini ? "flex-col max-[960px]:flex-row" : "px-1")}>
-        <Link href="/" aria-label={`${brand.wordmark} – Startseite`} className="flex min-w-0 flex-1 items-center gap-3">
-          <span className={cn("shrink-0", mini ? "w-[40px]" : "w-[46px]")}>{brand.logo}</span>
-          <span className={cn("min-w-0", nurSymbol("hidden max-[960px]:block"))}>
-            <b className="block text-[17px] leading-tight font-bold tracking-[0.16em] text-accent">{brand.wordmark}</b>
-            {brand.tagline && <small className="mt-0.5 block text-[11.5px] tracking-[0.04em] text-frame-muted">{brand.tagline}</small>}
-          </span>
+      <div className={cn("mb-2 flex items-center gap-1.5 border-b border-frame-line pt-1.5 pb-3.5", mini ? "flex-col max-[960px]:flex-row" : "px-1")}>
+        {/* Logo wie in der Demo: ausgeklappt ganzes Logo (178 px), eingeklappt nur das Symbol; Konturen weiß auf der dunklen Leiste */}
+        <Link
+          href="/"
+          aria-label={`${brand.name} – Dashboard`}
+          data-logo
+          className="flex min-w-0 flex-1 items-center rounded-sm [--logo-ink:var(--frame-logo-ink)]"
+        >
+          <span className={cn("w-[178px] max-w-full shrink", nurSymbol("hidden max-[960px]:block"))}>{brand.logo}</span>
+          {mini && <span className="w-[40px] shrink-0 max-[960px]:hidden">{brand.symbol}</span>}
         </Link>
         <button
           type="button"

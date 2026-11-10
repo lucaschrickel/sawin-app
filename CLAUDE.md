@@ -733,8 +733,9 @@ Maßstab ist OWASP ASVS Level 1. Vor dem Start mit Echtdaten müssen alle Mindes
   Kalenderfarben haben eigene Dunkel-Werte.
 - **Logo:** exakt das Logo von sawin-bauelemente.de, als SVG nachgezeichnet: Gebäude-Symbol (Konturen in Strichfarbe,
   Flächen Sand `#D2B19A` und Grau `#B3B3B3`) und Wortmarke „SAWIN“ (Sand) mit „BAUELEMENTE“ und Linie darunter.
-  Konturen, „BAUELEMENTE“ und Linie sind weiß auf dunklem und anthrazit (`#2E2B28`) auf hellem Grund. Seitenleiste:
-  ganzes Logo, eingeklappt nur das Symbol; Belegkopf, Formulare und Wochenplan: ganzes Logo; Browser-Symbol: Symbol
+  Konturen, „BAUELEMENTE“ und Linie sind weiß auf dunklem und anthrazit (`#2E2B28`) auf hellem Grund (Token
+  `--logo-ink`, auf der Seitenleiste `--frame-logo-ink`; Komponente mit `variante` „voll“ oder „symbol“). Seitenleiste:
+  ganzes Logo, eingeklappt nur das Symbol; Anmeldeseite: ganzes Logo; Belegkopf, Formulare und Wochenplan: ganzes Logo; Browser-Symbol: Symbol
   auf Anthrazit. Liegt als SVG in `src/customers/sawin/` (am besten die Original-Vektordatei von Sawins Agentur
   anfordern und gegen die Nachzeichnung tauschen).
 - **Akzentfarbe nur als Fläche.** Text auf Akzent nutzt `text-accent-ink`. Akzent als Textfarbe nur über `text-accent-text`.

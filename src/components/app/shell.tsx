@@ -26,7 +26,7 @@ export async function Shell(props: { active: string; crumbs: { label: string; hr
   return (
     <AppShell
       {...props}
-      brand={{ wordmark: c.brandWordmark, tagline: c.brandTagline, logo: <Logo className="w-full" /> }}
+      brand={{ name: c.name, logo: <Logo className="block w-full" />, symbol: <Logo variante="symbol" className="block w-full" /> }}
       user={{ initials: initialen(benutzer.name), name: benutzer.name, role: `${benutzer.admin ? "Admin" : "Benutzer"} · Büro` }}
       zaehler={zaehler}
       eingeklappt={einstellung?.seitenleiste_eingeklappt ?? false}

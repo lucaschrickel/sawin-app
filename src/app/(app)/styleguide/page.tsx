@@ -9,9 +9,9 @@ import { Shell } from "@/components/app/shell";
 import { Badge, Tag, type Tone } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Input } from "@/components/ui/field";
+import { Input, PasswortInput } from "@/components/ui/field";
 import { Table, Td, Th, Tr } from "@/components/ui/table";
-import { resolveSlot } from "@/customers";
+import { getCustomer, resolveSlot } from "@/customers";
 import { eur } from "@/lib/format";
 import { AUFTRAG_PHASE_TEXT, AUFTRAG_PHASE_TON, AUFTRAG_PHASEN, BELEG_STATUS_TONE } from "@/lib/status";
 import { BestaetigenDemo, DialogDemo, FormDemo, FormularDialogDemo } from "./demo-interactive";
@@ -95,6 +95,7 @@ function Section({ title, description, children }: { title: string; description?
 export default function StyleguidePage() {
   // Kunden können die Pipeline-Karte per Slot ersetzen, ohne den Basiscode zu ändern.
   const Card_ = resolveSlot("PipelineCard", PipelineCard);
+  const { Logo } = getCustomer();
 
   return (
     <Shell active="styleguide" crumbs={[{ label: "System" }, { label: "Designsystem" }]}>
@@ -266,6 +267,21 @@ export default function StyleguidePage() {
           <BestaetigenDemo />
         </Section>
 
+        <Section title="Logo" description="Aus dem Kunden-Ordner (variante voll oder symbol) · Konturen und Wortmarke über das Token --logo-ink: anthrazit auf hellem, weiß auf dunklem Grund">
+          <div className="grid gap-4 sm:grid-cols-3">
+            <div className="flex items-center justify-center rounded-lg border border-line bg-surface p-6">
+              <Logo className="block w-[220px]" />
+            </div>
+            <div className="flex items-center justify-center gap-5 rounded-lg bg-frame p-6 [--logo-ink:var(--frame-logo-ink)]">
+              <Logo className="block w-[178px]" />
+              <Logo variante="symbol" className="block w-[40px]" />
+            </div>
+            <div data-theme="dark" className="flex items-center justify-center rounded-lg bg-canvas p-6">
+              <Logo className="block w-[220px]" />
+            </div>
+          </div>
+        </Section>
+
         <Section title="Dunkles Theme" description="Für die Anmeldeseite · data-theme=&quot;dark&quot; auf einem umschließenden Element">
           <div data-theme="dark" className="rounded-lg bg-canvas p-6 text-ink">
             <div className="mx-auto flex max-w-sm flex-col gap-4 rounded-lg border border-line bg-surface p-6">
@@ -276,6 +292,10 @@ export default function StyleguidePage() {
               <label className="flex flex-col gap-1.5 text-sm font-medium text-ink-3">
                 E-Mail
                 <Input type="email" placeholder="name@firma.de" />
+              </label>
+              <label className="flex flex-col gap-1.5 text-sm font-medium text-ink-3">
+                Passwort
+                <PasswortInput defaultValue="geheim-Beispiel1" autoComplete="off" />
               </label>
               <div className="flex flex-wrap gap-2">
                 <Badge tone="green">Angenommen</Badge>
