@@ -12,18 +12,7 @@ import { ladeAnsicht } from "@/lib/ansicht";
 import { pruefeSitzung } from "@/lib/auth/sitzung";
 import { cn } from "@/lib/cn";
 import { ladeTickets, type TicketZeile } from "@/lib/service";
-import {
-  ABRECHNUNG_TEXT,
-  TICKET_ART_TEXT,
-  TICKET_ARTEN,
-  TICKET_PRIO_TEXT,
-  TICKET_PRIO_TON,
-  TICKET_STATUS,
-  TICKET_STATUS_TEXT,
-  TICKET_STATUS_TON,
-  type TicketArt,
-  type TicketStatus,
-} from "@/lib/status";
+import { ABRECHNUNG_TEXT, TICKET_ART_TEXT, TICKET_ARTEN, TICKET_PRIO_TEXT, TICKET_PRIO_TON, TICKET_STATUS, TICKET_STATUS_TEXT, TICKET_STATUS_TON, type TicketArt, type TicketStatus } from "@/lib/ticket-status";
 import { kurzTermin, tag } from "@/lib/zeit";
 import { AnsichtUmschalter } from "../anfragen/ui";
 import { TicketBoard, TicketDialog, type BoardKarte } from "./ui";

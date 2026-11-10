@@ -715,6 +715,69 @@ describe("Service-Tickets", () => {
   });
 });
 
+describe("Einkauf", () => {
+  let lieferant, bestellung;
+  it("Lieferant samt Ansprechpartnern speichern, entfernter nur markiert", async () => {
+    const { data: id, error } = await buero.client.rpc("lieferant_speichern", {
+      p_id: null,
+      p_lieferant: { name: `Fensterwerk ${lauf}`, produktgruppen: ["Fenster", "Haustür"], lieferzeit: "4–6 Wochen" },
+      p_kontakte: [{ name: "Anna Außendienst", funktion: "Außendienst", handy: "0171 1" }, { name: "Bert Innendienst" }, { name: " " }],
+    });
+    assert.ifError(error);
+    angelegt.push(["lieferant", id]);
+    const { data: k } = await buero.client.from("lieferant_kontakt").select("id, name").eq("lieferant_id", id).order("reihenfolge");
+    k.forEach((x) => angelegt.push(["lieferant_kontakt", x.id]));
+    assert.deepEqual(k.map((x) => x.name), ["Anna Außendienst", "Bert Innendienst"]);
+    assert.ifError((await buero.client.rpc("lieferant_speichern", { p_id: id, p_lieferant: { name: `Fensterwerk ${lauf}` }, p_kontakte: [{ id: k[0].id, name: "Anna Außendienst" }] })).error);
+    const { data: rest } = await buero.client.from("lieferant_kontakt").select("id").eq("lieferant_id", id);
+    assert.equal(rest.length, 1);
+    lieferant = id;
+  });
+
+  it("Lieferanten-Konditionen nur mit dem Recht „Konditionen sehen“", async () => {
+    const { data, error } = await admin.client.from("lieferant_kondition").insert({ lieferant_id: lieferant, text: "12 % Rabatt" }).select().single();
+    assert.ifError(error);
+    angelegt.push(["lieferant_kondition", data.id]);
+    const { data: ohne } = await buero.client.from("lieferant_kondition").select("text").eq("lieferant_id", lieferant);
+    assert.equal(ohne.length, 0, "Büro ohne Recht sieht Konditionen");
+    assert.ok((await buero.client.from("lieferant_kondition").update({ text: "x" }).eq("lieferant_id", lieferant).select()).data?.length === 0);
+  });
+
+  it("Bestellung: Nummer BE-JJ-NNN, Zeilen nur mit Auftrag, mindestens eine Zeile", async () => {
+    const kopf = { lieferant_id: lieferant, liefer_kw: 50, liefer_jahr: 2026, status: "bestellt" };
+    assert.equal((await buero.client.rpc("bestellung_speichern", { p_id: null, p_kopf: kopf, p_zeilen: [] })).error?.code, "23514");
+    assert.ok((await buero.client.rpc("bestellung_speichern", { p_id: null, p_kopf: kopf, p_zeilen: [{ artikeltext: "ohne Auftrag" }] })).error, "Zeile ohne Auftrag akzeptiert");
+    const { data: id, error } = await buero.client.rpc("bestellung_speichern", { p_id: null, p_kopf: kopf, p_zeilen: [{ auftrag_id: daten.auftrag.id, artikeltext: "4 × Fenster", menge: 4 }, { auftrag_id: daten.auftrag.id, artikeltext: "Haustür" }] });
+    assert.ifError(error);
+    angelegt.push(["bestellung", id]);
+    const { data: b } = await buero.client.from("bestellung").select("nummer").eq("id", id).single();
+    assert.match(b.nummer, /^BE-\d{2}-\d{3}$/);
+    const { data: z } = await buero.client.from("bestellzeile").select("id, menge").eq("bestellung_id", id).order("reihenfolge");
+    z.forEach((x) => angelegt.push(["bestellzeile", x.id]));
+    assert.equal(z.length, 2);
+    bestellung = { id, zeilen: z };
+  });
+
+  it("Lieferant mit offener Bestellung nicht löschbar; gelieferte Bestellung nicht löschbar", async () => {
+    assert.equal((await buero.client.rpc("loeschen", { p_tabelle: "lieferant", p_id: lieferant })).error?.code, "23503");
+    assert.ifError((await buero.client.from("bestellzeile").update({ geliefert: true }).eq("id", bestellung.zeilen[0].id)).error);
+    assert.equal((await buero.client.rpc("bestellung_loeschen", { p_id: bestellung.id })).error?.code, "23503");
+  });
+
+  it("ungelieferte Bestellung und Lieferant ohne offene Bestellungen nur als gelöscht markiert", async () => {
+    const { data: id } = await buero.client.rpc("bestellung_speichern", { p_id: null, p_kopf: { lieferant_id: lieferant }, p_zeilen: [{ auftrag_id: daten.auftrag.id, artikeltext: "Rollladen" }] });
+    angelegt.push(["bestellung", id]);
+    const { data: z } = await service.from("bestellzeile").select("id").eq("bestellung_id", id);
+    z.forEach((x) => angelegt.push(["bestellzeile", x.id]));
+    assert.ifError((await buero.client.rpc("bestellung_loeschen", { p_id: id })).error);
+    assert.ok((await service.from("bestellung").select("deleted_at").eq("id", id).single()).data.deleted_at);
+    assert.ifError((await buero.client.from("bestellzeile").update({ geliefert: true }).eq("id", bestellung.zeilen[1].id)).error);
+    assert.ifError((await buero.client.rpc("loeschen", { p_tabelle: "lieferant", p_id: lieferant })).error);
+    const { data: k } = await service.from("lieferant_kontakt").select("deleted_at").eq("lieferant_id", lieferant);
+    assert.ok(k.every((x) => x.deleted_at), "Ansprechpartner mit markiert");
+  });
+});
+
 describe("Soft Delete und Audit-Log", () => {
   let aufgabe;
   it("echtes Löschen ist gesperrt", async () => {

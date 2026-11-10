@@ -21,6 +21,8 @@ export type AuftragZeile = {
   created_at: string;
   kunde: { id: string; name: string } | null;
   einsaetze: EinsatzKurz[];
+  /** Bestellzeilen des Auftrags (für den abgeleiteten Bestellstatus) */
+  bestellzeilen: { geliefert: boolean }[];
 };
 
 export type Auftrag = AuftragZeile & {
@@ -33,7 +35,7 @@ export type Auftrag = AuftragZeile & {
 };
 
 const ZEILE =
-  "id, nummer, titel, objekt, phase, montagestatus, produkte, liefertermin, zustaendig_id, warten_auf_kunde, pruefhinweis, noch_nicht_bestellt, created_at, kunde:kunde_id(id, name), einsaetze:einsatz(id, beginn, ende, fest)";
+  "id, nummer, titel, objekt, phase, montagestatus, produkte, liefertermin, zustaendig_id, warten_auf_kunde, pruefhinweis, noch_nicht_bestellt, created_at, kunde:kunde_id(id, name), einsaetze:einsatz(id, beginn, ende, fest), bestellzeilen:bestellzeile(geliefert)";
 
 /** Nächster Montagetermin (ab heute), sonst der letzte; null ohne Einsatz */
 export function montageTermin(einsaetze: EinsatzKurz[]): EinsatzKurz | null {

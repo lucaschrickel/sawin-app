@@ -614,6 +614,9 @@ Die Monteur-App kommt in Version 2.
   Auftrag „Offen“, „Teilweise bestellt“, „Bestellt“, „Teilweise geliefert“, „Abgeschlossen“ aus seinen Zeilen und
   dem Feld „Noch nicht bestellt“. Liefer-KW des Auftrags = früheste offene Zeile.
 - Beim Anlegen einer Bestellung aus dem Auftrag werden passende Zeilen aus „Noch nicht bestellt“ entfernt.
+- **Ware eingetroffen** (Entscheidung 10.11.2026): Ist alles geliefert und nichts mehr offen, zeigt der Auftrag den
+  Bestellstatus „Ware eingetroffen“ und, solange er in der Phase „Bestellung“ steht, den Hinweis „Ware vollständig
+  eingetroffen“ mit dem Knopf „Phase auf Montage setzen“. Die Phase wechselt nie automatisch.
 
 ### Einstellungen
 

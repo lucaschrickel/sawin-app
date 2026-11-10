@@ -3,7 +3,7 @@
 import { refresh } from "next/cache";
 import { redirect } from "next/navigation";
 import { pruefeSitzung } from "@/lib/auth/sitzung";
-import { ABRECHNUNG, TICKET_ARTEN, TICKET_PRIO, TICKET_STATUS_HAND } from "@/lib/status";
+import { ABRECHNUNG, TICKET_ARTEN, TICKET_PRIO, TICKET_STATUS_HAND } from "@/lib/ticket-status";
 
 export type Ergebnis = { fehler?: string; ok?: boolean; hinweis?: string; felder?: Record<string, string>; id?: string };
 

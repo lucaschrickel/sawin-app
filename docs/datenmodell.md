@@ -78,7 +78,7 @@ Sonderregeln per Trigger (RLS kann Spaltenänderungen nicht prüfen):
 | `kunde_speichern()` | Funktion: Kunde mit Lieferadressen in einer Transaktion anlegen oder ändern (RLS gilt, Audit mit Benutzer). Gespeicherte Lieferadressen werden nie gelöscht, nur „Alt“. Die Lexware-Felder setzt nur der Server; einen Kunden mit Anfragen, Aufträgen, Belegen oder Tickets lehnt das Löschen mit Begründung ab. |
 | `kunde_kondition` | Kunde, Freitext (eigene RLS, nur Recht „Konditionen“) |
 | `lieferant` | Firma, Produktgruppen, Konfigurator-Link, Händlerportal, unsere Kundennummer, Lieferzeit, Telefon, Notiz |
-| `lieferant_kontakt` | Lieferant, Name, Funktion, Handy, Telefon, E-Mail |
+| `lieferant_kontakt` | Lieferant, Name, Funktion, Handy, Telefon, E-Mail. Lieferant und Ansprechpartner speichert `lieferant_speichern(id, lieferant, kontakte)` in einem Schritt; entfernte Ansprechpartner nur markiert. Ein Lieferant mit offener Bestellung ist nicht löschbar |
 | `lieferant_kondition` | Lieferant, Freitext (eigene RLS, nur Recht „Konditionen“) |
 
 ### Anfragen, Aufträge, Service
@@ -123,8 +123,8 @@ Wahl der Rechnung). Höchstens eine Zahlungsbestätigung je Zahlung. Höchstens 
 | `chat_gelesen` | Nachricht, Benutzer, gelesen am |
 | `historie_notiz` | Telefonat oder Notiz von Hand zu Anfrage, Auftrag, Ticket oder Kunde (Ereignisse kommen aus dem Audit-Log) |
 | `benachrichtigung` | Glocke: Benutzer, Art, Text, Link, gelesen am (Erwähnungen, Genehmigungen; andere Hinweise werden berechnet) |
-| `bestellung` | Nummer, Lieferant, Bestelldatum, AB-Nummer des Lieferanten, Liefer-KW, Status (bestellt, bestaetigt) |
-| `bestellzeile` | Bestellung, Auftrag, Artikeltext, Menge, geliefert |
+| `bestellung` | Nummer `BE-JJ-NNN`, Lieferant, Bestelldatum, AB-Nummer des Lieferanten, Liefer-KW und -Jahr, Status (bestellt, bestaetigt), Notiz. Gespeichert über `bestellung_speichern(id, kopf, zeilen)` (mindestens eine Zeile); löschen über `bestellung_loeschen` nur ohne gelieferte Zeile (nur Markierung, Zeilen mit). „Teilweise geliefert“, „Geliefert“ und „Überfällig“ werden abgeleitet |
+| `bestellzeile` | Bestellung, Auftrag (Pflicht, eine Bestellung kann mehrere Aufträge abdecken), Artikeltext, Menge, geliefert. Daraus abgeleitet: Bestellstatus des Auftrags (Offen … „Ware eingetroffen“) und Liefer-KW = früheste offene Zeile |
 
 ### Audit
 
@@ -174,6 +174,9 @@ und danach wieder entfernt:
     gelöscht markieren.
 13. **Service-Tickets:** Nummer `ST-JJ-NNNN`, Tag in „Terminierbar“, kein „Abgerechnet“ von Hand, Eingeplant/Neu nach
     Einsätzen, Zeit auf ein Ticket, Löschregel.
+14. **Einkauf:** Lieferant samt Ansprechpartnern (entfernter nur markiert), Lieferanten-Konditionen nur mit Recht,
+    Bestellung `BE-JJ-NNN` nur mit Zeilen und Auftrag, gelieferte Bestellung und Lieferant mit offener Bestellung nicht
+    löschbar, Löschen nur als Markierung.
 11. **Abwesenheiten löschen:** eine entschiedene Abwesenheit löscht nur ein Admin (nur als Markierung), einen Antrag
     und eine Krankmeldung jeder Benutzer.
 

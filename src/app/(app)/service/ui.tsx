@@ -12,20 +12,7 @@ import { FormularDialog, type FormularSteuerung } from "@/components/ui/formular
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { cn } from "@/lib/cn";
 import type { Ticket } from "@/lib/service";
-import {
-  ABRECHNUNG,
-  ABRECHNUNG_TEXT,
-  TICKET_ART_TEXT,
-  TICKET_ARTEN,
-  TICKET_PRIO,
-  TICKET_PRIO_TEXT,
-  TICKET_STATUS,
-  TICKET_STATUS_HAND,
-  TICKET_STATUS_TEXT,
-  TICKET_STATUS_TON,
-  type TicketPrio,
-  type TicketStatus,
-} from "@/lib/status";
+import { ABRECHNUNG, ABRECHNUNG_TEXT, TICKET_ART_TEXT, TICKET_ARTEN, TICKET_PRIO, TICKET_PRIO_TEXT, TICKET_STATUS, TICKET_STATUS_HAND, TICKET_STATUS_TEXT, TICKET_STATUS_TON, type TicketPrio, type TicketStatus } from "@/lib/ticket-status";
 import { KundenAuswahl } from "../anfragen/anfrage-dialog";
 import { kundenObjekte } from "../anfragen/aktionen";
 import { AuftragSuche, type AuftragWahl } from "../montageplan/einsatz-dialog";

@@ -11,6 +11,7 @@ import { ladeBenutzerAuswahl } from "@/lib/anfragen";
 import { ladeAnsicht } from "@/lib/ansicht";
 import { ladeAuftraege, montageTermin, type AuftragZeile } from "@/lib/auftraege";
 import { cn } from "@/lib/cn";
+import { AUFTRAG_BESTELL_TEXT, auftragBestellstatus } from "@/lib/einkauf-status";
 import { AUFTRAG_PHASE_TEXT, AUFTRAG_PHASE_TON, AUFTRAG_PHASEN, istAuftragPhase, MONTAGESTATUS_TEXT } from "@/lib/status";
 import { heuteBerlin, kurzTermin, tag } from "@/lib/zeit";
 import { AnsichtUmschalter } from "../anfragen/ui";
@@ -117,6 +118,7 @@ export default async function AuftraegePage({ searchParams }: PageProps<"/auftra
             produkte: a.produkte,
             stand: stand(a, heute),
             warnung: warnung(a),
+            bestellstatus: a.phase === "abgeschlossen" ? null : AUFTRAG_BESTELL_TEXT[auftragBestellstatus(a.bestellzeilen, a.noch_nicht_bestellt, a.phase)],
             zustaendig: a.zustaendig_id ? (namen.get(a.zustaendig_id) ?? null) : null,
           }))}
         />
@@ -128,7 +130,7 @@ export default async function AuftraegePage({ searchParams }: PageProps<"/auftra
                 <tr>
                   <Th className="pl-4">Auftrag</Th>
                   <Th>Kunde</Th>
-                  <Th>Phase</Th>
+                  <Th>Status</Th>
                   <Th className="max-[1380px]:hidden">Produkte</Th>
                   <Th>Termin</Th>
                   <Th className="pr-4">Zuständig</Th>
@@ -149,6 +151,7 @@ export default async function AuftraegePage({ searchParams }: PageProps<"/auftra
                       </Td>
                       <Td>
                         <Badge tone={AUFTRAG_PHASE_TON[a.phase]} dot>{AUFTRAG_PHASE_TEXT[a.phase]}</Badge>
+                        {a.phase !== "abgeschlossen" && (() => { const b = auftragBestellstatus(a.bestellzeilen, a.noch_nicht_bestellt, a.phase); return <div className={cn("mt-1 text-xs", b === "abgeschlossen" ? "text-tone-green-fg" : "text-muted")} data-bestellstatus={b}>{AUFTRAG_BESTELL_TEXT[b]}</div>; })()}
                         {w && <div className="mt-1 text-xs text-tone-red-fg">{w}</div>}
                       </Td>
                       <Td className="max-[1380px]:hidden"><span className="flex flex-wrap gap-1">{a.produkte.map((p) => <Badge key={p} tone="gray">{p}</Badge>)}</span></Td>

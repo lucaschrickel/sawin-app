@@ -4,7 +4,7 @@ import { useState, useTransition, type ComponentProps } from "react";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/cn";
 import type { TerminierbaresTicket } from "@/lib/service";
-import { TICKET_ART_TEXT } from "@/lib/status";
+import { TICKET_ART_TEXT } from "@/lib/ticket-status";
 import { lokalAus, stundenJeTag } from "@/lib/woche";
 import { einsatzSpeichern } from "../montageplan/aktionen";
 import { LABEL, Plantafel, SLOT } from "../montageplan/plantafel";

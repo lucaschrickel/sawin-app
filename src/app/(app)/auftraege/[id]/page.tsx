@@ -1,10 +1,11 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { TriangleAlert } from "lucide-react";
+import { PackageCheck, Plus, TriangleAlert } from "lucide-react";
 import { Angabe, Karte } from "@/components/app/info-karte";
 import { Shell } from "@/components/app/shell";
 import { Badge } from "@/components/ui/badge";
+import { Table, Td, Th } from "@/components/ui/table";
 import { getCustomer } from "@/customers";
 import { ladeBenutzerAuswahl } from "@/lib/anfragen";
 import { pruefeSitzung } from "@/lib/auth/sitzung";
@@ -13,7 +14,13 @@ import { ladeAuftrag } from "@/lib/auftraege";
 import { stundenText } from "@/lib/team";
 import { ladeBuchungen, ladeZeitDialogDaten, summeJeAuftrag } from "@/lib/zeiten";
 import { cn } from "@/lib/cn";
-import { AUFTRAG_PHASE_TEXT, AUFTRAG_PHASE_TON, MONTAGESTATUS_TEXT, TICKET_STATUS_TEXT, TICKET_STATUS_TON } from "@/lib/status";
+import { ladeBestellzeilenZuAuftrag } from "@/lib/einkauf";
+import { AUFTRAG_BESTELL_TEXT, AUFTRAG_BESTELL_TON, auftragBestellstatus, auftragLieferKw } from "@/lib/einkauf-status";
+import { kalenderwoche } from "@/lib/woche";
+import { NeueBestellung } from "../../bestellungen/neu";
+import { GeliefertSchalter } from "../../bestellungen/ui";
+import { AUFTRAG_PHASE_TEXT, AUFTRAG_PHASE_TON, MONTAGESTATUS_TEXT } from "@/lib/status";
+import { TICKET_STATUS_TEXT, TICKET_STATUS_TON } from "@/lib/ticket-status";
 import { ladeTicketsZu } from "@/lib/service";
 import { TicketDialog } from "../../service/ui";
 import { montagVon } from "@/lib/woche";
@@ -21,7 +28,7 @@ import { heuteBerlin, kurzTermin, tag, utcNachBerlinLokal, zeitpunkt } from "@/l
 import { NotizFormular } from "../../anfragen/ui";
 import { AufgabenKarte } from "../../aufgaben/ui";
 import { ZeitDialog } from "../../zeiten/zeit-dialog";
-import { AuftragDialog, AuftragLoeschen, LieferungFormular, PhaseAuswahl, Phasenleiste, PruefhinweisEntfernen } from "../ui";
+import { AuftragDialog, AuftragLoeschen, LieferungFormular, PhaseAuswahl, PhaseMontageSetzen, Phasenleiste, PruefhinweisEntfernen } from "../ui";
 
 export const metadata: Metadata = { title: "Auftrag" };
 
@@ -31,7 +38,7 @@ const uhrzeit = (iso: string) => kurzTermin(iso).split(" ").at(-1);
 export default async function AuftragPage({ params, searchParams }: PageProps<"/auftraege/[id]">) {
   const { id } = await params;
   const reiter = eins((await searchParams).reiter) === "historie" ? "historie" : "uebersicht";
-  const [daten, benutzer, { benutzer: ich }, aufgaben, tickets, zeiten, zeitDialog] = await Promise.all([
+  const [daten, benutzer, { benutzer: ich }, aufgaben, tickets, zeiten, zeitDialog, bestellzeilen] = await Promise.all([
     ladeAuftrag(id),
     ladeBenutzerAuswahl(),
     pruefeSitzung(),
@@ -39,6 +46,7 @@ export default async function AuftragPage({ params, searchParams }: PageProps<"/
     ladeTicketsZu({ auftrag_id: id }),
     ladeBuchungen({ von: null, bis: null, auftrag: id }).catch(() => []),
     ladeZeitDialogDaten(),
+    ladeBestellzeilenZuAuftrag(id),
   ]);
   if (!daten) notFound();
   const { auftrag: a, kunde: k, anfrage, einsaetze, ursprung, nachtraege, historie } = daten;
@@ -47,6 +55,10 @@ export default async function AuftragPage({ params, searchParams }: PageProps<"/
   const heute = heuteBerlin();
   const woche = (iso: string) => montagVon(utcNachBerlinLokal(iso).slice(0, 10));
   const planWoche = montagVon(a.liefertermin && a.liefertermin > heute ? a.liefertermin : heute);
+  const bestellstatus = auftragBestellstatus(bestellzeilen, a.noch_nicht_bestellt, a.phase);
+  const lieferKw = auftragLieferKw(bestellzeilen.map((z) => ({ geliefert: z.geliefert, liefer_kw: z.bestellung!.liefer_kw, liefer_jahr: z.bestellung!.liefer_jahr })));
+  const lieferterminKw = a.liefertermin ? kalenderwoche(a.liefertermin) : null;
+  const kwWeichtAb = !!(lieferKw && a.liefertermin && (lieferKw.kw !== lieferterminKw || lieferKw.jahr !== Number(a.liefertermin.slice(0, 4))));
   const tab = (aktiv: boolean) => cn("-mb-px border-b-2 px-1 pb-2.5 text-[15px]", aktiv ? "border-ink font-semibold text-ink" : "border-transparent text-muted hover:text-ink");
 
   return (
@@ -136,8 +148,65 @@ export default async function AuftragPage({ params, searchParams }: PageProps<"/
                 </div>
               </Karte>
 
-              <Karte titel="Bestellung & Lieferung">
+              <Karte
+                titel="Bestellung & Lieferung"
+                rechts={
+                  <span className="flex items-center gap-2">
+                    <Badge tone={AUFTRAG_BESTELL_TON[bestellstatus]} dot data-bestellstatus={bestellstatus}>{AUFTRAG_BESTELL_TEXT[bestellstatus]}</Badge>
+                    {a.phase !== "abgeschlossen" && (
+                      <NeueBestellung
+                        auftragId={a.id}
+                        ausloeser={
+                          <button type="button" data-neue-bestellung className="inline-flex items-center gap-1 rounded-full border border-line px-3 py-1 text-sm font-medium hover:border-line-strong">
+                            <Plus className="size-3.5" strokeWidth={2.2} />
+                            Bestellung
+                          </button>
+                        }
+                      />
+                    )}
+                  </span>
+                }
+              >
+                {bestellstatus === "abgeschlossen" && bestellzeilen.length > 0 && a.phase === "bestellung" && (
+                  <div role="status" data-ware-eingetroffen className="mb-3 flex flex-wrap items-center gap-3 rounded-md bg-tone-green-bg px-4 py-3 text-sm text-tone-green-fg">
+                    <PackageCheck className="size-5 shrink-0" />
+                    <span className="flex-1">Ware vollständig eingetroffen. Der Auftrag kann in die Montage.</span>
+                    <PhaseMontageSetzen id={a.id} />
+                  </div>
+                )}
                 <LieferungFormular auftrag={a} />
+                <p className="mt-2 text-xs text-muted-2" data-liefer-kw>
+                  {lieferKw ? `Liefer-KW aus Bestellungen: KW ${lieferKw.kw}/${lieferKw.jahr}` : bestellzeilen.some((z) => !z.geliefert) ? "Noch keine Liefer-KW aus Bestellungen" : ""}
+                  {kwWeichtAb && <span className="font-medium text-tone-red-fg"> · weicht ab (Liefertermin in KW {lieferterminKw})</span>}
+                </p>
+                {bestellzeilen.length > 0 ? (
+                  <Table className="mt-3 min-w-[560px]">
+                    <thead>
+                      <tr>
+                        <Th>Lieferant</Th>
+                        <Th>Artikel</Th>
+                        <Th className="text-right">Menge</Th>
+                        <Th>Bestellung</Th>
+                        <Th>KW</Th>
+                        <Th>Geliefert</Th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {bestellzeilen.map((z) => (
+                        <tr key={z.id} data-bestellzeile={z.id}>
+                          <Td>{z.bestellung!.lieferant ? <Link href={`/lieferanten/${z.bestellung!.lieferant.id}`} className="hover:underline">{z.bestellung!.lieferant.name}</Link> : "–"}</Td>
+                          <Td>{z.artikeltext}</Td>
+                          <Td className="text-right tabular">{Number(z.menge).toLocaleString("de-DE")}</Td>
+                          <Td><Link href={`/bestellungen/${z.bestellung!.id}`} className="font-mono text-[13px] hover:underline">{z.bestellung!.nummer}</Link></Td>
+                          <Td className="tabular">{z.bestellung!.liefer_kw ?? "–"}</Td>
+                          <Td><GeliefertSchalter id={z.id} geliefert={z.geliefert} text={z.artikeltext} /></Td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </Table>
+                ) : (
+                  <p className="mt-2 text-sm text-muted">Noch keine Bestellung zu diesem Auftrag.</p>
+                )}
               </Karte>
 
               <AufgabenKarte aufgaben={aufgaben} bezug={{ art: "auftrag", id: a.id, text: `${a.nummer} · ${a.titel}` }} kontext={{ benutzer, ichId: ich.id, heute }} />

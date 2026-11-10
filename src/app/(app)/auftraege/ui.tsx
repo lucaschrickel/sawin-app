@@ -42,6 +42,7 @@ export type PipelineKarte = {
   stand: { text: string; ton: "blue" | "brand" | "green" | "amber" | "gray" };
   warnung: string | null;
   zustaendig: string | null;
+  bestellstatus: string | null;
 };
 
 /** Pipeline (Kanban): Karten in eine andere Spalte ziehen ändert die Phase. */
@@ -105,6 +106,7 @@ export function AuftraegePipeline({ karten, phasen }: { karten: PipelineKarte[];
                     <StatusDot tone={k.stand.ton} className="size-1.5" />
                     {k.stand.text}
                   </span>
+                  {k.bestellstatus && <span className="text-xs text-muted-2">Bestellung: {k.bestellstatus}</span>}
                   {k.warnung && <span className="rounded-xs bg-tone-red-bg px-2 py-1 text-[12.5px] text-tone-red-fg">{k.warnung}</span>}
                 </Link>
               ))}
@@ -316,6 +318,20 @@ export function AuftragLoeschen({ id, nummer }: { id: string; nummer: string }) 
         </Button>
       </Bestaetigen>
       {ergebnis.fehler && <div className="basis-full"><Meldung e={ergebnis} /></div>}
+    </>
+  );
+}
+
+/** Hinweis „Ware vollständig eingetroffen“: Phase von Hand auf Montage setzen (nie automatisch) */
+export function PhaseMontageSetzen({ id }: { id: string }) {
+  const [laeuft, starten] = useTransition();
+  const [fehler, setFehler] = useState<string>();
+  return (
+    <>
+      <Button size="sm" variant="primary" disabled={laeuft} onClick={() => starten(async () => setFehler((await phaseSetzen(id, "montage")).fehler))}>
+        Phase auf Montage setzen
+      </Button>
+      {fehler && <div className="basis-full"><Meldung e={{ fehler }} /></div>}
     </>
   );
 }

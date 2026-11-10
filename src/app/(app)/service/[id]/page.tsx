@@ -11,16 +11,8 @@ import { ladeAufgabenZu } from "@/lib/aufgaben";
 import { cn } from "@/lib/cn";
 import { heute as ladeHeute } from "@/lib/heute";
 import { ladeTicket } from "@/lib/service";
-import {
-  ABRECHNUNG_TEXT,
-  AUFTRAG_PHASE_TEXT,
-  AUFTRAG_PHASE_TON,
-  TICKET_ART_TEXT,
-  TICKET_PRIO_TEXT,
-  TICKET_PRIO_TON,
-  TICKET_STATUS_TEXT,
-  TICKET_STATUS_TON,
-} from "@/lib/status";
+import { AUFTRAG_PHASE_TEXT, AUFTRAG_PHASE_TON } from "@/lib/status";
+import { ABRECHNUNG_TEXT, TICKET_ART_TEXT, TICKET_PRIO_TEXT, TICKET_PRIO_TON, TICKET_STATUS_TEXT, TICKET_STATUS_TON } from "@/lib/ticket-status";
 import { stundenText } from "@/lib/team";
 import { lokalKurz, montagVon } from "@/lib/woche";
 import { tag, zeitpunkt } from "@/lib/zeit";

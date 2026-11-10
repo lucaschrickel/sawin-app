@@ -22,7 +22,7 @@ import {
 } from "lucide-react";
 
 /** Schlüssel der Zähler an den Menüpunkten (berechnet in der Server-Hülle) */
-export type ZaehlerSchluessel = "aufgaben" | "anfragen" | "auftraege" | "service" | "fahrzeuge" | "abwesenheiten";
+export type ZaehlerSchluessel = "aufgaben" | "anfragen" | "auftraege" | "service" | "fahrzeuge" | "abwesenheiten" | "bestellungen";
 export type Zaehler = Partial<Record<ZaehlerSchluessel, { n: number; dringend?: boolean }>>;
 
 export type NavItem = { key: string; href: string; label: string; icon: LucideIcon; bereit?: boolean; zaehler?: ZaehlerSchluessel };
@@ -70,8 +70,8 @@ export const NAVIGATION: NavGroup[] = [
   {
     label: "Einkauf",
     items: [
-      { key: "lieferanten", href: "/lieferanten", label: "Lieferanten", icon: Store },
-      { key: "bestellungen", href: "/bestellungen", label: "Bestellungen", icon: ShoppingCart },
+      { key: "lieferanten", href: "/lieferanten", label: "Lieferanten", icon: Store, bereit: true },
+      { key: "bestellungen", href: "/bestellungen", label: "Bestellungen", icon: ShoppingCart, bereit: true, zaehler: "bestellungen" },
     ],
   },
   {

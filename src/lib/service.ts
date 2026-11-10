@@ -2,7 +2,8 @@ import "server-only";
 import { pruefeSitzung } from "@/lib/auth/sitzung";
 import { suchbegriff } from "@/lib/kunden";
 import { zuTafelEinsatz } from "@/lib/montageplan";
-import type { Abrechnung, AuftragPhase, TicketArt, TicketPrio, TicketStatus } from "@/lib/status";
+import type { AuftragPhase } from "@/lib/status";
+import type { Abrechnung, TicketArt, TicketPrio, TicketStatus } from "@/lib/ticket-status";
 import { plusTage } from "@/lib/woche";
 
 export type TicketZeile = {
