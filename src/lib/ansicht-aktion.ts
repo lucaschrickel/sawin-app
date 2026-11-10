@@ -21,3 +21,14 @@ export async function seitenleisteSetzen(eingeklappt: boolean) {
   if (data) await supabase.from("benutzer_einstellung").update({ seitenleiste_eingeklappt: !!eingeklappt }).eq("id", data.id);
   else await supabase.from("benutzer_einstellung").insert({ benutzer_id: benutzer.id, seitenleiste_eingeklappt: !!eingeklappt });
 }
+
+/** Merkt die gewählte Dashboard-Ansicht (Geschäftsführung, Montage, Einkauf) je Benutzer. Gibt keine Rechte. */
+export async function dashboardAnsichtSetzen(ansicht: "gf" | "montage" | "einkauf") {
+  if (!["gf", "montage", "einkauf"].includes(ansicht)) return;
+  const { supabase, benutzer } = await pruefeSitzung();
+  const { data } = await supabase.from("benutzer_einstellung").select("id, ansichten").eq("benutzer_id", benutzer.id).maybeSingle();
+  const ansichten = { ...((data?.ansichten as Record<string, string>) ?? {}), dashboard: ansicht };
+  if (data) await supabase.from("benutzer_einstellung").update({ ansichten }).eq("id", data.id);
+  else await supabase.from("benutzer_einstellung").insert({ benutzer_id: benutzer.id, ansichten });
+  refresh();
+}

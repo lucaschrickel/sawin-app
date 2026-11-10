@@ -36,7 +36,7 @@ export const NAVIGATION: NavGroup[] = [
   {
     label: "Übersicht",
     items: [
-      { key: "dashboard", href: "/", label: "Dashboard", icon: LayoutDashboard },
+      { key: "dashboard", href: "/", label: "Dashboard", icon: LayoutDashboard, bereit: true },
       { key: "aufgaben", href: "/aufgaben", label: "Aufgaben", icon: CheckSquare, bereit: true, zaehler: "aufgaben" },
     ],
   },

@@ -102,6 +102,7 @@ APP_URL=http://localhost:3100 npm run test:seitenleiste  # Seitenleiste wie in d
 APP_URL=http://localhost:3100 npm run test:team          # Fahrzeuge, Fahrzeug in der Plantafel, Kalender
 APP_URL=http://localhost:3100 npm run test:service       # Service-Tickets und Service-Plan
 APP_URL=http://localhost:3100 npm run test:einkauf       # Lieferanten, Bestellungen, „Ware eingetroffen“ am Auftrag
+APP_URL=http://localhost:3100 npm run test:dashboard     # Dashboard: drei Ansichten mit echten Daten, Ansicht je Benutzer gemerkt
 ```
 
 **Vor der Einladung von Mitarbeitern:** Der eingebaute E-Mail-Versand von Supabase schickt nur an Mitglieder der

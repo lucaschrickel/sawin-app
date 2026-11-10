@@ -43,7 +43,7 @@ try {
 
   b = await browser();
   await b.anmelden(admin);
-  await b.warte("location.pathname === '/kunden'");
+  await b.warte("location.pathname === '/'");
 
   // ---------- Fahrzeuge ----------
   await b.gehe("/fahrzeuge");

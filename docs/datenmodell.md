@@ -53,7 +53,7 @@ Sonderregeln per Trigger (RLS kann Spaltenänderungen nicht prüfen):
 | Tabelle | Inhalt |
 |---|---|
 | `benutzer` | `id` = `auth.users.id`, Name, E-Mail, `mitarbeiter_id`, `admin`, `konditionen`, `aktiv`, `dashboard_start` (gf/montage/einkauf) |
-| `benutzer_einstellung` | je Benutzer: Farbschema (hell/dunkel/system), Seitenleiste hell/eingeklappt, gemerkte Ansichten (Liste/Board) |
+| `benutzer_einstellung` | je Benutzer: Farbschema (hell/dunkel/system), Seitenleiste hell/eingeklappt, gemerkte Ansichten (Liste/Board je Seite, `ansichten.dashboard` = zuletzt gewählte Dashboard-Ansicht; ohne Wahl gilt `benutzer.dashboard_start`) |
 | `mitarbeiter` | Kürzel (eindeutig), Name, Rolle, Telefon, `ist_monteur`, `aktiv`, Reihenfolge in der Plantafel, eigener Urlaubsanspruch (leer = Standard). Löschen nur ohne Einsätze, Zeiten, Abwesenheiten, Kolonne und Benutzerkonto, sonst deaktivieren |
 | `kolonne` | Name, Stammfahrzeug, Reihenfolge |
 | `kolonne_mitglied` | Kolonne, Mitarbeiter (nur Monteure), Reihenfolge; ein Monteur kann in mehreren Kolonnen sein |

@@ -41,7 +41,7 @@ try {
   merken("anfrage", anfrage.id);
   b = await browser();
   await b.anmelden(admin);
-  await b.warte("location.pathname === '/kunden'");
+  await b.warte("location.pathname === '/'");
 
   // 1. Meine Aufgaben: überfällig, mit Bezug zum Kunden
   await b.gehe("/aufgaben");

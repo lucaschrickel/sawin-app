@@ -199,6 +199,9 @@ Die Monteur-App kommt in Version 2.
     Nächstes, Abwesenheiten der nächsten zwei Wochen, Ware für anstehende Montagen, Fahrzeugtermine.
   - Einkauf: offene Bestellungen, Lieferungen je Kalenderwoche, überschrittene Liefertermine, noch nicht bestellte
     Positionen, fehlende AB vom Lieferanten, Lieferanten-Schnellzugriff.
+  - Das Dashboard ist die Startseite (`/`). Welche Herkunftsarten als „online“ zählen, steht in der Konfiguration
+    der Instanz (`herkunftOnline`). Bis zum Beleg-Modul stehen Auftragsbestand, Forderungen, Angebotsquote und
+    Auftragswert je Monat als Platzhalter „Folgt mit dem Beleg-Modul“ (Entscheidung 10.11.2026).
 
 ### Kunden (Endkunden des Betriebs)
 

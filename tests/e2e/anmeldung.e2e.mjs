@@ -151,7 +151,7 @@ try {
   const secret = (await js("document.querySelector('details code').textContent")).replace(/\s/g, "");
   let code = totp(secret);
   await formular({ code });
-  pruefe("Einrichtung abgeschlossen, App erreichbar", await warte("location.pathname === '/kunden'"), await pfad());
+  pruefe("Einrichtung abgeschlossen, App erreichbar", await warte("location.pathname === '/'"), await pfad());
   pruefe("Benutzername in der Seitenleiste", await warte(`document.body.innerText.includes(${JSON.stringify(`E2E Admin ${lauf}`)})`));
 
   // 4. Benutzerverwaltung (Admin)
@@ -169,7 +169,7 @@ try {
   pruefe("falscher Code wird abgelehnt", (await text()).includes("Der Code stimmt nicht"));
   code = await frischerCode(secret, code);
   await formular({ code });
-  pruefe("richtiger Code: angemeldet", await warte("location.pathname === '/kunden'"), await pfad());
+  pruefe("richtiger Code: angemeldet", await warte("location.pathname === '/'"), await pfad());
 
   // 6. Nicht-Admin: keine Benutzerverwaltung
   await service.from("benutzer").update({ admin: false }).eq("id", angelegt.user.id);
@@ -199,7 +199,7 @@ try {
   await warte("document.body.innerText.includes('Mindestens 12')");
   pruefe("zu kurzes Passwort abgelehnt", (await text()).includes("Mindestens 12 Zeichen"));
   await formular({ passwort: neuesPasswort, passwort2: neuesPasswort });
-  pruefe("neues Passwort gespeichert", await warte("location.pathname === '/kunden'"), await pfad());
+  pruefe("neues Passwort gespeichert", await warte("location.pathname === '/'"), await pfad());
   await abmeldenKlicken();
   await warte("location.pathname === '/anmelden'");
   await formular({ email, passwort });
@@ -228,7 +228,7 @@ try {
   await warte("!!document.querySelector('details code')");
   const secret2 = (await js("document.querySelector('details code').textContent")).replace(/\s/g, "");
   await formular({ code: totp(secret2) });
-  pruefe("Einladung: angemeldet", await warte("location.pathname === '/kunden'"), await pfad());
+  pruefe("Einladung: angemeldet", await warte("location.pathname === '/'"), await pfad());
 
   // 11. Deaktivierter Benutzer verliert den Zugriff sofort
   await service.from("benutzer").update({ aktiv: false }).eq("id", inv.user.id);

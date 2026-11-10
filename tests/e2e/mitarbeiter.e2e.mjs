@@ -26,7 +26,7 @@ try {
   const admin = await testAdmin();
   b = await browser();
   await b.anmelden(admin);
-  await b.warte("location.pathname === '/kunden'");
+  await b.warte("location.pathname === '/'");
 
   // 1. Monteur anlegen mit eigenem Urlaubsanspruch → Detailseite
   await b.gehe("/mitarbeiter");

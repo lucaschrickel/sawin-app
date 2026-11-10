@@ -20,10 +20,12 @@ try {
   const admin = await testAdmin({ konditionen: true });
   b = await browser();
   await b.anmelden(admin);
-  pruefe("Anmeldung führt zur Kundenliste", await b.warte("location.pathname === '/kunden'"), await b.pfad());
+  pruefe("Anmeldung führt zum Dashboard", await b.warte("location.pathname === '/'"), await b.pfad());
   await b.enthaelt("Kunden");
   const nav = await b.js("[...document.querySelectorAll('aside a[href]')].map((a) => a.getAttribute('href'))");
   pruefe("Navigation zeigt nur fertige Module", nav.includes("/kunden") && nav.includes("/einstellungen") && !nav.includes("/belege") && !nav.includes("/angebote"), nav.join(" "));
+
+  await b.gehe("/kunden");
 
   // 1. Anlegen mit Lieferadresse
   await b.klickText("button", "Neuer Kunde");

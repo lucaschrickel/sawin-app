@@ -20,7 +20,7 @@ try {
   merken("kunde", kunde.id);
   b = await browser();
   await b.anmelden(admin);
-  await b.warte("location.pathname === '/kunden'");
+  await b.warte("location.pathname === '/'");
 
   // 1. Erfassen mit Kundensuche; Objekt und Herkunft aus dem Kunden vorbelegt
   await b.gehe("/anfragen");

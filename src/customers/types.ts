@@ -19,6 +19,8 @@ export type CustomerConfig = {
   locale: string;
   /** Auswahl „Herkunft“ bei Kunden und Anfragen (Daten der Instanz, kein Sonder-Code) */
   herkunft: string[];
+  /** Herkunftsarten, die im Dashboard als „online“ zählen (Anteil Anfragen online) */
+  herkunftOnline: string[];
   /** Produktgruppen (Anfragen, Aufträge, Lieferanten) */
   produkte: string[];
   // eslint-disable-next-line @typescript-eslint/no-explicit-any

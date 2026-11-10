@@ -30,7 +30,7 @@ try {
   merken("anfrage", anfrage.id);
   b = await browser();
   await b.anmelden(admin);
-  await b.warte("location.pathname === '/kunden'");
+  await b.warte("location.pathname === '/'");
 
   // 1. Auftrag aus der Anfrage; Hinweis verlinkt den Auftrag
   await b.gehe(`/anfragen/${anfrage.id}`);

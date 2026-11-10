@@ -52,7 +52,7 @@ try {
 
   b = await browser();
   await b.anmelden(admin);
-  await b.warte("location.pathname === '/kunden'");
+  await b.warte("location.pathname === '/'");
 
   // 1. Ticket anlegen mit Ursprungsauftrag
   await b.gehe("/service");

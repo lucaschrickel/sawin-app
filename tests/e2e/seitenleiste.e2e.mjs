@@ -17,14 +17,14 @@ const DEMO = [
   ["Team und Ressourcen", ["Kalender", "Mitarbeiter", "Fahrzeuge", "Zeiterfassung", "Abwesenheiten"]],
   ["System", ["Einstellungen"]],
 ];
-const FERTIG = ["Aufgaben", "Kunden", "Anfragen", "Aufträge", "Montageplan", "Service-Tickets", "Service-Plan", "Kalender", "Mitarbeiter", "Fahrzeuge", "Zeiterfassung", "Abwesenheiten", "Lieferanten", "Bestellungen", "Einstellungen"];
+const FERTIG = ["Dashboard", "Aufgaben", "Kunden", "Anfragen", "Aufträge", "Montageplan", "Service-Tickets", "Service-Plan", "Kalender", "Mitarbeiter", "Fahrzeuge", "Zeiterfassung", "Abwesenheiten", "Lieferanten", "Bestellungen", "Einstellungen"];
 const ZUSATZ = (process.env.FERTIG_ZUSATZ ?? "").split(",").filter(Boolean); // später gebaute Module
 
 try {
   const admin = await testAdmin();
   b = await browser();
   await b.anmelden(admin);
-  await b.warte("location.pathname === '/kunden'");
+  await b.warte("location.pathname === '/'");
   await b.warte("[...document.querySelectorAll('aside [data-folgt]')].some((x) => x.getClientRects().length)");
 
   // 1. Gruppen und Einträge in der Reihenfolge der Demo

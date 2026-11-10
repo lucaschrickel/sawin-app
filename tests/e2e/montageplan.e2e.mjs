@@ -55,7 +55,7 @@ try {
 
   b = await browser();
   await b.anmelden(admin);
-  await b.warte("location.pathname === '/kunden'");
+  await b.warte("location.pathname === '/'");
 
   // 1. Tafel: Woche, Arbeitszeit, Monteur-Zeile, genehmigte Abwesenheit
   await b.gehe(`/montageplan?woche=${WOCHE}`);

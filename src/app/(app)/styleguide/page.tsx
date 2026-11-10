@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Plus } from "lucide-react";
 import type { ReactNode } from "react";
+import { BalkenListe, DashKarte, HinweisZeile, Platzhalter, Ring, RingKarte } from "@/components/app/dashboard-bausteine";
 import { KpiCard } from "@/components/app/kpi-card";
 import { PageHeader } from "@/components/app/page-header";
 import { PipelineCard, type PipelineCardProps } from "@/components/app/pipeline-card";
@@ -191,6 +192,21 @@ export default function StyleguidePage() {
           <KpiCard label="Auftragsbestand brutto" value="184.230 €" note="11 offene Aufträge" spark={[27, 39, 44, 41, 36, 47]} />
           <KpiCard label="Offene Forderungen" value="23.410 €" note="2 überfällig" spark={[8, 4, 12, 6, 9, 5]} />
           <KpiCard label="Montagen 14 Tage" value="6" note="Nächste morgen 07:30" spark={[2, 3, 1, 2, 3, 1]} />
+        </div>
+
+        <div className="grid grid-cols-[repeat(auto-fit,minmax(300px,1fr))] gap-4">
+          <Platzhalter titel="Offene Forderungen" />
+          <DashKarte titel="Balkenliste" mehr={{ href: "#", text: "Alle" }}>
+            <BalkenListe zeilen={[{ name: "Website", titel: "Website", n: 12, zusatz: "40 %" }, { name: "Empfehlung", titel: "Empfehlung", n: 9, zusatz: "30 %" }, { name: "Google", titel: "Google", n: 5, zusatz: "17 %" }]} />
+          </DashKarte>
+          <DashKarte titel="Braucht Aufmerksamkeit">
+            <HinweisZeile href="#" titel="2 Abwesenheiten zur Genehmigung" info="Vitali ab 16.11. · Jannis ab 23.11." ton="amber" />
+            <HinweisZeile href="#" titel="1 Bestellung überfällig" info="BE-26-004 Fensterwerk" ton="red" />
+          </DashKarte>
+        </div>
+        <div className="flex flex-wrap gap-4">
+          <RingKarte dunkel href="#" titel="Abwesenheiten" text="1 Antrag wartet auf Genehmigung · heute 90 % des Teams da" ring={<Ring dunkel prozent={90} zahl={1} titel="90 % anwesend" />} />
+          <RingKarte href="#" titel="Einsätze heute" text="Team Vitali, Jannis · nächste 14 Tage zu 75 % freigegeben" ring={<Ring prozent={75} zahl={2} titel="75 % freigegeben" />} />
         </div>
 
         <div className="grid gap-4 lg:grid-cols-[2fr_1fr]">

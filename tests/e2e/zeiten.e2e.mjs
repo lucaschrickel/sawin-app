@@ -46,7 +46,7 @@ try {
 
   b = await browser();
   await b.anmelden(admin);
-  await b.warte("location.pathname === '/kunden'");
+  await b.warte("location.pathname === '/'");
 
   // 1. Montage ohne Auftrag wird abgelehnt, Eingaben bleiben; mit Auftrag gespeichert (8,5 h)
   await b.gehe(`/zeiten?ab=${WOCHE}`);
