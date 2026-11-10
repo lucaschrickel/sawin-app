@@ -12,6 +12,7 @@ import { pruefeSitzung } from "@/lib/auth/sitzung";
 import { ladeAufgabenZu } from "@/lib/aufgaben";
 import { ladeAuftrag } from "@/lib/auftraege";
 import { ladeBelegeZu } from "@/lib/belege";
+import { zahlungenImHintergrund } from "@/lib/lexware/zahlungen";
 import { anzeigeStatus, auftragFinanzen, auftragSchritte } from "@/lib/belege-status";
 import { eur } from "@/lib/format";
 import { BelegeKompakt } from "../../beleg/kompakt";
@@ -59,6 +60,7 @@ export default async function AuftragPage({ params, searchParams }: PageProps<"/
   const c = getCustomer();
   const zustaendig = benutzer.find((b) => b.id === a.zustaendig_id)?.name;
   const heute = heuteBerlin();
+  if (belege.some((b) => b.lexware_status && b.status === "offen")) await zahlungenImHintergrund();
   const woche = (iso: string) => montagVon(utcNachBerlinLokal(iso).slice(0, 10));
   const planWoche = montagVon(a.liefertermin && a.liefertermin > heute ? a.liefertermin : heute);
   const bestellstatus = auftragBestellstatus(bestellzeilen, a.noch_nicht_bestellt, a.phase);

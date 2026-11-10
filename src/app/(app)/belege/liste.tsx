@@ -5,9 +5,10 @@ import { ListenSuche } from "@/components/app/listen-suche";
 import { PageHeader } from "@/components/app/page-header";
 import { Shell } from "@/components/app/shell";
 import { Badge } from "@/components/ui/badge";
-import { heuteBerlin, ladeBeleg, ladeBelegListe, ladeBelegTags, zaehleBelegarten, type BelegZeile } from "@/lib/belege";
+import { belegeMitAppBuchung, heuteBerlin, ladeBeleg, ladeBelegListe, ladeBelegTags, zaehleBelegarten, type BelegZeile } from "@/lib/belege";
 import { anzeigeStatus, BELEGART_LISTE, BELEGART_TEXT, BELEGARTEN, bearbeitbar, type Belegart } from "@/lib/belege-status";
 import { eur } from "@/lib/format";
+import { zahlungenImHintergrund } from "@/lib/lexware/zahlungen";
 import { tag, zeitpunkt } from "@/lib/zeit";
 import { PdfKachel, TagsKommentar, VerwerfenKnopf } from "../beleg/ui";
 import { BelegTabelle, Filterleiste, NeuMenue } from "./ui";
@@ -56,6 +57,10 @@ export async function BelegListe({ liste, searchParams }: { liste: string; searc
   const [alle, anzahl, tagVorschlaege] = await Promise.all([ladeBelegListe(artFilter ? [artFilter] : def.arten), def.key === "alle" ? zaehleBelegarten() : Promise.resolve({} as Record<string, number>), ladeBelegTags()]);
   // Datum erst nach dem Laden der Daten (Sitzung): mit Cache Components darf die Zeit nicht vorher gelesen werden
   const heute = heuteBerlin();
+  // Rechnungen und Abschläge: Zahlungsstand aus Lexware im Hintergrund, App-Buchungen „in Lexware noch buchen“
+  const mitRechnungen = def.arten.some((a) => a === "rechnung" || a === "abschlagsrechnung");
+  if (mitRechnungen) await zahlungenImHintergrund();
+  const lexBuchen = mitRechnungen ? await belegeMitAppBuchung() : new Set<string>();
   const ketten = new Map<string, BelegZeile[]>();
   for (const b of alle) ketten.set(b.kette_id, [...(ketten.get(b.kette_id) ?? []), b]);
   const mitStatus = alle.map((b) => ({ b, s: anzeigeStatus(b, ketten.get(b.kette_id) ?? [b], heute) }));
@@ -104,7 +109,7 @@ export async function BelegListe({ liste, searchParams }: { liste: string; searc
             art: BELEGART_LISTE[b.art],
             datum: tag(b.datum),
             kunde: b.kunde?.name ?? b.adresse_name ?? "–",
-            titel: b.titel && b.titel !== BELEGART_TEXT[b.art] ? b.titel : "",
+            titel: [b.titel && b.titel !== BELEGART_TEXT[b.art] ? b.titel : "", lexBuchen.has(b.id) ? "in Lexware noch buchen" : ""].filter(Boolean).join(" · "),
             betrag: b.art === "lieferschein" ? "–" : def.key === "forderungen" ? eur(b.offen_betrag ?? b.summe_brutto) : eur(b.summe_brutto),
             status: s,
           }))}

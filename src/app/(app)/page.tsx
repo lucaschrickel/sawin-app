@@ -5,6 +5,7 @@ import { PageHeader } from "@/components/app/page-header";
 import { Shell } from "@/components/app/shell";
 import { ladeDashboardAnsicht } from "@/lib/ansicht";
 import { pruefeSitzung } from "@/lib/auth/sitzung";
+import { zahlungenImHintergrund } from "@/lib/lexware/zahlungen";
 import { DASHBOARD_ANSICHTEN, ladeEinkauf, ladeGeschaeftsfuehrung, ladeMontage } from "@/lib/dashboard";
 import { kalenderwoche } from "@/lib/woche";
 import { heuteBerlin, utcNachBerlinLokal } from "@/lib/zeit";
@@ -59,6 +60,7 @@ export default async function DashboardPage() {
     );
   }
   const d = await ladeGeschaeftsfuehrung();
+  await zahlungenImHintergrund();
   const gruss = stunde < 11 ? "Guten Morgen" : stunde < 18 ? "Guten Tag" : "Guten Abend";
   const abwesend = d.abwesenheiten.abwesendHeute;
   return (

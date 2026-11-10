@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { cn } from "@/lib/cn";
 import { BELEGART_KURZ, type BelegKurz, type Schritt } from "@/lib/belege-status";
-import { angebotStatus, belegUebergeben, belegVerwerfen, lexwarePdfHolen, nachtragAnlegen, tagsKommentarSpeichern } from "./aktionen";
+import { angebotStatus, belegUebergeben, belegVerwerfen, lexwarePdfHolen, nachtragAnlegen, tagsKommentarSpeichern, zahlungsbestaetigungErstellen } from "./aktionen";
 import { TagEingabe } from "./editor";
 
 /** Sprungleiste der Kette: aktueller Beleg dunkel, Entwürfe gestrichelt, abgelehnte durchgestrichen */
@@ -66,7 +66,12 @@ export function SchrittKnoepfe({ schritte, belegId, klein }: { schritte: Schritt
               onClick={() =>
                 starte(async () => {
                   setFehler(null);
-                  const r = await angebotStatus(belegId!, s.aktion!);
+                  if (s.aktion === "zahlungsbestaetigung") {
+                    const z = await zahlungsbestaetigungErstellen(s.ziel!);
+                    if (z.fehler || !z.id) return setFehler(z.fehler ?? "Die Zahlungsbestätigung konnte nicht erstellt werden.");
+                    return router.push(`/beleg/${z.id}`);
+                  }
+                  const r = await angebotStatus(belegId!, s.aktion as "angenommen" | "abgelehnt");
                   if (r.fehler) return setFehler(r.fehler);
                   if (r.frage === "anfrage_verloren" && r.anfrageId) setVerloren(r.anfrageId);
                   router.refresh();

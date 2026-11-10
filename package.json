@@ -32,7 +32,8 @@
     "test:dashboard": "node tests/e2e/dashboard.e2e.mjs",
     "test:oberflaeche": "node tests/e2e/oberflaeche.e2e.mjs",
     "test:belege": "node tests/e2e/belege.e2e.mjs",
-    "test:lexware": "node tests/e2e/lexware.e2e.mjs"
+    "test:lexware": "node tests/e2e/lexware.e2e.mjs",
+    "test:zahlungen": "node tests/e2e/zahlungen.e2e.mjs"
   },
   "dependencies": {
     "@fontsource-variable/inter": "^5.3.0",

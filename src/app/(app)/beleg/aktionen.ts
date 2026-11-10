@@ -7,6 +7,7 @@ import { abrechnungAnwenden } from "@/lib/beleg-abrechnung";
 import { aufbereiten, meldung } from "@/lib/beleg-eingabe";
 import { LEXWARE_BELEGARTEN } from "@/lib/belege-status";
 import { anLexwareUebertragen, lexwarePdfNachladen } from "@/lib/lexware/uebertragung";
+import { zahlstandHolen } from "@/lib/lexware/zahlungen";
 import type { EditorZustand } from "@/lib/beleg-typen";
 import { ladeBeleg, ladeKundeFuerBeleg, kundeVorbelegung, type KundeFuerBeleg } from "@/lib/belege";
 
@@ -147,6 +148,72 @@ export async function lexwarePdfHolen(id: string): Promise<Ergebnis> {
     await lexwarePdfNachladen(d);
   } catch (e) {
     return { fehler: `Das PDF konnte nicht von Lexware geholt werden: ${e instanceof Error ? e.message : "unbekannter Fehler"}` };
+  }
+  refresh();
+  return { ok: true };
+}
+
+const ZAHLUNGSARTEN = ["ueberweisung", "bar", "karte", "sonstiges"];
+const DATUM = /^\d{4}-\d{2}-\d{2}$/;
+
+/** PDF einer neuen Zahlungsbestätigung ablegen (Fehler nur als Hinweis; das PDF entsteht sonst beim Öffnen) */
+async function bestaetigungAblegen(id: string): Promise<string | undefined> {
+  const d = await ladeBeleg(id);
+  if (!d) return undefined;
+  try {
+    await pdfAblegen(d);
+  } catch {
+    return "Das PDF der Zahlungsbestätigung wird beim Öffnen erzeugt.";
+  }
+}
+
+/** „Als bezahlt markieren“: App-Buchung (Teilzahlung möglich), optional mit Zahlungsbestätigung */
+export async function alsBezahltMarkieren(id: string, e: { datum: string; betrag: string; zahlungsart: string; bestaetigung: boolean }): Promise<Ergebnis> {
+  if (!UUID.test(id)) return { fehler: "Beleg nicht gefunden." };
+  if (!DATUM.test(e.datum)) return { fehler: "Bitte das Datum des Zahlungseingangs angeben." };
+  if (!ZAHLUNGSARTEN.includes(e.zahlungsart)) return { fehler: "Bitte eine Zahlungsart wählen." };
+  const betrag = Number(String(e.betrag).trim().replace(/\./g, "").replace(",", "."));
+  if (!Number.isFinite(betrag) || betrag <= 0) return { fehler: "Bitte einen Betrag über 0 € angeben." };
+  const { supabase } = await pruefeSitzung();
+  const { data, error } = await supabase.rpc("zahlung_erfassen", { p_beleg: id, p_datum: e.datum, p_betrag: Math.round(betrag * 100) / 100, p_zahlungsart: e.zahlungsart, p_bestaetigung: e.bestaetigung });
+  if (error) return { fehler: meldung(error, "Die Zahlung konnte nicht gespeichert werden.") };
+  const zb = (data as { zahlungsbestaetigung_id: string | null }).zahlungsbestaetigung_id;
+  const hinweis = zb ? await bestaetigungAblegen(zb) : undefined;
+  refresh();
+  return { ok: true, id: zb ?? undefined, hinweis };
+}
+
+/** Zahlungsbestätigung zu einer Zahlung (App-Buchung oder aus Lexware) */
+export async function zahlungsbestaetigungErstellen(zahlungId: string): Promise<Ergebnis> {
+  if (!UUID.test(zahlungId)) return { fehler: "Zahlung nicht gefunden." };
+  const { supabase } = await pruefeSitzung();
+  const { data, error } = await supabase.rpc("zahlungsbestaetigung_erstellen", { p_zahlung: zahlungId });
+  if (error || !data) return { fehler: meldung(error, "Die Zahlungsbestätigung konnte nicht erstellt werden.") };
+  const hinweis = await bestaetigungAblegen(data as string);
+  refresh();
+  return { ok: true, id: data as string, hinweis };
+}
+
+/** Eigene, noch nicht abgeglichene Zahlung ohne Bestätigung entfernen (Markierung als gelöscht) */
+export async function zahlungEntfernen(zahlungId: string): Promise<Ergebnis> {
+  if (!UUID.test(zahlungId)) return { fehler: "Zahlung nicht gefunden." };
+  const { supabase } = await pruefeSitzung();
+  const { error } = await supabase.rpc("loeschen", { p_tabelle: "zahlung", p_id: zahlungId });
+  if (error) return { fehler: meldung(error, "Die Zahlung konnte nicht entfernt werden.") };
+  refresh();
+  return { ok: true };
+}
+
+/** Zahlungsstand eines Belegs sofort von Lexware abrufen */
+export async function zahlungsstandAbrufen(id: string): Promise<Ergebnis> {
+  if (!UUID.test(id)) return { fehler: "Beleg nicht gefunden." };
+  const { benutzer } = await pruefeSitzung();
+  const d = await ladeBeleg(id);
+  if (!d?.beleg.lexware_id) return { fehler: "Der Beleg liegt nicht in Lexware." };
+  try {
+    await zahlstandHolen({ id, lexware_id: d.beleg.lexware_id }, benutzer.id);
+  } catch (e) {
+    return { fehler: `Lexware: ${e instanceof Error ? e.message : "unbekannter Fehler"}` };
   }
   refresh();
   return { ok: true };

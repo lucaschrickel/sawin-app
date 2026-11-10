@@ -118,7 +118,23 @@ export type BelegDetail = {
   kette: BelegZeile[];
   versionen: { version: number; eingefroren_am: string; pdf_pfad: string | null }[];
   versand: { version: number | null; kanal: string; gesendet_am: string }[];
+  /** Rechnung und Abschlag: Zahlungen (App-Buchungen und aus Lexware) */
+  zahlungen: Zahlung[];
+  /** Zahlungsbestätigung: die bestätigte Zahlung und ihre Rechnung */
+  bestaetigt: { datum: string; betrag: number; zahlungsart: string; rechnung: { art: Belegart; nummer: string | null; datum: string; summe_brutto: number } } | null;
 };
+
+export type Zahlung = {
+  id: string;
+  datum: string;
+  betrag: number;
+  zahlungsart: "ueberweisung" | "bar" | "karte" | "sonstiges";
+  quelle: "app" | "lexware";
+  lex_abgleich: "offen" | "abgeglichen";
+  zahlungsbestaetigung: { id: string; nummer: string | null } | null;
+};
+
+export const ZAHLUNGSART_TEXT: Record<Zahlung["zahlungsart"], string> = { ueberweisung: "Überweisung", bar: "Bar", karte: "Karte", sonstiges: "Sonstiges" };
 
 export const positionZahlen = (p: Position): Position => ({
   ...p,
@@ -139,11 +155,17 @@ export async function ladeBeleg(id: string): Promise<BelegDetail | null> {
     .eq("id", id)
     .maybeSingle();
   if (!b) return null;
-  const [{ data: pos }, { data: kette }, { data: versionen }, { data: versand }] = await Promise.all([
+  const [{ data: pos }, { data: kette }, { data: versionen }, { data: versand }, { data: zahl }, { data: best }] = await Promise.all([
     supabase.from("beleg_position").select(POSITION).eq("beleg_id", id).order("reihenfolge"),
     supabase.from("beleg").select(ZEILE).eq("kette_id", b.kette_id),
     supabase.from("beleg_version").select("version, eingefroren_am, pdf_pfad").eq("beleg_id", id).order("version", { ascending: false }),
     supabase.from("beleg_versand").select("version, kanal, gesendet_am").eq("beleg_id", id).order("gesendet_am", { ascending: false }),
+    ["rechnung", "abschlagsrechnung"].includes(b.art)
+      ? supabase.from("zahlung").select("id, datum, betrag, zahlungsart, quelle, lex_abgleich, zahlungsbestaetigung:zahlungsbestaetigung_id(id, nummer)").eq("beleg_id", id).order("datum").order("created_at")
+      : Promise.resolve({ data: [] }),
+    b.art === "zahlungsbestaetigung"
+      ? supabase.from("zahlung").select("datum, betrag, zahlungsart, rechnung:beleg_id(art, nummer, datum, summe_brutto)").eq("zahlungsbestaetigung_id", id).maybeSingle()
+      : Promise.resolve({ data: null }),
   ]);
   const beleg = zahlen(b) as unknown as Beleg;
   beleg.gesamtrabatt_prozent = Number(beleg.gesamtrabatt_prozent);
@@ -157,6 +179,13 @@ export async function ladeBeleg(id: string): Promise<BelegDetail | null> {
     kette: ketteSortiert(((kette ?? []) as unknown as BelegZeile[]).map(zahlen)),
     versionen: versionen ?? [],
     versand: versand ?? [],
+    zahlungen: ((zahl ?? []) as unknown as Zahlung[]).map((z) => ({ ...z, betrag: Number(z.betrag) })),
+    bestaetigt: best
+      ? (() => {
+          const x = best as unknown as NonNullable<BelegDetail["bestaetigt"]>;
+          return { ...x, betrag: Number(x.betrag), rechnung: { ...x.rechnung, summe_brutto: Number(x.rechnung.summe_brutto) } };
+        })()
+      : null,
   };
 }
 
@@ -630,6 +659,13 @@ export async function neuerBelegZustand(p: NeuParameter): Promise<{ zustand: Edi
   return { zustand: { kopf, positionen }, hinweis };
 }
 
+
+/** Belege mit App-Buchungen, die Lexware noch nicht gemeldet hat („in Lexware noch buchen“) */
+export async function belegeMitAppBuchung(): Promise<Set<string>> {
+  const { supabase } = await pruefeSitzung();
+  const { data } = await supabase.from("zahlung").select("beleg_id").eq("quelle", "app").eq("lex_abgleich", "offen");
+  return new Set((data ?? []).map((z) => z.beleg_id as string));
+}
 
 /** Tags aller Belege (Vorschläge) */
 export async function ladeBelegTags(): Promise<string[]> {

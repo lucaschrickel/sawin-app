@@ -159,8 +159,10 @@ export type Schritt = {
   text: string;
   /** Link (öffnet z. B. den Editor) */
   href?: string;
-  /** Aktion auf dem Angebot */
-  aktion?: "angenommen" | "abgelehnt";
+  /** Aktion auf dem Beleg (Angebot angenommen/abgelehnt, Zahlungsbestätigung zu einer Zahlung) */
+  aktion?: "angenommen" | "abgelehnt" | "zahlungsbestaetigung";
+  /** Zahlung, zu der die Zahlungsbestätigung entsteht */
+  ziel?: string;
   ton: "primary" | "secondary" | "danger";
 };
 
@@ -171,7 +173,14 @@ const weiter = (b: BelegKurz): Schritt => ({ text: `${BELEGART_TEXT[b.art]} weit
  * Nächster Schritt auf der Belegseite: nur Schritte, die von genau diesem Beleg ausgehen. Gibt es schon einen
  * Entwurf als Folgebeleg, steht nur „… weiter bearbeiten“ da.
  */
-export function belegSchritte(b: BelegKurz, kette: BelegKurz[]): Schritt[] {
+export function belegSchritte(b: BelegKurz, kette: BelegKurz[], zahlungen: { id: string; zahlungsbestaetigung: unknown }[] = []): Schritt[] {
+  // Rechnung und Abschlag: zu jeder Zahlung ohne Bestätigung „Zahlungsbestätigung erstellen“
+  const ohneBestaetigung = zahlungen.find((z) => !z.zahlungsbestaetigung);
+  const bestaetigung: Schritt[] = ohneBestaetigung ? [{ text: "Zahlungsbestätigung erstellen", aktion: "zahlungsbestaetigung", ziel: ohneBestaetigung.id, ton: "secondary" }] : [];
+  return [...belegSchritteOhneZahlung(b, kette), ...bestaetigung];
+}
+
+function belegSchritteOhneZahlung(b: BelegKurz, kette: BelegKurz[]): Schritt[] {
   if (b.status === "entwurf" || ["abgelehnt", "nicht_beauftragt"].includes(b.status)) return [];
   const folgeEntwurf = kette.find((f) => f.vorgaenger_id === b.id && f.status === "entwurf");
   if (folgeEntwurf) return [weiter(folgeEntwurf)];

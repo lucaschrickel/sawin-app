@@ -96,6 +96,8 @@ export type PdfBeleg = {
   liefertermin: string | null;
   leistung_von: string | null;
   leistung_bis: string | null;
+  /** Zahlungsbestätigung: bestätigte Zahlung, Rechnung und Restbetrag (keine Positionen, keine Umsatzsteuer) */
+  bestaetigung?: { datum: string; betrag: number; zahlungsart: string; rechnung: { art: Belegart; nummer: string | null; datum: string; summe_brutto: number }; rest: number } | null;
 };
 
 export type PdfPosition = {
@@ -155,7 +157,8 @@ function spalten(preise: boolean, rabatt: boolean, ust: boolean) {
 }
 
 function BelegDokument({ b, positionen, firma, logo, entwurf }: { b: PdfBeleg; positionen: PdfPosition[]; firma: PdfFirma; logo: LogoPfade; entwurf: boolean }) {
-  const preise = b.art !== "lieferschein";
+  const zb = b.art === "zahlungsbestaetigung";
+  const preise = b.art !== "lieferschein" && !zb;
   const s: Summen = belegSummen(positionen.map((p) => ({ ...p, abzug: !!p.abzug_beleg_id })), b);
   const mitRabatt = positionen.some((p) => p.typ === "artikel" && p.rabatt_prozent > 0);
   const saetze = new Set(positionen.filter((p) => p.typ === "artikel").map((p) => p.steuersatz));
@@ -226,7 +229,38 @@ function BelegDokument({ b, positionen, firma, logo, entwurf }: { b: PdfBeleg; p
         )}
         <Absatz text={b.einleitung} />
 
+        {zb && b.bestaetigung && (
+          <View style={{ marginTop: 18 }}>
+            <Text>Wir bestätigen den Eingang folgender Zahlung:</Text>
+            <View style={{ marginTop: 10, width: 330 }}>
+              {(
+                [
+                  [`Zu ${BELEGART_TEXT[b.bestaetigung.rechnung.art]}`, `${b.bestaetigung.rechnung.nummer ?? ""} vom ${tag(b.bestaetigung.rechnung.datum)}`],
+                  [`Betrag der ${BELEGART_TEXT[b.bestaetigung.rechnung.art]}`, eur(b.bestaetigung.rechnung.summe_brutto)],
+                  ["Zahlungseingang am", tag(b.bestaetigung.datum)],
+                  ["Zahlungsart", b.bestaetigung.zahlungsart],
+                ] as [string, string][]
+              ).map(([n, w]) => (
+                <View key={n} style={st.summenZeile}>
+                  <Text style={{ color: F.ink3 }}>{n}</Text>
+                  <Text>{w}</Text>
+                </View>
+              ))}
+              <View style={[st.summenZeile, { borderTopWidth: 1.4, borderTopColor: F.ink, marginTop: 4, paddingTop: 5 }]}>
+                <Text style={{ fontWeight: 700, fontSize: 12 }}>Gezahlter Betrag</Text>
+                <Text style={{ fontWeight: 700, fontSize: 12 }}>{eur(b.bestaetigung.betrag)}</Text>
+              </View>
+              <View style={st.summenZeile}>
+                <Text style={{ color: F.ink3 }}>Restbetrag</Text>
+                <Text>{eur(b.bestaetigung.rest)}</Text>
+              </View>
+            </View>
+            <Absatz fett text="Diese Zahlungsbestätigung ist keine Rechnung." />
+          </View>
+        )}
+
         {/* Positionen */}
+        {!zb && (
         <View style={{ marginTop: 18 }}>
           <View fixed style={{ flexDirection: "row", borderBottomWidth: 1.4, borderBottomColor: F.ink }}>
             <Text style={[st.th, { width: sp.pos }]}>Pos.</Text>
@@ -271,6 +305,7 @@ function BelegDokument({ b, positionen, firma, logo, entwurf }: { b: PdfBeleg; p
             });
           })()}
         </View>
+        )}
 
         {/* Summen */}
         {preise && (
@@ -313,7 +348,7 @@ function BelegDokument({ b, positionen, firma, logo, entwurf }: { b: PdfBeleg; p
 
         {preise && b.steuerart !== "standard" && <Absatz fett text={b.steuerart === "bauleistung_13b" ? HINWEIS_13B : HINWEIS_STEUERFREI} />}
         {b.art === "auftragsbestaetigung" && <Absatz text={b.lieferbedingungen} />}
-        <Absatz text={zahlung} />
+        {!zb && <Absatz text={zahlung} />}
         <Absatz text={b.nachbemerkung} />
         <View wrap={false} style={{ marginTop: 18 }}>
           <Text>Mit freundlichen Grüßen</Text>

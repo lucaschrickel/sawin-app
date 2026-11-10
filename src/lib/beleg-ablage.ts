@@ -1,7 +1,7 @@
 import "server-only";
 import { getCustomer } from "@/customers";
 import { pruefeSitzung } from "@/lib/auth/sitzung";
-import { ladeFirma, type BelegDetail } from "@/lib/belege";
+import { ladeFirma, ZAHLUNGSART_TEXT, type BelegDetail } from "@/lib/belege";
 import { belegPdf, pdfDateiname, type PdfBeleg, type PdfPosition } from "@/lib/pdf/beleg-pdf";
 
 /*
@@ -46,6 +46,9 @@ export function druckDaten(d: BelegDetail): { b: PdfBeleg; positionen: PdfPositi
       liefertermin: b.liefertermin,
       leistung_von: b.leistung_von,
       leistung_bis: b.leistung_bis,
+      bestaetigung: d.bestaetigt
+        ? { ...d.bestaetigt, zahlungsart: ZAHLUNGSART_TEXT[d.bestaetigt.zahlungsart as keyof typeof ZAHLUNGSART_TEXT] ?? d.bestaetigt.zahlungsart, rest: b.offen_betrag ?? 0 }
+        : null,
     },
     positionen: d.positionen,
   };

@@ -964,6 +964,73 @@ describe("Belege", () => {
     assert.equal(gesperrt.error?.code, "42501", "fertiger Abschlag geändert");
   });
 
+  it("Zahlungen: App-Buchung, Bestätigung, Abgleich mit Lexware, automatischer Abschluss", async () => {
+    const auftrag = await svcInsert("auftrag", { nummer: `TESTZ-${lauf}`, kunde_id: daten.kunde.id, titel: "Zahlungen", phase: "abnahme" });
+    const re = await svcInsert("beleg", {
+      art: "rechnung", auftrag_id: auftrag.id, kunde_id: daten.kunde.id, status: "offen", nummer: `RE-Z-${lauf}`, lexware_id: `lexz-${lauf}`,
+      summe_netto: 840.34, summe_brutto: 1000, offen_betrag: 1000, lexware_offen: 1000,
+    });
+    const merkeZahlungen = async () => {
+      const { data } = await service.from("zahlung").select("id, zahlungsbestaetigung_id").eq("beleg_id", re.id);
+      for (const z of data) {
+        if (z.zahlungsbestaetigung_id && !angelegt.some(([, x]) => x === z.zahlungsbestaetigung_id)) angelegt.push(["beleg", z.zahlungsbestaetigung_id]);
+        if (!angelegt.some(([, x]) => x === z.id)) angelegt.push(["zahlung", z.id]);
+      }
+    };
+    // direkt: keine Lexware-Zahlung, kein Status, kein offener Betrag, keine Zahlungsbestätigung ohne Zahlung
+    const { data: z0, error: e0 } = await buero.client.from("zahlung").insert({ beleg_id: re.id, datum: "2026-11-12", betrag: 1, quelle: "lexware", lex_abgleich: "abgeglichen" }).select().single();
+    assert.ifError(e0);
+    angelegt.push(["zahlung", z0.id]);
+    assert.equal(z0.quelle, "app", "Benutzer hat eine Lexware-Zahlung angelegt");
+    assert.equal(z0.lex_abgleich, "offen");
+    const betrag = await buero.client.from("zahlung").update({ betrag: 999 }).eq("id", z0.id);
+    assert.equal(betrag.error?.code, "42501", "Zahlung geändert");
+    assert.ifError((await buero.client.rpc("loeschen", { p_tabelle: "zahlung", p_id: z0.id })).error);
+    const { data: nachEntfernen } = await service.from("beleg").select("offen_betrag").eq("id", re.id).single();
+    assert.equal(Number(nachEntfernen.offen_betrag), 1000, "Entfernen stellt den offenen Betrag wieder her");
+    const st = await buero.client.from("beleg").update({ status: "bezahlt", offen_betrag: 0 }).eq("id", re.id).select("status, offen_betrag").single();
+    assert.ok(st.error || (st.data.status === "offen" && Number(st.data.offen_betrag) === 1000), "Status bzw. offener Betrag von Hand gesetzt");
+    const zbDirekt = await buero.client.from("beleg").insert({ art: "zahlungsbestaetigung", auftrag_id: auftrag.id, kunde_id: daten.kunde.id });
+    assert.ok(zbDirekt.error, "Zahlungsbestätigung ohne Zahlung angelegt");
+
+    // Als bezahlt markieren: Teilzahlung bar mit Bestätigung
+    const tagHeute = new Intl.DateTimeFormat("sv-SE", { timeZone: "Europe/Berlin" }).format(new Date());
+    const zuViel = await buero.client.rpc("zahlung_erfassen", { p_beleg: re.id, p_datum: tagHeute, p_betrag: 1000.01, p_zahlungsart: "bar", p_bestaetigung: false });
+    assert.ok(zuViel.error, "mehr als offen gebucht");
+    const { data: e1, error: f1 } = await buero.client.rpc("zahlung_erfassen", { p_beleg: re.id, p_datum: tagHeute, p_betrag: 400, p_zahlungsart: "bar", p_bestaetigung: true });
+    assert.ifError(f1);
+    await merkeZahlungen();
+    const { data: zb } = await service.from("beleg").select("art, nummer, status, vorgaenger_id, summe_brutto, offen_betrag, kette_id").eq("id", e1.zahlungsbestaetigung_id).single();
+    assert.equal(zb.art, "zahlungsbestaetigung");
+    assert.match(zb.nummer, /^ZB1\d{6}$/);
+    assert.deepEqual([zb.status, zb.vorgaenger_id, Number(zb.summe_brutto), Number(zb.offen_betrag)], ["fertiggestellt", re.id, 400, 600]);
+    const zweite = await buero.client.rpc("zahlungsbestaetigung_erstellen", { p_zahlung: e1.zahlung_id });
+    assert.ok(zweite.error, "zweite Zahlungsbestätigung zu derselben Zahlung");
+    const mitBest = await buero.client.rpc("loeschen", { p_tabelle: "zahlung", p_id: e1.zahlung_id });
+    assert.ok(mitBest.error, "Zahlung mit Bestätigung entfernt");
+    let { data: r1 } = await service.from("beleg").select("status, offen_betrag").eq("id", re.id).single();
+    assert.deepEqual([r1.status, Number(r1.offen_betrag)], ["offen", 600]);
+
+    // Lexware meldet die 400 € (abgeglichen statt doppelt) und weitere 600 € (neue Zahlung) → bezahlt
+    const lexP = await buero.client.rpc("lexware_zahlungen", { p_beleg: re.id, p_benutzer: buero.id, p_daten: {} });
+    assert.ok(lexP.error, "Benutzer ruft den Lexware-Abgleich auf");
+    const posten = (n, betrag, datum) => ({ schluessel: `lexz-${lauf}:partPaymentFinancialTransaction:${datum}:${betrag}:${n}`, art: "partPaymentFinancialTransaction", datum, betrag });
+    assert.ifError((await service.rpc("lexware_zahlungen", { p_beleg: re.id, p_benutzer: null, p_daten: { offen: 600, status: "open", posten: [posten(1, 400, "2026-11-14")] } })).error);
+    await merkeZahlungen();
+    const { data: nachEins } = await service.from("zahlung").select("quelle, lex_abgleich, betrag").eq("beleg_id", re.id).is("deleted_at", null);
+    assert.deepEqual(nachEins.map((z) => [z.quelle, z.lex_abgleich, Number(z.betrag)]), [["app", "abgeglichen", 400]], "App-Buchung abgeglichen, nicht doppelt");
+    ({ data: r1 } = await service.from("beleg").select("status, offen_betrag").eq("id", re.id).single());
+    assert.deepEqual([r1.status, Number(r1.offen_betrag)], ["offen", 600]);
+    assert.ifError((await service.rpc("lexware_zahlungen", { p_beleg: re.id, p_benutzer: null, p_daten: { offen: 0, status: "paidoff", posten: [posten(1, 400, "2026-11-14"), posten(1, 600, "2026-11-20")] } })).error);
+    await merkeZahlungen();
+    const { data: alle } = await service.from("zahlung").select("quelle").eq("beleg_id", re.id).is("deleted_at", null);
+    assert.equal(alle.length, 2, "erneuter Abgleich legt nichts doppelt an");
+    ({ data: r1 } = await service.from("beleg").select("status, offen_betrag").eq("id", re.id).single());
+    assert.deepEqual([r1.status, Number(r1.offen_betrag)], ["bezahlt", 0]);
+    const { data: a } = await service.from("auftrag").select("phase").eq("id", auftrag.id).single();
+    assert.equal(a.phase, "abgeschlossen", "Auftrag in Abnahme mit bezahlter Schlussrechnung wird abgeschlossen");
+  });
+
   it("PDF-Speicher: nur angemeldete Benutzer, Löschen gesperrt", async () => {
     const pfad = `rls-${lauf}/test.pdf`;
     const hoch = await buero.client.storage.from("belege").upload(pfad, new Blob(["%PDF-1.4 test"], { type: "application/pdf" }), { contentType: "application/pdf" });

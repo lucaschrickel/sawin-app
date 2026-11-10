@@ -106,6 +106,7 @@ APP_URL=http://localhost:3100 npm run test:dashboard     # Dashboard: drei Ansic
 APP_URL=http://localhost:3100 npm run test:oberflaeche   # Passwortfeld mit Augen-Symbol, Logo hell und dunkel
 APP_URL=http://localhost:3100 npm run test:belege        # Belege: Angebot → AB → Auftrag → Lieferschein, PDF, Versionen, Listen
 APP_URL=http://localhost:3100 npm run test:lexware      # Lexware-Testkonto: Angebot → AB → 2 Abschläge → Schlussrechnung → Gutschrift, Ticket-Rechnung
+APP_URL=http://localhost:3100 npm run test:zahlungen    # Lexware-Testkonto: Zahlungsstand abrufen, Als bezahlt markieren, Zahlungsbestätigung
 npm run test:unit                                       # Belegsummen und Abschläge (Rundung auf Cent, Schlussrechnung centgenau), ohne App
 ```
 
@@ -140,6 +141,11 @@ einen eigenen SMTP-Zugang eintragen (z. B. Microsoft 365 des Betriebs oder ein V
   Funktionen nicht aufrufen; im Audit-Log steht trotzdem der Benutzer, der „Fertigstellen“ geklickt hat. Der
   Secret Key muss deshalb auch auf Vercel (nur Server, nie `NEXT_PUBLIC_`) gesetzt sein.
 - **Drosselung:** höchstens 2 Anfragen pro Sekunde je Server-Instanz, bei HTTP 429 Wiederholung mit Backoff.
+- **Zahlungen:** Lexware nimmt Zahlungen über die API nicht an. Bar- und Kartenzahlungen, die das Büro in der App
+  „als bezahlt markiert“, müssen zusätzlich in Lexware gebucht werden; die App gleicht sie dann ab (gleicher Beleg,
+  gleicher Betrag). Den Zahlungsstand holt die App beim Öffnen von Belegen, Aufträgen und Dashboard (höchstens alle
+  5 Minuten) und über „Zahlungsstand abrufen“. **Sobald die App auf Vercel läuft:** Cron alle 15 Minuten einrichten
+  (neue Variable `CRON_SECRET`, wird mit dem Cron ergänzt).
 - **Fehler:** Lehnt Lexware einen Beleg ab, bleibt er Entwurf, die Meldung steht auf der Belegseite, und
   „Fertigstellen“ versucht es erneut. Ein schon angelegter Beleg wird dabei gefunden (Kontakt, Datum, Betrag) und
   nicht doppelt angelegt. Fehlt das Original-PDF, holt die App es beim Öffnen nach („PDF von Lexware holen“).

@@ -13,7 +13,10 @@ import { anzeigeStatus, bearbeitbar, BELEGART_TEXT, belegSchritte, LEXWARE_BELEG
 import { eur } from "@/lib/format";
 import { tag, zeitpunkt } from "@/lib/zeit";
 import { BelegEditor } from "../editor";
+import { zahlungenImHintergrund } from "@/lib/lexware/zahlungen";
+import { ZAHLUNGSART_TEXT } from "@/lib/belege";
 import { AKTIV, LISTE } from "../navigation";
+import { ZahlungenKarte } from "../zahlungen";
 import { AngebotZuruecksetzen, KettenLeiste, LexwarePdfKnopf, SchrittKnoepfe, TagsKommentar, UebergebenKnopf } from "../ui";
 
 export const metadata: Metadata = { title: "Beleg" };
@@ -55,13 +58,16 @@ export default async function BelegPage({ params }: PageProps<"/beleg/[id]">) {
 
   const heute = heuteBerlin();
   const status = anzeigeStatus(b, d.kette, heute);
-  const schritte = belegSchritte(b, d.kette);
+  const schritte = belegSchritte(b, d.kette, d.zahlungen);
   const aenderbar = bearbeitbar(b, d.kette);
   const tags = await ladeBelegTags();
   const pdf = `/pdf/beleg/${b.id}`;
   const versionierbar = b.art === "angebot" || b.art === "auftragsbestaetigung";
   const abgelaufen = b.art === "angebot" && b.status === "offen" && b.gueltig_bis && b.gueltig_bis < heute;
   const lexArt = LEXWARE_BELEGARTEN.includes(b.art);
+  const mitZahlungen = b.art === "rechnung" || b.art === "abschlagsrechnung";
+  // Zahlungsstand aus Lexware im Hintergrund abgleichen (höchstens alle 5 Minuten)
+  if (lexArt) await zahlungenImHintergrund();
   const ueberfaellig = lexArt && b.art !== "gutschrift" && b.status === "offen" && (b.offen_betrag ?? 0) > 0 && !!b.faellig_am && b.faellig_am < heute;
 
   return (
@@ -128,7 +134,7 @@ export default async function BelegPage({ params }: PageProps<"/beleg/[id]">) {
                   <Download className="size-4" /> PDF herunterladen
                 </a>
               </Button>
-              {!lexArt && (
+              {!lexArt && b.art !== "zahlungsbestaetigung" && (
                 <Button asChild variant="ghost">
                   <Link href={`/beleg/neu?art=${b.art}&kopie=${b.id}`}>
                     <Copy className="size-4" /> Duplizieren
@@ -179,6 +185,14 @@ export default async function BelegPage({ params }: PageProps<"/beleg/[id]">) {
               {b.art === "auftragsbestaetigung" && (b.leistung_von || b.leistung_bis) && (
                 <Angabe name="Liefer-/Montagezeit">{[b.leistung_von, b.leistung_bis].filter(Boolean).map((x) => tag(x!)).join(" – ")}</Angabe>
               )}
+              {d.bestaetigt && (
+                <>
+                  <Angabe name="Bestätigte Zahlung">
+                    <span className="tabular">{eur(d.bestaetigt.betrag)}</span> am {tag(d.bestaetigt.datum)} · {ZAHLUNGSART_TEXT[d.bestaetigt.zahlungsart as keyof typeof ZAHLUNGSART_TEXT]}
+                  </Angabe>
+                  <Angabe name="Restbetrag danach"><span className="tabular">{eur(b.offen_betrag ?? 0)}</span></Angabe>
+                </>
+              )}
               {b.fertiggestellt_am && <Angabe name="Fertiggestellt">{zeitpunkt(b.fertiggestellt_am)}</Angabe>}
             </dl>
           </Karte>
@@ -210,6 +224,12 @@ export default async function BelegPage({ params }: PageProps<"/beleg/[id]">) {
                 })}
               </ul>
               <UebergebenKnopf id={b.id} version={b.version} />
+            </Karte>
+          )}
+
+          {mitZahlungen && (
+            <Karte titel="Zahlungen" rechts={<span className="text-xs text-muted-2">offen {eur(b.offen_betrag ?? 0)}</span>}>
+              <ZahlungenKarte belegId={b.id} offen={b.offen_betrag ?? 0} heute={heute} zahlungen={d.zahlungen} markierbar={b.status === "offen"} />
             </Karte>
           )}
 

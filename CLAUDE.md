@@ -95,6 +95,18 @@ Eine Codebasis, je Kunde eine eigene Instanz. Diese Datei gilt für jede Arbeit 
     annimmt, trägt eine App-Buchung das Kennzeichen `lex_abgleich` = offen: Belegseite und Glocke zeigen „in Lexware
     noch buchen“, bis Lexware die Zahlung meldet und die App sie abgleicht. Tabelle `zahlung` (Beleg, Datum, Betrag,
     Zahlungsart, Quelle App/Lexware, abgeglichen, Zahlungsbestätigung).
+    **Umsetzung (10.11.2026):** Offener Betrag = offener Betrag laut Lexware (`lexware_offen`) − App-Buchungen, die
+    Lexware noch nicht kennt; 0 → „Bezahlt“. Abgleich: Die App liest die Lexware-Belegliste (offener Betrag, Status) ab
+    der ältesten offenen Forderung und holt nur für geänderte Belege die Zahlungsposten (`/v1/payments/{id}`).
+    Ausgelöst beim Öffnen von Belegseite, Belegliste, Auftrag und Dashboard (im Hintergrund nach der Antwort, höchstens
+    alle 5 Minuten) und über „Zahlungsstand abrufen“; ein Vercel-Cron folgt, sobald Staging auf Vercel läuft, der
+    Lexware-Webhook danach. Nur Geldeingänge werden Zahlungen; Gutschriften, Skonto und Ausbuchungen verringern nur den
+    offenen Betrag. **Abgleich App-Buchung ↔ Lexware-Zahlung:** gleicher Beleg und gleicher Betrag, bei mehreren das
+    nächstliegende Datum; ohne genaue Übereinstimmung (z. B. Skonto) bleibt „in Lexware noch buchen“ stehen. Eine eigene,
+    noch nicht abgeglichene Zahlung ohne Bestätigung lässt sich entfernen (Markierung). Steht der Auftrag in „Abnahme“
+    oder „Baustelle fertig“, ist die Schlussrechnung fertig und nichts mehr offen, wird er „Abgeschlossen“ (Historie:
+    System). Die Glocke („in Lexware noch buchen“) folgt mit der Glocke; die Pipeline-Zeilen des Montageplans
+    (Lieferung, Abschlag bezahlt, Warten auf Kunde) sind noch nicht gebaut.
   - **Zahlungsbestätigung:** App-Beleg zu einer Rechnung oder Abschlagsrechnung, je Zahlung höchstens eine. Inhalt:
     Bezug auf die Rechnung (Nummer, Datum, Betrag), Zahlungseingang, Zahlungsart, gezahlter Betrag, Restbetrag und der
     Satz „Diese Zahlungsbestätigung ist keine Rechnung“. **Keine Positionen und keine ausgewiesene Umsatzsteuer**, damit
@@ -750,8 +762,11 @@ Maßstab ist OWASP ASVS Level 1. Vor dem Start mit Echtdaten müssen alle Mindes
   - (m) Am Kontakt nur eine Rechnungs- und höchstens eine Lieferadresse; die Lieferanschrift erscheint nicht als
     eigenes Feld auf der Rechnung, deshalb steht sie in der Einleitung (p). Die Kundennummer vergibt Lexware.
   - (p) Bauvorhaben und Objekt / Lieferanschrift: erste Zeilen der Einleitung (auf dem PDF geprüft).
-  - (q) `/v1/payments/{id}` liefert offenen Betrag und Zahlungsposten (lesend); der Zahlungsabgleich folgt mit
-    „Als bezahlt markieren“. Welches Event Lexware bei Zahlungen schickt, ist noch zu prüfen.
+  - (q) Zahlungen sind über die API nur lesbar. `/v1/payments/{id}` liefert `openAmount`, `voucherStatus` und
+    `paymentItems` (Art, Buchungsdatum, Betrag; **ohne eigene ID**, die App bildet einen Schlüssel aus Beleg, Art, Datum,
+    Betrag und laufender Nummer). Eine Gutschrift zu einer Rechnung erscheint als `partPaymentCreditNote` und
+    verringert `openAmount`. Die Belegliste (`voucherlist`) enthält `openAmount` je Rechnung. Event-Abos
+    (`payment.changed`) brauchen eine öffentliche Adresse und werden mit Staging auf Vercel geprüft.
   - Rundung: Lexware rundet jede Zeile auf Cent und rechnet die Steuer je Satz auf die Summe, netto wie brutto, auch
     mit Positions- und Gesamtrabatt – genau wie `src/lib/beleg-summen.ts` (geprüft, centgleich).
   - PDF: `GET /v1/invoices/{id}/file` bzw. `/v1/credit-notes/{id}/file` liefert das Original, erst nach dem
@@ -814,7 +829,9 @@ Maßstab ist OWASP ASVS Level 1. Vor dem Start mit Echtdaten müssen alle Mindes
       offen nur noch `vatfree` und das Zahlungs-Event (q)
 - [ ] Belegerstellung vollständig gegen das Lexware-Testkonto durchgespielt: Angebot → AB → Auftrag, zwei Abschläge,
       Schlussrechnung mit Abzug, Gutschrift und Ticket-Rechnung mit Austausch der Vorschau durch das Lexware-PDF
-      erledigt (`npm run test:lexware`, 10.11.2026); offen: Teil-AB, Lieferschein → Teilrechnung, Zahlung übernommen
+      erledigt (`npm run test:lexware`, 10.11.2026); Zahlungsstand aus Lexware und „Als bezahlt markieren“ erledigt
+      (`npm run test:zahlungen`, 10.11.2026); offen: Teil-AB, Lieferschein → Teilrechnung, eine echte Bankzahlung in
+      Lexware gebucht und abgeglichen
 - [ ] Nummernkreise der App-Belege mit Sawin abgestimmt (Startwerte je Belegart nach der Airtable-Übernahme)
 - [ ] E-Mail-Versand über Microsoft Graph mit Sawins Postfach getestet (PDF-Gruppen, BCC an angebot@/auftrag@, Protokoll)
 - [ ] Steuerarten (Standard, § 13b, steuerfrei), Pflichtangaben auf Rechnungen und das Muster der
