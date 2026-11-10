@@ -1,6 +1,7 @@
 import "server-only";
 import { belegSummen, zahl } from "@/lib/beleg-summen";
-import { textZuHtml, type EditorZustand } from "@/lib/beleg-typen";
+import type { EditorZustand } from "@/lib/beleg-typen";
+import { htmlBereinigen } from "@/lib/html";
 import { EDITOR_BELEGARTEN } from "@/lib/belege-status";
 
 /* Eingaben des Beleg-Editors prüfen und für die Datenbank aufbereiten (Speichern und Vorschau) */
@@ -40,7 +41,8 @@ export function aufbereiten(z: EditorZustand): { fehler: string } | { kopf: Reco
     id: p.id && UUID.test(p.id) ? p.id : null,
     typ: p.typ === "text" ? "text" : "artikel",
     titel: kurz(p.titel, 300).trim(),
-    beschreibung_html: textZuHtml(kurz(p.beschreibung, 8000)),
+    // formatierter Text: serverseitig nach Whitelist bereinigt (CLAUDE.md Sicherheit Punkt 11)
+    beschreibung_html: htmlBereinigen(p.beschreibung),
     optional: k.art === "angebot" && !!p.optional,
     menge: zahl(p.menge),
     einheit: kurz(p.einheit, 20).trim(),

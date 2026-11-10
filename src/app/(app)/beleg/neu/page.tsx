@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { Shell } from "@/components/app/shell";
 import { getCustomer } from "@/customers";
-import { ladeAbrechnung, ladeBelegTags, ladeKundeFuerBeleg, ladeZahlungsbedingungen, neuerBelegZustand } from "@/lib/belege";
+import { ladeAbrechnung, ladeArtikel, ladeBelegTags, ladeKundeFuerBeleg, ladeTextvorlagen, ladeZahlungsbedingungen, neuerBelegZustand } from "@/lib/belege";
 import { BELEGART_TEXT, EDITOR_BELEGARTEN, type Belegart } from "@/lib/belege-status";
 import { BelegEditor } from "../editor";
 import { AKTIV, LISTE } from "../navigation";
@@ -16,7 +16,7 @@ export default async function NeuerBelegPage({ searchParams }: PageProps<"/beleg
   const sp = await searchParams;
   const art = (EDITOR_BELEGARTEN as string[]).includes(eins(sp.art) ?? "") ? (eins(sp.art) as Belegart) : "angebot";
   const p = { art, vorgaenger: eins(sp.vorgaenger), anfrage: eins(sp.anfrage), auftrag: eins(sp.auftrag), ticket: eins(sp.ticket), kunde: eins(sp.kunde), kopie: eins(sp.kopie) };
-  const [start, zahlungsbedingungen, tags] = await Promise.all([neuerBelegZustand(p), ladeZahlungsbedingungen(), ladeBelegTags()]);
+  const [start, zahlungsbedingungen, tags, artikel, vorlagen] = await Promise.all([neuerBelegZustand(p), ladeZahlungsbedingungen(), ladeBelegTags(), ladeArtikel(), ladeTextvorlagen()]);
   const zurueck = p.vorgaenger
     ? { href: `/beleg/${p.vorgaenger}`, text: "Vorgängerbeleg" }
     : p.kopie
@@ -50,6 +50,8 @@ export default async function NeuerBelegPage({ searchParams }: PageProps<"/beleg
         hinweis={start.hinweis}
         modus="neu"
         zahlungsbedingungen={zahlungsbedingungen}
+        artikel={artikel}
+        vorlagen={vorlagen}
         kundeStart={kunde}
         tagVorschlaege={tags}
         herkunftListe={getCustomer().herkunft}

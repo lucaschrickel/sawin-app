@@ -7,7 +7,7 @@ export function EinstellungenReiter({ aktiv, admin }: { aktiv: "firma" | "benutz
     { key: "firma", href: "/einstellungen/firma", label: "Firma" },
     ...(admin ? [{ key: "benutzer", href: "/einstellungen/benutzer", label: "Benutzer" }] : []),
     { key: "montageplan", href: "/einstellungen/montageplan", label: "Montageplan" },
-    { key: "belege", href: "/einstellungen/belege", label: "Belege" },
+    { key: "belege", href: "/einstellungen/belege", label: "Belege & Artikel" },
   ];
   return (
     <nav aria-label="Einstellungen" className="mb-5 flex gap-6 border-b border-line-soft">

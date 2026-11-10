@@ -150,8 +150,12 @@ Eine Codebasis, je Kunde eine eigene Instanz. Diese Datei gilt für jede Arbeit 
   `em`, `u`, `ul`, `ol`, `li`, `p`, `br`, `span` mit nur `color` und `font-weight`), serverseitig erneut bereinigt.
   Editor-Baustein: TipTap (oder gleichwertig), kein `execCommand` wie im Prototyp. An Lexware geht reiner Text
   (Aufzählungen als „• “ bzw. „1. “, Absätze als Zeilenumbrüche).
-  **Stand 10.11.2026:** Im Beleg-Modul sind Beschreibungen vorerst reiner Text mit Zeilenumbrüchen (gespeichert als
-  bereinigtes HTML aus `<p>` und `<br>`); der Formatier-Editor folgt zusammen mit Artikelkatalog und Textvorlagen.
+  **Umsetzung (10.11.2026):** Baustein `RichText` (`src/components/ui/rich-text.tsx`, TipTap 3) mit schwebender
+  Format-Leiste; Schriftfarbe aus einer kleinen Auswahl oder frei (TipTap speichert sie als `rgb(…)`, beides erlaubt).
+  Serverseitige Bereinigung `htmlBereinigen` (`src/lib/html.ts`, Paket `sanitize-html`) vor jedem Speichern von
+  Positionen und Artikeln; reiner Text älterer Belege wird dabei in Absätze umgewandelt. Ausgegeben wird HTML nie direkt:
+  der Editor liest es über TipTap, das PDF über einen eigenen Umsetzer (`src/lib/pdf/rich-text.tsx`, Inter auch
+  kursiv), Listen und Lexware über `htmlZuText` (Aufzählung „• “, Nummerierung „1. “).
 - **KI-Agents (Version 2)** laufen als eigener Hintergrunddienst an einer Warteschlange in Supabase, nicht im Frontend.
 
 ## Anforderungen Version 1

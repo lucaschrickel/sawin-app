@@ -8,7 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { getCustomer } from "@/customers";
 import { STEUERART_TEXT } from "@/lib/beleg-typen";
-import { belegZuEingabe, heuteBerlin, ladeAbrechnung, ladeBeleg, ladeBelegTags, ladeKundeFuerBeleg, ladeZahlungsbedingungen } from "@/lib/belege";
+import { belegZuEingabe, heuteBerlin, ladeAbrechnung, ladeArtikel, ladeBeleg, ladeBelegTags, ladeKundeFuerBeleg, ladeTextvorlagen, ladeZahlungsbedingungen } from "@/lib/belege";
 import { anzeigeStatus, bearbeitbar, BELEGART_TEXT, belegSchritte, LEXWARE_BELEGARTEN } from "@/lib/belege-status";
 import { eur } from "@/lib/format";
 import { tag, zeitpunkt } from "@/lib/zeit";
@@ -32,11 +32,13 @@ export default async function BelegPage({ params }: PageProps<"/beleg/[id]">) {
   const crumbs = [{ label: "Belege" }, { label: liste.text, href: liste.href }, { label: titel }];
 
   if (b.status === "entwurf") {
-    const [zahlungsbedingungen, tags, kunde, abrechnung] = await Promise.all([
+    const [zahlungsbedingungen, tags, kunde, abrechnung, artikel, vorlagen] = await Promise.all([
       ladeZahlungsbedingungen(),
       ladeBelegTags(),
       b.kunde_id ? ladeKundeFuerBeleg(b.kunde_id) : null,
       (b.art === "abschlagsrechnung" || b.art === "rechnung") && b.auftrag ? ladeAbrechnung(b.auftrag.id) : null,
+      ladeArtikel(),
+      ladeTextvorlagen(),
     ]);
     return (
       <Shell active={AKTIV[b.art]} crumbs={crumbs}>
@@ -45,6 +47,8 @@ export default async function BelegPage({ params }: PageProps<"/beleg/[id]">) {
           start={belegZuEingabe(d)}
           modus="entwurf"
           zahlungsbedingungen={zahlungsbedingungen}
+          artikel={artikel}
+          vorlagen={vorlagen}
           kundeStart={kunde}
           tagVorschlaege={tags}
           herkunftListe={getCustomer().herkunft}

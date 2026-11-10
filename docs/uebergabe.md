@@ -107,12 +107,15 @@ APP_URL=http://localhost:3100 npm run test:oberflaeche   # Passwortfeld mit Auge
 APP_URL=http://localhost:3100 npm run test:belege        # Belege: Angebot → AB → Auftrag → Lieferschein, PDF, Versionen, Listen
 APP_URL=http://localhost:3100 npm run test:lexware      # Lexware-Testkonto: Angebot → AB → Abschlag → Teil-AB → Teilrechnung → Abschlag → Schlussrechnung → Gutschrift, Ticket-Rechnung
 APP_URL=http://localhost:3100 npm run test:zahlungen    # Lexware-Testkonto: Zahlungsstand abrufen, Als bezahlt markieren, Zahlungsbestätigung
+APP_URL=http://localhost:3100 npm run test:katalog      # Artikelkatalog, Textvorlagen, formatierte Beschreibungen (ohne Lexware)
 npm run test:unit                                       # Belegsummen und Abschläge (Rundung auf Cent, Schlussrechnung centgenau), ohne App
 ```
 
 **Belege einrichten (je Instanz, einmalig in der App):** Unter Einstellungen › Firma die Firmendaten eintragen (stehen
 im Kopf, in der Absenderzeile und im Fuß jedes Beleg-PDFs, auch Bank, USt-IdNr. und Steuernummer). Unter Einstellungen ›
-Belege die Gültigkeit der Angebote und die Zahlungsbedingungen anlegen (Standard je Belegart markieren). Der private
+Belege & Artikel die Gültigkeit der Angebote, die Zahlungsbedingungen (Standard je Belegart markieren), den
+Artikelkatalog (Stern = Schnellauswahl im Editor) und die Textvorlagen für Einleitung, Lieferbedingungen und
+Nachbemerkung anlegen. Der private
 Speicher `belege` für die PDFs entsteht mit der Migration, es ist nichts per Klick anzulegen. Die Schrift Inter für die
 PDFs kommt aus `@fontsource/inter` und wird über `outputFileTracingIncludes` (`next.config.ts`) mit ausgeliefert.
 

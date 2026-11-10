@@ -33,7 +33,8 @@
     "test:oberflaeche": "node tests/e2e/oberflaeche.e2e.mjs",
     "test:belege": "node tests/e2e/belege.e2e.mjs",
     "test:lexware": "node tests/e2e/lexware.e2e.mjs",
-    "test:zahlungen": "node tests/e2e/zahlungen.e2e.mjs"
+    "test:zahlungen": "node tests/e2e/zahlungen.e2e.mjs",
+    "test:katalog": "node tests/e2e/katalog.e2e.mjs"
   },
   "dependencies": {
     "@fontsource-variable/inter": "^5.3.0",
@@ -47,12 +48,17 @@
     "@react-pdf/renderer": "^4.9.0",
     "@supabase/ssr": "^0.12.7",
     "@supabase/supabase-js": "^2.119.0",
+    "@tiptap/extension-text-style": "^3.33.1",
+    "@tiptap/pm": "^3.33.1",
+    "@tiptap/react": "^3.33.1",
+    "@tiptap/starter-kit": "^3.33.1",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "lucide-react": "^1.59.0",
     "next": "16.4.2",
     "react": "19.3.0",
     "react-dom": "19.3.0",
+    "sanitize-html": "^2.18.1",
     "server-only": "^0.0.1",
     "tailwind-merge": "^3.7.0"
   },
@@ -61,6 +67,7 @@
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "@types/sanitize-html": "^2.16.2",
     "eslint": "^9",
     "eslint-config-next": "16.4.2",
     "pg": "^8.23.1",

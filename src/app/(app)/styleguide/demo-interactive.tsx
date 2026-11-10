@@ -1,5 +1,7 @@
 "use client";
 
+import { useState } from "react";
+import { RichText } from "@/components/ui/rich-text";
 import { Bestaetigen } from "@/components/ui/bestaetigen";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogClose, DialogContent, DialogTrigger } from "@/components/ui/dialog";
@@ -101,5 +103,17 @@ export function FormularDialogDemo() {
         </Formular>
       )}
     </FormularDialog>
+  );
+}
+
+/** Formatierter Text (Positions- und Artikelbeschreibungen): Format-Leiste erscheint beim Fokus über dem Feld */
+export function RichTextDemo() {
+  const [html, setHtml] = useState("<p><strong>Kunststofffenster</strong> 2-flügelig</p><ul><li><p>3-fach-Verglasung</p></li><li><p><span style=\"color: #a33a2e\">RC2</span></p></li></ul>");
+  return (
+    <div className="flex flex-col gap-1.5">
+      <span className="text-sm font-medium text-ink-3">Beschreibung (formatierbar)</span>
+      <RichText label="Beschreibung" wert={html} onChange={setHtml} />
+      <code className="mt-1 block text-xs break-all text-muted-2">{html}</code>
+    </div>
   );
 }

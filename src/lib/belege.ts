@@ -2,7 +2,7 @@ import "server-only";
 import { pruefeSitzung } from "@/lib/auth/sitzung";
 import type { Kunde, Lieferadresse } from "@/lib/kunden";
 import { heuteBerlin } from "@/lib/zeit";
-import { htmlZuText, leerePosition, neuerSchluessel, STANDARD_TEXTE, type EditorZustand, type KopfEingabe, type PositionEingabe } from "./beleg-typen";
+import { leerePosition, neuerSchluessel, STANDARD_TEXTE, type EditorZustand, type KopfEingabe, type PositionEingabe } from "./beleg-typen";
 import { BELEGART_TEXT, ketteSortiert, type Belegart, type BelegKurz } from "./belege-status";
 import { belegSummen, type Steuerart } from "./beleg-summen";
 import { abzugPositionen, type AbschlagFuerAbzug, type AuftragsWert, type SatzBetrag } from "./abschlag";
@@ -308,7 +308,7 @@ export function positionZuEingabe(p: Position, mitId: boolean): PositionEingabe 
     id: mitId ? p.id : null,
     typ: p.typ,
     titel: p.titel,
-    beschreibung: htmlZuText(p.beschreibung_html),
+    beschreibung: p.beschreibung_html ?? "",
     optional: p.optional,
     menge: dez(p.menge),
     einheit: p.einheit ?? "",
@@ -464,7 +464,7 @@ export async function neuerBelegZustand(p: NeuParameter): Promise<{ zustand: Edi
     ladeZahlungsbedingungen(),
     supabase.from("textvorlage").select("feld, text, belegarten").eq("standard", true),
   ]);
-  const vorlage = (feld: string) => (vorlagen ?? []).find((v) => v.feld === feld && (v.belegarten as string[]).includes(p.art))?.text;
+  const vorlage = (feld: string) => (vorlagen ?? []).find((v) => v.feld === feld && (!(v.belegarten as string[]).length || (v.belegarten as string[]).includes(p.art)))?.text;
   const zb = bedingungen.find((z) => z.standard_fuer.includes(p.art));
   const kopf: KopfEingabe = {
     id: null,
@@ -689,6 +689,24 @@ export async function neuerBelegZustand(p: NeuParameter): Promise<{ zustand: Edi
   return { zustand: { kopf, positionen }, hinweis };
 }
 
+
+export type Artikel = { id: string; bezeichnung: string; einheit: string; preis_netto: number; beschreibung_html: string | null; schnellauswahl: boolean; reihenfolge: number };
+
+/** Artikelkatalog (Schnellauswahl zuerst) */
+export async function ladeArtikel(): Promise<Artikel[]> {
+  const { supabase } = await pruefeSitzung();
+  const { data } = await supabase.from("artikel").select("id, bezeichnung, einheit, preis_netto, beschreibung_html, schnellauswahl, reihenfolge").order("reihenfolge").order("bezeichnung");
+  return ((data ?? []) as Artikel[]).map((a) => ({ ...a, preis_netto: Number(a.preis_netto) }));
+}
+
+export type Textvorlage = { id: string; feld: "einleitung" | "lieferbedingungen" | "nachbemerkung"; belegarten: Belegart[]; name: string; text: string; standard: boolean };
+
+/** Textvorlagen für Einleitung, Lieferbedingungen und Nachbemerkung */
+export async function ladeTextvorlagen(): Promise<Textvorlage[]> {
+  const { supabase } = await pruefeSitzung();
+  const { data } = await supabase.from("textvorlage").select("id, feld, belegarten, name, text, standard").order("feld").order("name");
+  return (data ?? []) as Textvorlage[];
+}
 
 /** Belege mit App-Buchungen, die Lexware noch nicht gemeldet hat („in Lexware noch buchen“) */
 export async function belegeMitAppBuchung(): Promise<Set<string>> {

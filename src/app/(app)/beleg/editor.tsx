@@ -2,12 +2,13 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, Copy, Eye, GripVertical, Lock, Pencil, Plus, Save, Trash2, UserPlus, X } from "lucide-react";
+import { ArrowLeft, BookOpen, Copy, Eye, FileText, GripVertical, Lock, Pencil, Plus, Save, Trash2, UserPlus, X } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState, useTransition, type ReactNode } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Bestaetigen } from "@/components/ui/bestaetigen";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
+import { RichText } from "@/components/ui/rich-text";
 import { cn } from "@/lib/cn";
 import { eur } from "@/lib/format";
 import { belegSummen, rund, zahl, type Steuerart } from "@/lib/beleg-summen";
@@ -16,6 +17,7 @@ import {
   EINHEITEN,
   HINWEIS_13B,
   HINWEIS_STEUERFREI,
+  htmlZuText,
   leerePosition,
   neuerSchluessel,
   PLATZHALTER,
@@ -27,7 +29,7 @@ import {
   type PositionEingabe,
 } from "@/lib/beleg-typen";
 import { BELEGART_TEXT, LEXWARE_BELEGARTEN } from "@/lib/belege-status";
-import type { AbrechnungKontext, KundeFuerBeleg, Zahlungsbedingung } from "@/lib/belege";
+import type { AbrechnungKontext, Artikel, KundeFuerBeleg, Textvorlage, Zahlungsbedingung } from "@/lib/belege";
 import { KundeDialog } from "../kunden/kunde-dialog";
 import { kundenSuchen, type KundeTreffer } from "../anfragen/aktionen";
 import { belegFertigstellen, belegSpeichern, belegVerwerfen, kundeFuerEditor } from "./aktionen";
@@ -42,6 +44,10 @@ type Props = {
   tagVorschlaege: string[];
   herkunftListe: string[];
   zurueck: { href: string; text: string };
+  /** Artikelkatalog (Stern = Schnellauswahl) */
+  artikel?: Artikel[];
+  /** Textvorlagen für Einleitung, Lieferbedingungen, Nachbemerkung */
+  vorlagen?: Textvorlage[];
   /** Abschlag und Schlussrechnung: Werte der AB und angelegte Abschläge */
   abrechnung?: AbrechnungKontext | null;
   /** Stand der Übertragung an Lexware (Entwurf nach einem fehlgeschlagenen Versuch) */
@@ -100,7 +106,7 @@ function Karte({ titel, rechts, children }: { titel?: string; rechts?: ReactNode
   );
 }
 
-export function BelegEditor({ start, hinweis, modus, zahlungsbedingungen, kundeStart, tagVorschlaege, herkunftListe, zurueck, abrechnung, lexware }: Props) {
+export function BelegEditor({ start, hinweis, modus, zahlungsbedingungen, kundeStart, tagVorschlaege, herkunftListe, zurueck, abrechnung, lexware, artikel = [], vorlagen = [] }: Props) {
   const router = useRouter();
   const [z, setZ] = useState<EditorZustand>(() =>
     start.kopf.art === "abschlagsrechnung" ? { ...start, positionen: abschlagZeilen(start.kopf, abrechnung, start.positionen) } : start,
@@ -287,6 +293,19 @@ export function BelegEditor({ start, hinweis, modus, zahlungsbedingungen, kundeS
     }));
     setGeaendert(true);
   };
+
+  // ---------- Artikel aus dem Katalog: Titel, Beschreibung, Einheit, Preis (bei Brutto-Eingabe mit 19 %) ----------
+  const artikelEinfuegen = (a: Artikel) =>
+    setPositionen((ps) => {
+      const preis = k.preise_brutto && !frei ? rund(a.preis_netto * 1.19) : a.preis_netto;
+      const neu: PositionEingabe = { ...leerePosition(), titel: a.bezeichnung, beschreibung: a.beschreibung_html ?? "", einheit: a.einheit, einzelpreis: String(preis).replace(".", ","), steuersatz: frei ? "0" : "19" };
+      const normale = ps.filter((p) => !p.abzug_beleg_id);
+      const abzuege = ps.filter((p) => p.abzug_beleg_id);
+      const letzte = normale[normale.length - 1];
+      const leer = letzte && letzte.typ === "artikel" && !letzte.titel.trim() && !letzte.einzelpreis.trim() && !letzte.beschreibung.trim();
+      return [...(leer ? normale.slice(0, -1) : normale), neu, ...abzuege];
+    });
+  const vorlagenFuer = (feld: Textvorlage["feld"]) => vorlagen.filter((v) => v.feld === feld && (!v.belegarten.length || v.belegarten.includes(art)));
 
   // ---------- Positionen: Ziehen am Griff, Pfeiltasten am Griff ----------
   const gezogen = useRef<string | null>(null);
@@ -520,9 +539,9 @@ export function BelegEditor({ start, hinweis, modus, zahlungsbedingungen, kundeS
                   </datalist>
                 </Beschriftet>
               </div>
-              <Beschriftet name="Einleitung">
-                <textarea rows={3} className={flaeche} value={k.einleitung} onChange={(e) => setKopf({ einleitung: e.target.value })} name="einleitung" />
-              </Beschriftet>
+              <TextMitVorlage name="Einleitung" vorlagen={vorlagenFuer("einleitung")} onVorlage={(t) => setKopf({ einleitung: t })}>
+                <textarea rows={3} className={flaeche} value={k.einleitung} onChange={(e) => setKopf({ einleitung: e.target.value })} name="einleitung" aria-label="Einleitung" />
+              </TextMitVorlage>
             </div>
           </Karte>
 
@@ -534,6 +553,25 @@ export function BelegEditor({ start, hinweis, modus, zahlungsbedingungen, kundeS
             titel="Positionen"
             rechts={<span className="text-xs text-muted-2">{ls ? "Lieferscheine zeigen keine Preise" : frei ? "ohne Umsatzsteuer" : k.preise_brutto ? "Preise brutto, inkl. USt" : "Preise netto, zzgl. USt"}</span>}
           >
+            {artikel.length > 0 && (
+              <div className="mb-3 flex flex-wrap items-center gap-1.5" data-schnellauswahl>
+                {artikel
+                  .filter((a) => a.schnellauswahl)
+                  .map((a) => (
+                    <button
+                      key={a.id}
+                      type="button"
+                      onClick={() => artikelEinfuegen(a)}
+                      data-artikel-knopf={a.bezeichnung}
+                      title={`${a.bezeichnung} · ${eur(a.preis_netto)} netto / ${a.einheit}`}
+                      className="inline-flex items-center gap-1 rounded-full border border-line bg-surface px-3 py-1 text-[13px] hover:border-line-strong"
+                    >
+                      <Plus className="size-3.5" /> {a.bezeichnung}
+                    </button>
+                  ))}
+                <KatalogDialog artikel={artikel} onWahl={artikelEinfuegen} />
+              </div>
+            )}
             <div className="-mx-1 overflow-x-auto">
               <table className="w-full min-w-[640px] table-fixed border-collapse text-[14px]" data-positionen>
                 <colgroup>
@@ -662,13 +700,11 @@ export function BelegEditor({ start, hinweis, modus, zahlungsbedingungen, kundeS
                         <tr>
                           <td />
                           <td className="px-1 pt-1 pb-2.5" colSpan={preisSpalten ? 7 : 3}>
-                            <textarea
-                              aria-label={`Beschreibung Position ${i + 1}`}
-                              rows={Math.min(8, Math.max(1, p.beschreibung.split("\n").length))}
-                              className={cn(flaeche, "py-1.5 text-[13.5px]")}
+                            <RichText
+                              label={`Beschreibung Position ${i + 1}`}
                               placeholder="Beschreibung (optional)"
-                              value={p.beschreibung}
-                              onChange={(e) => setPos(p.key, { beschreibung: e.target.value })}
+                              wert={p.beschreibung}
+                              onChange={(html) => setPos(p.key, { beschreibung: html })}
                             />
                             {art === "angebot" && p.typ === "artikel" && (
                               <label className="mt-1 inline-flex items-center gap-1.5 text-[12.5px] text-muted">
@@ -699,7 +735,7 @@ export function BelegEditor({ start, hinweis, modus, zahlungsbedingungen, kundeS
                       <li key={p.key} className="flex justify-between gap-3" data-abzug>
                         <span className="min-w-0">
                           <span className="font-medium">{p.titel}</span>
-                          <span className="block text-xs text-muted">{p.beschreibung}</span>
+                          <span className="block text-xs text-muted">{htmlZuText(p.beschreibung)}</span>
                         </span>
                         <span className="whitespace-nowrap tabular">{eur(summen.zeilen[i] ?? 0)}</span>
                       </li>
@@ -762,9 +798,9 @@ export function BelegEditor({ start, hinweis, modus, zahlungsbedingungen, kundeS
           <Karte>
             <div className="flex flex-col gap-3">
               {(art === "auftragsbestaetigung" || art === "teil_ab") && (
-                <Beschriftet name="Lieferbedingungen">
-                  <textarea rows={3} className={flaeche} value={k.lieferbedingungen} onChange={(e) => setKopf({ lieferbedingungen: e.target.value })} name="lieferbedingungen" />
-                </Beschriftet>
+                <TextMitVorlage name="Lieferbedingungen" vorlagen={vorlagenFuer("lieferbedingungen")} onVorlage={(t) => setKopf({ lieferbedingungen: t })}>
+                  <textarea rows={3} className={flaeche} value={k.lieferbedingungen} onChange={(e) => setKopf({ lieferbedingungen: e.target.value })} name="lieferbedingungen" aria-label="Lieferbedingungen" />
+                </TextMitVorlage>
               )}
               {!ls && !gutschrift && (
                 <>
@@ -813,9 +849,9 @@ export function BelegEditor({ start, hinweis, modus, zahlungsbedingungen, kundeS
                   </div>
                 </>
               )}
-              <Beschriftet name="Nachbemerkung">
-                <textarea rows={3} className={flaeche} value={k.nachbemerkung} onChange={(e) => setKopf({ nachbemerkung: e.target.value })} name="nachbemerkung" />
-              </Beschriftet>
+              <TextMitVorlage name="Nachbemerkung" vorlagen={vorlagenFuer("nachbemerkung")} onVorlage={(t) => setKopf({ nachbemerkung: t })}>
+                <textarea rows={3} className={flaeche} value={k.nachbemerkung} onChange={(e) => setKopf({ nachbemerkung: e.target.value })} name="nachbemerkung" aria-label="Nachbemerkung" />
+              </TextMitVorlage>
             </div>
           </Karte>
         </div>
@@ -1265,5 +1301,92 @@ function AbschlagKarte({
       )}
       {!ergebnis && <p className="mt-2 text-sm text-muted">Bitte {k.abschlag_art === "prozent" ? "den Prozentsatz" : "den Betrag"} eingeben.</p>}
     </Karte>
+  );
+}
+
+/** Textfeld mit Auswahl einer Textvorlage (Symbol neben der Beschriftung); die Vorlage wird in den Beleg kopiert */
+function TextMitVorlage({ name, vorlagen, onVorlage, children }: { name: string; vorlagen: Textvorlage[]; onVorlage: (text: string) => void; children: ReactNode }) {
+  const [offen, setOffen] = useState(false);
+  return (
+    <div className="flex min-w-0 flex-col gap-1">
+      <div className="flex items-center justify-between gap-2 text-[12.5px] font-medium text-ink-3">
+        <span>{name}</span>
+        {vorlagen.length > 0 && (
+          <span className="relative">
+            <button
+              type="button"
+              aria-expanded={offen}
+              aria-label={`Vorlage für ${name} wählen`}
+              data-vorlage-wahl={name}
+              onClick={() => setOffen((o) => !o)}
+              className="inline-flex items-center gap-1 rounded-sm border border-line px-2 py-0.5 text-xs hover:border-line-strong"
+            >
+              <FileText className="size-3.5" /> Vorlage
+            </button>
+            {offen && (
+              <ul className="absolute top-full right-0 z-20 mt-1 w-64 rounded-md border border-line bg-surface py-1 shadow-pop" onMouseLeave={() => setOffen(false)}>
+                {vorlagen.map((v) => (
+                  <li key={v.id}>
+                    <button
+                      type="button"
+                      className="w-full px-3 py-1.5 text-left text-sm hover:bg-surface-muted"
+                      onClick={() => {
+                        onVorlage(v.text);
+                        setOffen(false);
+                      }}
+                    >
+                      {v.name}
+                      {v.standard && <span className="ml-1.5 text-xs text-muted-2">Standard</span>}
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </span>
+        )}
+      </div>
+      {children}
+    </div>
+  );
+}
+
+/** „+ aus dem Katalog …“: alle Artikel mit Suche; ein Klick fügt die Position an */
+function KatalogDialog({ artikel, onWahl }: { artikel: Artikel[]; onWahl: (a: Artikel) => void }) {
+  const [offen, setOffen] = useState(false);
+  const [q, setQ] = useState("");
+  const treffer = artikel.filter((a) => `${a.bezeichnung} ${a.beschreibung_html ?? ""}`.toLowerCase().includes(q.trim().toLowerCase()));
+  return (
+    <>
+      <button type="button" onClick={() => setOffen(true)} data-katalog className="inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[13px] text-accent-text hover:underline">
+        <BookOpen className="size-3.5" /> aus dem Katalog …
+      </button>
+      <Dialog open={offen} onOpenChange={(o) => (setOffen(o), o || setQ(""))}>
+        <DialogContent title="Artikel aus dem Katalog">
+          <input autoFocus className={eingabe} placeholder="Artikel suchen …" aria-label="Artikel suchen" value={q} onChange={(e) => setQ(e.target.value)} />
+          <ul className="mt-3 flex max-h-[50vh] flex-col overflow-auto" data-katalog-liste>
+            {treffer.map((a) => (
+              <li key={a.id}>
+                <button
+                  type="button"
+                  className="flex w-full items-baseline justify-between gap-3 border-t border-line-soft px-1 py-2 text-left text-sm first:border-t-0 hover:bg-surface-muted"
+                  onClick={() => {
+                    onWahl(a);
+                    setOffen(false);
+                    setQ("");
+                  }}
+                >
+                  <span className="min-w-0">
+                    <span className="font-medium">{a.bezeichnung}</span>
+                    {a.beschreibung_html && <span className="block truncate text-xs text-muted">{htmlZuText(a.beschreibung_html).split("\n")[0]}</span>}
+                  </span>
+                  <span className="whitespace-nowrap tabular text-muted">{eur(a.preis_netto)} / {a.einheit}</span>
+                </button>
+              </li>
+            ))}
+            {!treffer.length && <li className="py-2 text-sm text-muted">Kein Artikel gefunden.</li>}
+          </ul>
+        </DialogContent>
+      </Dialog>
+    </>
   );
 }

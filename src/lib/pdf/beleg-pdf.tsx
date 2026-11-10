@@ -3,6 +3,7 @@ import path from "node:path";
 import { Document, Font, G, Page, Path, renderToBuffer, StyleSheet, Svg, Text, View } from "@react-pdf/renderer";
 import type { LogoPfade } from "@/customers/types";
 import { belegSummen, type Summen } from "@/lib/beleg-summen";
+import { RichPdf } from "./rich-text";
 import { HINWEIS_13B, HINWEIS_STEUERFREI, htmlZuText, zahlungsbedingungFuellen } from "@/lib/beleg-typen";
 import { BELEGART_TEXT, NUMMER_LABEL, type Belegart } from "@/lib/belege-status";
 import { eur } from "@/lib/format";
@@ -23,6 +24,9 @@ function schriften() {
       { src: path.join(SCHRIFT, "inter-latin-400-normal.woff") },
       { src: path.join(SCHRIFT, "inter-latin-600-normal.woff"), fontWeight: 600 },
       { src: path.join(SCHRIFT, "inter-latin-700-normal.woff"), fontWeight: 700 },
+      { src: path.join(SCHRIFT, "inter-latin-400-italic.woff"), fontStyle: "italic" },
+      { src: path.join(SCHRIFT, "inter-latin-600-italic.woff"), fontWeight: 600, fontStyle: "italic" },
+      { src: path.join(SCHRIFT, "inter-latin-700-italic.woff"), fontWeight: 700, fontStyle: "italic" },
     ],
   });
   Font.registerHyphenationCallback((w) => [w]);
@@ -276,14 +280,14 @@ function BelegDokument({ b, positionen, firma, logo, entwurf }: { b: PdfBeleg; p
             const nummern = positionen.reduce<(number | null)[]>((acc, p) => [...acc, p.typ === "artikel" ? acc.filter((x) => x !== null).length + 1 : null], []);
             return positionen.map((p, i) => {
               const nr = nummern[i];
-              const beschreibung = htmlZuText(p.beschreibung_html);
+              const beschreibung = p.beschreibung_html && htmlZuText(p.beschreibung_html) ? p.beschreibung_html : null;
               if (p.typ === "text")
                 return (
                   <View key={i} wrap={false} style={st.posZeile}>
                     <Text style={[st.td, { width: sp.pos }]} />
                     <View style={[st.td, { flex: 1 }]}>
                       {p.titel ? <Text style={{ fontWeight: 600, color: F.ink3 }}>{p.titel}</Text> : null}
-                      {beschreibung ? <Text style={{ color: F.ink3 }}>{beschreibung}</Text> : null}
+                      <RichPdf html={beschreibung} farbe={F.ink3} />
                     </View>
                   </View>
                 );
@@ -294,7 +298,7 @@ function BelegDokument({ b, positionen, firma, logo, entwurf }: { b: PdfBeleg; p
                   <View style={[st.td, { flex: 1 }]}>
                     {p.optional && <Text style={{ fontSize: 6.6, fontWeight: 700, letterSpacing: 0.8, color: F.sand }}>OPTIONAL</Text>}
                     <Text style={{ fontWeight: 600 }}>{p.titel}</Text>
-                    {beschreibung ? <Text style={{ color: F.ink3, marginTop: 1 }}>{beschreibung}</Text> : null}
+                    <RichPdf html={beschreibung} farbe={F.ink3} />
                   </View>
                   <Text style={[st.td, { width: sp.menge, textAlign: "right" }]}>{`${menge(p.menge)} ${p.einheit ?? ""}`.trim()}</Text>
                   {sp.ep > 0 && <Text style={[st.td, { width: sp.ep, textAlign: "right" }]}>{eur(p.einzelpreis)}</Text>}

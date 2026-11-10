@@ -14,7 +14,7 @@ import { Table, Td, Th, Tr } from "@/components/ui/table";
 import { getCustomer, resolveSlot } from "@/customers";
 import { eur } from "@/lib/format";
 import { AUFTRAG_PHASE_TEXT, AUFTRAG_PHASE_TON, AUFTRAG_PHASEN, BELEG_STATUS_TONE } from "@/lib/status";
-import { BestaetigenDemo, DialogDemo, FormDemo, FormularDialogDemo } from "./demo-interactive";
+import { BestaetigenDemo, DialogDemo, FormDemo, FormularDialogDemo, RichTextDemo } from "./demo-interactive";
 
 export const metadata: Metadata = { title: "Designsystem" };
 
@@ -213,6 +213,9 @@ export default function StyleguidePage() {
         <div className="grid gap-4 lg:grid-cols-[2fr_1fr]">
           <Section title="Formular" description="Felder mit Beschriftung, Hinweis und Fehlerzustand">
             <FormDemo />
+            <div className="mt-8">
+              <RichTextDemo />
+            </div>
           </Section>
           <Section title="Pipeline-Karten" description="Ersetzbar je Kunde über den Slot „PipelineCard“">
             <div className="flex flex-col gap-2.5 rounded-[20px] bg-surface-sunken p-3">

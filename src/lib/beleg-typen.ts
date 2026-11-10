@@ -103,17 +103,27 @@ export function textZuHtml(text: string): string {
 /** HTML → reiner Text (Aufzählungen als „• “, Absätze als Leerzeile); auch für Lexware und das PDF */
 export function htmlZuText(html: string | null | undefined): string {
   if (!html) return "";
-  let n = 0;
+  // Listen der Reihe nach: Aufzählung „• “, Nummerierung „1. “ (auch verschachtelt)
+  const listen: { art: string; n: number }[] = [];
   return html
-    .replace(/<\s*br\s*\/?>/gi, "\n")
-    .replace(/<\s*ol[^>]*>/gi, () => ((n = 0), "\n"))
-    .replace(/<\s*li[^>]*>/gi, (m, off, all: string) => {
-      const vorher = all.slice(0, off);
-      const geordnet = vorher.lastIndexOf("<ol") > vorher.lastIndexOf("<ul");
-      return geordnet ? `${++n}. ` : "• ";
+    .replace(/<\s*(\/?)\s*(ul|ol|li|p|br)\b[^>]*>/gi, (_m, zu: string, tag: string) => {
+      const t = tag.toLowerCase();
+      if (t === "br") return "\n";
+      if (t === "ul" || t === "ol") {
+        if (zu) listen.pop();
+        else listen.push({ art: t, n: 0 });
+        return "\n";
+      }
+      if (t === "li") {
+        if (zu) return "\n";
+        const l = listen[listen.length - 1];
+        return l?.art === "ol" ? `${++l.n}. ` : "• ";
+      }
+      return zu ? "\n" : "";
     })
-    .replace(/<\/\s*(p|li|ul|ol)\s*>/gi, "\n")
     .replace(/<[^>]+>/g, "")
+    // Absatz innerhalb eines Listenpunkts: keine Leerzeile zwischen den Punkten
+    .replace(/\n+(?=(• |\d+\. ))/g, "\n")
     .replace(/&nbsp;/g, " ")
     .replace(/&lt;/g, "<")
     .replace(/&gt;/g, ">")

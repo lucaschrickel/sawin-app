@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { notFound, redirect } from "next/navigation";
 import { Shell } from "@/components/app/shell";
 import { getCustomer } from "@/customers";
-import { belegZuEingabe, ladeBeleg, ladeBelegTags, ladeKundeFuerBeleg, ladeZahlungsbedingungen } from "@/lib/belege";
+import { belegZuEingabe, ladeArtikel, ladeBeleg, ladeBelegTags, ladeKundeFuerBeleg, ladeTextvorlagen, ladeZahlungsbedingungen } from "@/lib/belege";
 import { bearbeitbar, BELEGART_TEXT } from "@/lib/belege-status";
 import { BelegEditor } from "../../editor";
 import { AKTIV, LISTE } from "../../navigation";
@@ -16,7 +16,7 @@ export default async function BelegBearbeitenPage({ params }: PageProps<"/beleg/
   if (!d) notFound();
   const b = d.beleg;
   if (b.status === "entwurf" || !bearbeitbar(b, d.kette)) redirect(`/beleg/${id}`);
-  const [zahlungsbedingungen, tags, kunde] = await Promise.all([ladeZahlungsbedingungen(), ladeBelegTags(), b.kunde_id ? ladeKundeFuerBeleg(b.kunde_id) : null]);
+  const [zahlungsbedingungen, tags, kunde, artikel, vorlagen] = await Promise.all([ladeZahlungsbedingungen(), ladeBelegTags(), b.kunde_id ? ladeKundeFuerBeleg(b.kunde_id) : null, ladeArtikel(), ladeTextvorlagen()]);
   const liste = LISTE[b.art];
   const hinweis =
     (b.eingefroren_version ?? 0) >= b.version
@@ -30,6 +30,8 @@ export default async function BelegBearbeitenPage({ params }: PageProps<"/beleg/
         hinweis={hinweis}
         modus="bearbeiten"
         zahlungsbedingungen={zahlungsbedingungen}
+        artikel={artikel}
+        vorlagen={vorlagen}
         kundeStart={kunde}
         tagVorschlaege={tags}
         herkunftListe={getCustomer().herkunft}

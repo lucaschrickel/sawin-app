@@ -34,8 +34,8 @@ const nextConfig: NextConfig = {
   },
   // Schriften für die serverseitig erzeugten PDFs (werden per Dateipfad gelesen, nicht importiert)
   outputFileTracingIncludes: {
-    "/pdf/**": ["./node_modules/@fontsource/inter/files/inter-latin-{400,600,700}-normal.woff"],
-    "/beleg/**": ["./node_modules/@fontsource/inter/files/inter-latin-{400,600,700}-normal.woff"],
+    "/pdf/**": ["./node_modules/@fontsource/inter/files/inter-latin-{400,600,700}-{normal,italic}.woff"],
+    "/beleg/**": ["./node_modules/@fontsource/inter/files/inter-latin-{400,600,700}-{normal,italic}.woff"],
   },
   async headers() {
     return [
