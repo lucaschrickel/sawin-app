@@ -85,17 +85,6 @@ export async function wiederherstellen(id: string): Promise<Ergebnis> {
 }
 
 /** Übergang bis zum Beleg-Modul: Auftrag (Nummer aus dem AB-Nummernkreis) anlegen, Anfrage wird gewonnen. */
-export async function auftragAnlegen(id: string): Promise<Ergebnis> {
-  const { supabase } = await pruefeSitzung();
-  const { data, error } = await supabase.rpc("anfrage_auftrag_anlegen", { p_anfrage_id: id });
-  if (error || !data) {
-    return { fehler: ["23505", "P0001"].includes(error?.code ?? "") ? error!.message : "Der Auftrag konnte nicht angelegt werden." };
-  }
-  const { data: a } = await supabase.from("auftrag").select("nummer").eq("id", data).single();
-  refresh();
-  return { ok: true, hinweis: `Auftrag ${a?.nummer ?? ""} angelegt.` };
-}
-
 export async function anfrageLoeschen(id: string): Promise<Ergebnis> {
   const { supabase } = await pruefeSitzung();
   const { error } = await supabase.rpc("loeschen", { p_tabelle: "anfrage", p_id: id });

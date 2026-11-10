@@ -1,8 +1,9 @@
 "use client";
 
 import Link from "next/link";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { Check, Pencil, Trash2 } from "lucide-react";
-import { useActionState, useState, useTransition } from "react";
+import { useActionState, useState, useTransition, type ReactNode } from "react";
 import { Badge, StatusDot } from "@/components/ui/badge";
 import { Bestaetigen } from "@/components/ui/bestaetigen";
 import { Button } from "@/components/ui/button";
@@ -333,5 +334,35 @@ export function PhaseMontageSetzen({ id }: { id: string }) {
       </Button>
       {fehler && <div className="basis-full"><Meldung e={{ fehler }} /></div>}
     </>
+  );
+}
+
+/** Listenzeile: Klick wählt (Vorschau rechts, ersetzt den Verlaufseintrag), Doppelklick oder Enter öffnet */
+export function AuswahlZeile({ id, href, gewaehlt, children }: { id: string; href: string; gewaehlt: boolean; children: ReactNode }) {
+  const router = useRouter();
+  const pfad = usePathname();
+  const params = useSearchParams();
+  const waehle = () => {
+    const neu = new URLSearchParams(params);
+    neu.set("id", id);
+    router.replace(`${pfad}?${neu}`, { scroll: false });
+  };
+  return (
+    <tr
+      tabIndex={0}
+      aria-selected={gewaehlt}
+      data-auswahl-zeile={id}
+      onClick={(e) => {
+        if ((e.target as HTMLElement).closest("a, button, input, label")) return;
+        waehle();
+      }}
+      onDoubleClick={() => router.push(href)}
+      onKeyDown={(e) => {
+        if (e.key === "Enter") router.push(href);
+      }}
+      className={cn("cursor-pointer outline-none hover:bg-surface-muted focus-visible:bg-surface-muted", gewaehlt && "bg-tone-brand-bg hover:bg-tone-brand-bg")}
+    >
+      {children}
+    </tr>
   );
 }

@@ -215,3 +215,22 @@ export async function browser() {
   const ende = () => { ws.close(); proc.kill(); try { rmSync(profil, { recursive: true, force: true }); } catch { /* belegt */ } };
   return { cdp, js, warte, da, klick, klickText, tippe, taste, gehe, pfad, text, enthaelt, foto, anmelden, ende };
 }
+
+/**
+ * Entfernt alle Belege eines Testkunden (mit Positionen, Versionen, Versand, PDFs) sowie die Aufträge und Anfragen,
+ * die erst durch die Belege entstanden sind. Vor aufraeumen() aufrufen.
+ */
+export async function belegeAufraeumen(kundeId) {
+  if (!kundeId) return;
+  const belege = await dbAbfrage("select id from public.beleg where kunde_id = $1", [kundeId]);
+  const ids = belege.map((x) => x.id);
+  if (ids.length) {
+    const pfade = (await dbAbfrage("select name from storage.objects where bucket_id = 'belege' and split_part(name, '/', 1) = any($1)", [ids])).map((x) => x.name);
+    if (pfade.length) await service.storage.from("belege").remove(pfade);
+    for (const t of ["beleg_position", "beleg_version", "beleg_versand"]) await dbAbfrage(`delete from public.${t} where beleg_id = any($1)`, [ids]);
+    await dbAbfrage("update public.beleg set vorgaenger_id = null where id = any($1)", [ids]);
+    await dbAbfrage("delete from public.beleg where id = any($1)", [ids]);
+  }
+  await dbAbfrage("delete from public.auftrag where kunde_id = $1 and not exists (select 1 from public.einsatz e where e.auftrag_id = auftrag.id) and not exists (select 1 from public.bestellzeile z where z.auftrag_id = auftrag.id)", [kundeId]);
+  await dbAbfrage("delete from public.anfrage a where kunde_id = $1 and not exists (select 1 from public.auftrag x where x.anfrage_id = a.id)", [kundeId]);
+}

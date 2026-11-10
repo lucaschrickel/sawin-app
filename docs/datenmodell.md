@@ -86,7 +86,7 @@ Sonderregeln per Trigger (RLS kann Spaltenänderungen nicht prüfen):
 | Tabelle | Inhalt |
 |---|---|
 | `anfrage` | Nummer, Kurzbezeichnung, Kunde (optional) oder Name/Telefon/E-Mail, Objekt, Beschreibung, Herkunft, Produkte, geschätzter Wert, Zuständig, Wiedervorlage, Aufmaß-Termin, interne Notiz, Status (neu, in_klaerung, aufmass, angebot_erstellen, angebot_versendet), Archiv (gewonnen/verloren) mit Grund, `nachtrag_zu` (Auftrag), entstandener Auftrag |
-| `anfrage_auftrag_anlegen()` | Funktion (Übergang bis zum Beleg-Modul): Auftrag aus einer Anfrage, Nummer aus dem AB-Nummernkreis, Anfrage wird „gewonnen“; nur einmal je Anfrage. Ein Aufmaß-Termin stellt eine neue Anfrage auf „Aufmaß“. Kunde ist Pflicht, „Zuständig“ ist ein Benutzer. |
+| `anfrage` (Regeln) | Ein Aufmaß-Termin stellt eine neue Anfrage auf „Aufmaß“. Kunde ist Pflicht, „Zuständig“ ist ein Benutzer. Gewonnen wird die Anfrage mit dem Fertigstellen der AB (`beleg_fertigstellen`); die frühere Übergangsfunktion `anfrage_auftrag_anlegen()` ist entfernt (Migration `…_belege_modul.sql`). |
 | `auftrag` | Nummer = AB-Nummer (eindeutig), Kunde, Anfrage, `nachtrag_zu`, Titel, Objekt, Phase (bestellung, montage, abnahme, baustelle_fertig, reklamation, abgeschlossen), Montagestatus, Herkunft, Zuständig, Produkte, Bemerkung, Liefertermin, „Noch nicht bestellt“, `warten_auf_kunde`, `stufe_datum` je Stufe (Lieferung, Abschlag bezahlt, Warten auf Kunde), Prüfhinweis, OneDrive-Ordner, `abgeschlossen_am` (folgt der Phase). Löschen nur ohne Belege, Einsätze, Bestellzeilen, Zeitbuchungen, Service-Tickets und Nachträge; Bestellstatus, Montagetermin und Rechnungsstand werden abgeleitet |
 | `service_ticket` | Nummer `ST-JJ-NNNN`, Kunde, Ursprungsauftrag, Thema, Art, Abrechnung (garantie, kulanz, kostenpflichtig), Priorität, Problem, Wunschtermin, `vorab_datum`, Zuständig, Objekt, Status (neu, eingeplant, in_arbeit, erledigt, abgerechnet). Trigger: `vorab_datum` (Tag in „Terminierbar“) beim Anlegen und bei geändertem Wunschtermin ohne Einsatz; Status „Eingeplant“ mit dem ersten Einsatz, ohne Einsatz zurück auf „Neu“; „Abgerechnet“ nicht von Hand; Löschen nur ohne Einsätze, Zeiten und Belege |
 
@@ -103,6 +103,11 @@ Bestellstatus, Liefer-KW, AB-Status und Pipeline-Stufe werden **abgeleitet**, ni
 | `beleg_versand_gruppe` | Beleg, Reihenfolge, Dateiname (PDF-Gruppen) |
 | `beleg_anhang` | Gruppe, Quelle (beleg, onedrive, upload, vorlage), Verweis, Reihenfolge |
 | `zahlung` | Beleg, Datum, Betrag, Zahlungsart, Quelle (app/lexware), `lex_abgleich` (offen/abgeglichen), Lexware-ID, Zahlungsbestätigung |
+| `beleg_speichern()` | Funktion: Kopf und Positionen in einem Schritt (fehlende Positionen nur markiert). Neues Angebot ohne Bezug legt im Hintergrund eine Anfrage an („Angebot erstellen“). Folgebelege und fertiggestellte Belege behalten ihren Bezug. Bearbeiten eines fertiggestellten Angebots bzw. einer AB: Datum auf heute (Gültig bis wandert mit), Version n+1, wenn die aktuelle eingefroren ist; die Nummer bleibt. |
+| `beleg_fertigstellen()` | Funktion für App-Belege (Angebot → offen, Anfrage „Angebot versendet“; Lieferschein → fertiggestellt, braucht einen Auftrag; AB → legt den Auftrag mit der AB-Nummer an bzw. übernimmt die Nummer eines bestehenden Auftrags ohne AB, hängt die Kette auf den Auftrag um, Angebot „angenommen“, offene andere Varianten „nicht beauftragt“, deren Entwürfe verworfen, Anfrage „gewonnen“). |
+| `beleg_uebergeben()` | Funktion „Als übergeben markieren“: friert die aktuelle Version (Kopf und Positionen als JSON, PDF-Pfad) in `beleg_version` ein und protokolliert die Übergabe in `beleg_versand` |
+| Regeln am Beleg | Neue Belege sind immer Entwurf; Status wechselt nur über `beleg_fertigstellen` bzw. beim Angebot offen ↔ angenommen/abgelehnt (zurück nur ohne AB); „nicht beauftragt“ nur durch die AB einer anderen Variante. Version, Fertigstellung und Lexware-Felder setzen nur die Funktionen bzw. der Server. Aufträge entstehen nur beim Fertigstellen der AB; die Auftragsnummer ändert sich nie. Ein Auftrag hat höchstens eine fertiggestellte AB. |
+| Speicher `belege` | privater Storage-Bucket für Beleg-PDFs (nur PDF, max. 10 MB), Pfad `<beleg_id>/<Nummer>[_V<n>]_<Belegart>.pdf`; lesen, anlegen und ersetzen nur angemeldete Benutzer, Löschen gesperrt. Die Ablage in OneDrive folgt mit dem OneDrive-Modul. |
 
 Regeln: Bezug „genau einer“; nur ein **Entwurf** darf noch ganz ohne Bezug sein (freie AB, Gutschrift vor der
 Wahl der Rechnung). Höchstens eine Zahlungsbestätigung je Zahlung. Höchstens eine Schlussrechnung je Auftrag.
@@ -138,7 +143,7 @@ Wahl der Rechnung). Höchstens eine Zahlungsbestätigung je Zahlung. Höchstens 
 2. `…_team.sql`: Benutzer, Mitarbeiter, Kolonnen, Ressourcen, Fahrzeuge, Abwesenheiten
 3. `…_stammdaten.sql`: Einstellungen, Artikel, Vorlagen, Zahlungsbedingungen, Kunden, Lieferanten, Konditionen
 4. `…_anfragen_auftraege.sql`: Anfragen, Aufträge, Service-Tickets
-5. `…_belege.sql`: Belege, Positionen, Versionen, Versand, Zahlungen
+5. `…_belege.sql`: Belege, Positionen, Versionen, Versand, Zahlungen (Modul Belege Schritt 1: `20261111090000_belege_modul.sql` mit Speichern, Fertigstellen, Übergeben, Status-Regeln, Speicher `belege`; Korrekturen `…090100` und `…090200`)
 6. `…_planung_arbeit.sql`: Einsätze, Zeiten, Aufgaben, Termine, Formulare, Chat, Notizen, Benachrichtigungen, Einkauf
 7. `…_rls.sql`: RLS und Policies für alle Tabellen, Rechte für `anon` entzogen, Prüfung am Ende: bricht ab, wenn
    eine Tabelle in `public` ohne RLS ist

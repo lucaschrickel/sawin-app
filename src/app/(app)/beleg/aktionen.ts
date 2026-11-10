@@ -1,0 +1,128 @@
+"use server";
+
+import { refresh } from "next/cache";
+import { pruefeSitzung } from "@/lib/auth/sitzung";
+import { pdfAblegen } from "@/lib/beleg-ablage";
+import { aufbereiten, meldung } from "@/lib/beleg-eingabe";
+import type { EditorZustand } from "@/lib/beleg-typen";
+import { ladeBeleg, ladeKundeFuerBeleg, kundeVorbelegung, type KundeFuerBeleg } from "@/lib/belege";
+
+export type Ergebnis = { fehler?: string; ok?: boolean; hinweis?: string; id?: string; nummer?: string | null; auftragId?: string | null; frage?: "anfrage_verloren"; anfrageId?: string };
+
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const kurz = (s: unknown, max: number) => String(s ?? "").slice(0, max);
+
+async function speichern(z: EditorZustand): Promise<{ fehler: string } | { id: string }> {
+  const daten = aufbereiten(z);
+  if ("fehler" in daten) return daten;
+  const { supabase } = await pruefeSitzung();
+  const { data, error } = await supabase.rpc("beleg_speichern", { p_id: z.kopf.id, p_kopf: daten.kopf, p_positionen: daten.positionen });
+  if (error || !data) return { fehler: meldung(error, "Der Beleg konnte nicht gespeichert werden.") };
+  return { id: data as string };
+}
+
+/** Entwurf speichern bzw. Änderungen an einem fertiggestellten Angebot / einer AB speichern (neues PDF) */
+export async function belegSpeichern(z: EditorZustand): Promise<Ergebnis> {
+  const r = await speichern(z);
+  if ("fehler" in r) return r;
+  const d = await ladeBeleg(r.id);
+  if (d && d.beleg.status !== "entwurf") {
+    try {
+      await pdfAblegen(d);
+    } catch {
+      return { ok: true, id: r.id, nummer: d.beleg.nummer, hinweis: "Gespeichert, das PDF konnte aber nicht abgelegt werden. Es wird beim Öffnen neu erzeugt." };
+    }
+  }
+  refresh();
+  return { ok: true, id: r.id, nummer: d?.beleg.nummer ?? null };
+}
+
+/** Speichern und fertigstellen: App-Belege werden gesperrt (Ausnahmen siehe CLAUDE.md) und als PDF abgelegt */
+export async function belegFertigstellen(z: EditorZustand): Promise<Ergebnis> {
+  if (z.positionen.some((p) => p.typ === "artikel" && !p.titel.trim())) return { fehler: "Jede Position braucht einen Titel." };
+  const r = await speichern(z);
+  if ("fehler" in r) return r;
+  const { supabase } = await pruefeSitzung();
+  const { data, error } = await supabase.rpc("beleg_fertigstellen", { p_id: r.id });
+  if (error) return { fehler: meldung(error, "Der Beleg konnte nicht fertiggestellt werden."), id: r.id };
+  const d = await ladeBeleg(r.id);
+  let hinweis: string | undefined;
+  if (d) {
+    try {
+      await pdfAblegen(d);
+    } catch {
+      hinweis = "Das PDF konnte nicht abgelegt werden. Es wird beim Öffnen neu erzeugt.";
+    }
+  }
+  refresh();
+  const erg = data as { nummer: string; auftrag_id: string | null };
+  return { ok: true, id: r.id, nummer: erg.nummer, auftragId: erg.auftrag_id, hinweis };
+}
+
+/** Entwurf verwerfen (Markierung als gelöscht) */
+export async function belegVerwerfen(id: string): Promise<Ergebnis> {
+  if (!UUID.test(id)) return { fehler: "Beleg nicht gefunden." };
+  const { supabase } = await pruefeSitzung();
+  const { error } = await supabase.rpc("loeschen", { p_tabelle: "beleg", p_id: id });
+  if (error) return { fehler: meldung(error, "Der Entwurf konnte nicht verworfen werden.") };
+  refresh();
+  return { ok: true };
+}
+
+/** Angebot angenommen / abgelehnt (bzw. zurück auf offen). Sind alle Angebote der Anfrage abgelehnt, fragt die App nach. */
+export async function angebotStatus(id: string, status: "angenommen" | "abgelehnt" | "offen"): Promise<Ergebnis> {
+  if (!UUID.test(id) || !["angenommen", "abgelehnt", "offen"].includes(status)) return { fehler: "Beleg nicht gefunden." };
+  const { supabase } = await pruefeSitzung();
+  const { data: b, error } = await supabase.from("beleg").update({ status }).eq("id", id).eq("art", "angebot").select("anfrage_id").maybeSingle();
+  if (error || !b) return { fehler: meldung(error, "Der Status konnte nicht geändert werden.") };
+  refresh();
+  if (status === "abgelehnt" && b.anfrage_id) {
+    const { data: andere } = await supabase.from("beleg").select("status").eq("anfrage_id", b.anfrage_id).eq("art", "angebot").neq("status", "entwurf");
+    const { data: q } = await supabase.from("anfrage").select("archiv").eq("id", b.anfrage_id).maybeSingle();
+    if (q && !q.archiv && (andere ?? []).every((x) => x.status === "abgelehnt")) return { ok: true, frage: "anfrage_verloren", anfrageId: b.anfrage_id };
+  }
+  return { ok: true };
+}
+
+/** „Als übergeben markieren“ (Post, persönlich): friert die aktuelle Version ein */
+export async function belegUebergeben(id: string): Promise<Ergebnis> {
+  if (!UUID.test(id)) return { fehler: "Beleg nicht gefunden." };
+  const { supabase } = await pruefeSitzung();
+  const { data, error } = await supabase.rpc("beleg_uebergeben", { p_id: id });
+  if (error) return { fehler: meldung(error, "Die Übergabe konnte nicht gespeichert werden.") };
+  refresh();
+  return { ok: true, hinweis: `Version ${data} als übergeben markiert.` };
+}
+
+/** Tags und internen Kommentar speichern (auch nach dem Fertigstellen) */
+export async function tagsKommentarSpeichern(id: string, tags: string[], kommentar: string): Promise<Ergebnis> {
+  if (!UUID.test(id)) return { fehler: "Beleg nicht gefunden." };
+  const { supabase } = await pruefeSitzung();
+  const sauber = [...new Set(tags.map((t) => kurz(t, 40).trim()).filter(Boolean))].slice(0, 30);
+  const { error } = await supabase.from("beleg").update({ tags: sauber, kommentar_intern: kurz(kommentar, 4000).trim() || null }).eq("id", id);
+  if (error) return { fehler: meldung(error, "Tags und Kommentar konnten nicht gespeichert werden.") };
+  refresh();
+  return { ok: true };
+}
+
+/** Kundendaten für den Editor (Auswahl, „Kunde bearbeiten“, „Neuer Kunde“) */
+export async function kundeFuerEditor(id: string): Promise<(KundeFuerBeleg & { vorbelegung: ReturnType<typeof kundeVorbelegung> }) | null> {
+  const k = await ladeKundeFuerBeleg(id);
+  return k ? { ...k, vorbelegung: kundeVorbelegung(k) } : null;
+}
+
+/** Nachtragsangebot zu einem Auftrag: eigene Anfrage mit Verweis auf den Ursprungsauftrag */
+export async function nachtragAnlegen(auftragId: string): Promise<Ergebnis> {
+  if (!UUID.test(auftragId)) return { fehler: "Auftrag nicht gefunden." };
+  const { supabase, benutzer } = await pruefeSitzung();
+  const { data: a } = await supabase.from("auftrag").select("id, nummer, titel, kunde_id, objekt, herkunft").eq("id", auftragId).maybeSingle();
+  if (!a) return { fehler: "Auftrag nicht gefunden." };
+  const { data, error } = await supabase
+    .from("anfrage")
+    .insert({ titel: `Nachtrag zu ${a.nummer}${a.titel ? ` · ${a.titel}` : ""}`, kunde_id: a.kunde_id, objekt: a.objekt, herkunft: a.herkunft, nachtrag_zu: a.id, status: "angebot_erstellen", zustaendig_id: benutzer.id })
+    .select("id")
+    .single();
+  if (error || !data) return { fehler: "Die Nachtragsanfrage konnte nicht angelegt werden." };
+  return { ok: true, id: data.id };
+}
+

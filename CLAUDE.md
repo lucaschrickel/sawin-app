@@ -62,9 +62,10 @@ Eine Codebasis, je Kunde eine eigene Instanz. Diese Datei gilt für jede Arbeit 
     Verweis `nachtrag_zu` und wird nach Annahme ein eigener Auftrag mit Verweis auf den Ursprungsauftrag.
   - **Auftragsnummer = AB-Nummer.** Der Auftrag entsteht ausschließlich beim Fertigstellen der AB und übernimmt
     deren Nummer. Es gibt keine eigenen Auftragsnummern mehr. Ein Auftrag hat genau eine AB.
-    **Übergang bis zum Beleg-Modul (Entscheidung 10.11.2026):** An der Anfrage legt „Gewonnen – Auftrag anlegen“ den
-    Auftrag an; er bekommt seine Nummer schon jetzt aus dem AB-Nummernkreis, und die spätere AB dieses Auftrags
-    übernimmt genau diese Nummer. Mit dem Beleg-Modul ersetzt „Auftragsbestätigung erstellen“ diesen Knopf.
+    **Übergang beendet (10.11.2026):** Der frühere Knopf „Gewonnen – Auftrag anlegen“ ist mit dem Beleg-Modul entfallen.
+    Aufträge aus dieser Zeit haben schon eine Nummer aus dem AB-Nummernkreis, aber noch keine AB; ihre AB entsteht am
+    Auftrag („Auftragsbestätigung erstellen“) und übernimmt genau diese Nummer. Die Datenbank lässt Aufträge nur noch
+    beim Fertigstellen einer AB entstehen.
   - **Belegketten:** Jedes Angebot beginnt eine Kette (`kette_id` = ID des ersten Belegs). Folgebelege übernehmen
     die `kette_id` ihres Vorgängers (`vorgaenger_id` in der App). Belege ohne Angebot (z. B. Rechnung am Ticket)
     bilden eine eigene Kette. Zwischen Lexware-Belegen (Rechnung → Gutschrift) setzt die App zusätzlich
@@ -120,6 +121,8 @@ Eine Codebasis, je Kunde eine eigene Instanz. Diese Datei gilt für jede Arbeit 
   `em`, `u`, `ul`, `ol`, `li`, `p`, `br`, `span` mit nur `color` und `font-weight`), serverseitig erneut bereinigt.
   Editor-Baustein: TipTap (oder gleichwertig), kein `execCommand` wie im Prototyp. An Lexware geht reiner Text
   (Aufzählungen als „• “ bzw. „1. “, Absätze als Zeilenumbrüche).
+  **Stand 10.11.2026:** Im Beleg-Modul sind Beschreibungen vorerst reiner Text mit Zeilenumbrüchen (gespeichert als
+  bereinigtes HTML aus `<p>` und `<br>`); der Formatier-Editor folgt zusammen mit Artikelkatalog und Textvorlagen.
 - **KI-Agents (Version 2)** laufen als eigener Hintergrunddienst an einer Warteschlange in Supabase, nicht im Frontend.
 
 ## Anforderungen Version 1

@@ -2,10 +2,11 @@
 // Aufruf: App starten (npm run build && npx next start -p 3100), dann APP_URL=http://localhost:3100 npm run test:anfragen
 // Optional FOTOS=<Ordner> für Bildschirmfotos.
 import path from "node:path";
-import { aufraeumen, bilanz, browser, dbAbfrage, lauf, merken, pruefe, service, sleep, testAdmin } from "./hilfen.mjs";
+import { aufraeumen, belegeAufraeumen, bilanz, browser, dbAbfrage, lauf, merken, pruefe, service, sleep, testAdmin } from "./hilfen.mjs";
 
 const fotos = process.env.FOTOS;
 let b;
+let testkunde;
 const sichtbar = (sel) => `[...document.querySelectorAll(${JSON.stringify(sel)})].find((e) => e.getClientRects().length > 0)`;
 const setzeWert = (sel, wert) => b.js(`(() => { const el = ${sichtbar(sel)}; el.value = ${JSON.stringify(wert)}; el.dispatchEvent(new Event("input", { bubbles: true })); })()`);
 const anfrageIdAusPfad = async () => (await b.pfad()).split("/").pop();
@@ -18,6 +19,7 @@ try {
     .select("id, name")
     .single();
   merken("kunde", kunde.id);
+  testkunde = kunde;
   b = await browser();
   await b.anmelden(admin);
   await b.warte("location.pathname === '/'");
@@ -113,10 +115,22 @@ try {
   pruefe("Löschen führt zur Liste", await b.warte("location.pathname === '/anfragen'"));
   pruefe("nur als gelöscht markiert", !!(await dbAbfrage("select deleted_at from public.anfrage where id = $1", [id2]))[0]?.deleted_at);
 
-  // 6. Gewonnen – Auftrag anlegen
+  // 6. Gewonnen: Angebot an der Anfrage, angenommen, AB fertigstellen legt den Auftrag an
   await b.gehe(`/anfragen/${id1}`);
-  await b.klickText("main button", "Gewonnen – Auftrag anlegen");
-  await b.klickText("[role=dialog] button", "Auftrag anlegen");
+  await b.klick("[data-neues-angebot]");
+  await b.da("[data-beleg-editor=angebot]");
+  pruefe("„Neues Angebot“ übernimmt Kunde und Anfrage", await b.warte(`document.querySelector('[name=adresse_name]').value === ${JSON.stringify(kunde.name)}`));
+  await b.tippe("[data-position='0'] [data-feld=titel]", "Haustür");
+  await b.tippe("[data-position='0'] [data-feld=preis]", "2000");
+  await b.klick("[data-aktion=fertigstellen]");
+  await b.warte("document.querySelector('[data-status]')?.dataset.status === 'offen'", 20000);
+  await b.klick("[data-schritt=angenommen]");
+  await b.warte("document.querySelector('[data-status]')?.dataset.status === 'angenommen'");
+  await b.klickText("[data-naechster-schritt] a", "Auftragsbestätigung erstellen");
+  await b.da("[data-beleg-editor=auftragsbestaetigung]");
+  await b.klick("[data-aktion=fertigstellen]");
+  await b.warte("document.querySelector('[data-status]')?.dataset.status === 'bestaetigt'", 20000);
+  await b.gehe(`/anfragen/${id1}`);
   pruefe("Auftrag angelegt, Hinweis mit AB-Nummer", await b.warte("/Auftrag AB2\\d{6} angelegt/.test(document.body.innerText)"));
   const [auftrag] = await dbAbfrage("select id, nummer from public.auftrag where anfrage_id = $1", [id1]);
   if (auftrag) merken("auftrag", auftrag.id);
@@ -131,6 +145,7 @@ try {
   pruefe(`Abbruch: ${e.message}`, false);
 } finally {
   b?.ende();
+  await belegeAufraeumen(testkunde?.id).catch((e) => console.error("Belege aufräumen:", e.message));
   await aufraeumen().catch((e) => console.error("Aufräumen:", e.message));
 }
 process.exit(bilanz() ? 1 : 0);

@@ -29,12 +29,14 @@ type Props = {
   herkunftListe: string[];
   /** Neuer Kunde aus einem anderen Dialog heraus: wird zurückgegeben statt zur Kundenseite zu springen */
   onAngelegt?: (k: { id: string; name: string }) => void;
+  /** nach jedem erfolgreichen Speichern (z. B. Beleg-Editor übernimmt Adresse und Steuerart) */
+  onGespeichert?: () => void;
   /** eigener Auslöser statt der Standard-Knöpfe */
   ausloeser?: ReactNode;
 };
 
 /** Kunde anlegen oder bearbeiten (Kundenmaske als Dialog, auch für den Beleg-Editor gedacht). */
-export function KundeDialog({ kunde, lieferadressen = [], herkunftListe, onAngelegt, ausloeser }: Props) {
+export function KundeDialog({ kunde, lieferadressen = [], herkunftListe, onAngelegt, onGespeichert, ausloeser }: Props) {
   const [offen, setOffen] = useState(false);
   const [geaendert, setGeaendert] = useState(false);
   const [nachfrage, setNachfrage] = useState(false);
@@ -85,6 +87,7 @@ export function KundeDialog({ kunde, lieferadressen = [], herkunftListe, onAngel
           onAenderung={() => setGeaendert(true)}
           onGespeichert={(e) => {
             if (e.id && onAngelegt) onAngelegt({ id: e.id, name: e.name ?? "" });
+            onGespeichert?.();
             schliessen();
           }}
           rueckgabe={!!onAngelegt}
@@ -103,7 +106,7 @@ function KundeFormular({
   onGespeichert,
   onAbbrechen,
   rueckgabe,
-}: Props & { lieferadressen: Lieferadresse[]; onAenderung: () => void; onGespeichert: (e: Ergebnis) => void; onAbbrechen: () => void; rueckgabe: boolean }) {
+}: Omit<Props, "onGespeichert"> & { lieferadressen: Lieferadresse[]; onAenderung: () => void; onGespeichert: (e: Ergebnis) => void; onAbbrechen: () => void; rueckgabe: boolean }) {
   const [z, aktion, laeuft] = useActionState<Ergebnis, FormData>(kundeSpeichern, {});
   const [typ, setTyp] = useState<"privat" | "firma">(kunde?.typ ?? "privat");
   const [zeilen, setZeilen] = useState<LaZeile[]>(() => lieferadressen.map(zuZeile));

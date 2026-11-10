@@ -22,7 +22,7 @@ import {
 } from "lucide-react";
 
 /** Schlüssel der Zähler an den Menüpunkten (berechnet in der Server-Hülle) */
-export type ZaehlerSchluessel = "aufgaben" | "anfragen" | "auftraege" | "service" | "fahrzeuge" | "abwesenheiten" | "bestellungen";
+export type ZaehlerSchluessel = "aufgaben" | "anfragen" | "auftraege" | "service" | "fahrzeuge" | "abwesenheiten" | "bestellungen" | "belege" | "angebote";
 export type Zaehler = Partial<Record<ZaehlerSchluessel, { n: number; dringend?: boolean }>>;
 
 export type NavItem = { key: string; href: string; label: string; icon: LucideIcon; bereit?: boolean; zaehler?: ZaehlerSchluessel };
@@ -50,10 +50,10 @@ export const NAVIGATION: NavGroup[] = [
   {
     label: "Belege",
     items: [
-      { key: "belege", href: "/belege", label: "Alle Belege", icon: Download },
-      { key: "angebote", href: "/belege/angebote", label: "Angebote", icon: FileText },
+      { key: "belege", href: "/belege", label: "Alle Belege", icon: Download, bereit: true, zaehler: "belege" },
+      { key: "angebote", href: "/belege/angebote", label: "Angebote", icon: FileText, bereit: true, zaehler: "angebote" },
       { key: "auftraege", href: "/auftraege", label: "Aufträge", icon: Briefcase, bereit: true, zaehler: "auftraege" },
-      { key: "lieferscheine", href: "/belege/lieferscheine", label: "Lieferscheine", icon: Truck },
+      { key: "lieferscheine", href: "/belege/lieferscheine", label: "Lieferscheine", icon: Truck, bereit: true },
       { key: "abschlaege", href: "/belege/abschlaege", label: "Abschlagsrechnungen", icon: Receipt },
       { key: "rechnungen", href: "/belege/rechnungen", label: "Rechnungen", icon: Receipt },
       { key: "gutschriften", href: "/belege/gutschriften", label: "Gutschriften", icon: Undo2 },

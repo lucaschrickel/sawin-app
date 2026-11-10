@@ -33,17 +33,23 @@ try {
   await b.warte("location.pathname === '/'");
 
   // 1. Auftrag aus der Anfrage; Hinweis verlinkt den Auftrag
+  // Auftrag wie aus der Zeit vor dem Beleg-Modul (noch ohne AB); den Weg über die AB prüft der Test „belege“
+  const { data: auftrag } = await service
+    .from("auftrag")
+    .insert({ nummer: `AT${lauf}`, kunde_id: kunde.id, anfrage_id: anfrage.id, titel: `Haustür Müller ${lauf}`, objekt: "Gartenweg 3, Celle", produkte: ["Haustür"] })
+    .select("id, nummer")
+    .single();
+  merken("auftrag", auftrag.id);
+  await service.from("anfrage").update({ archiv: "gewonnen" }).eq("id", anfrage.id);
   await b.gehe(`/anfragen/${anfrage.id}`);
-  await b.klickText("button", "Gewonnen – Auftrag anlegen");
-  await imLetztenDialog("Auftrag anlegen");
-  pruefe("Anfrage verlinkt den neuen Auftrag", await b.warte(`!!${sichtbar("main a[href^='/auftraege/']")}`));
-  const [auftrag] = await dbAbfrage("select id, nummer from public.auftrag where anfrage_id = $1", [anfrage.id]);
-  if (auftrag) merken("auftrag", auftrag.id);
-  pruefe("Auftrag mit AB-Nummer angelegt", /^AB2\d{6}$/.test(auftrag?.nummer ?? ""), auftrag?.nummer);
+  pruefe("Anfrage verlinkt den Auftrag", await b.warte(`!!${sichtbar("main a[href^='/auftraege/']")}`));
   await b.klick(`main a[href='/auftraege/${auftrag.id}']`);
   await b.warte(`location.pathname === '/auftraege/${auftrag.id}' && document.querySelector('main h1')?.textContent.includes(${JSON.stringify(kunde.name)})`);
   pruefe("Auftragsseite: Nummer, Kunde, Objekt, Telefon", await b.enthaelt(auftrag.nummer) && (await b.enthaelt("Gartenweg 3, Celle")) && (await b.enthaelt("05141 1234")));
-  pruefe("Anfrage verlinkt, Belege-Bereich vorbereitet", (await b.js(`!!${sichtbar(`a[href='/anfragen/${anfrage.id}']`)}`)) && (await b.enthaelt("Die Belegkette")));
+  pruefe(
+    "Anfrage verlinkt; Belege-Karte bietet die AB an (übernimmt die Auftragsnummer)",
+    (await b.js(`!!${sichtbar(`a[href='/anfragen/${anfrage.id}']`)}`)) && (await b.js(`!!document.querySelector("[data-schritte] a[href='/beleg/neu?art=auftragsbestaetigung&auftrag=${auftrag.id}']")`)),
+  );
 
   // 2. Phase über die Phasenleiste und das Auswahlfeld
   await b.klickText("ol[aria-label=Phase] button > span:last-child", "Montage");

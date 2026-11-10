@@ -80,6 +80,23 @@ async function tabellenDerApi() {
   return Object.keys(spec.paths).filter((p) => p !== "/" && !p.startsWith("/rpc/")).map((p) => p.slice(1));
 }
 
+/** Beleg über beleg_speichern anlegen (eine Position) und für das Aufräumen merken */
+async function belegSpeichern(wer, kopf, positionen = [{ titel: "Haustür", menge: 1, einzelpreis: 1000, steuersatz: 19 }]) {
+  const { data: id, error } = await wer.client.rpc("beleg_speichern", { p_id: null, p_kopf: kopf, p_positionen: positionen });
+  if (error) throw new Error(`beleg_speichern: ${error.message}`);
+  angelegt.push(["beleg", id]);
+  const { data: b } = await service.from("beleg").select("*").eq("id", id).single();
+  if (b.anfrage_id && !angelegt.some(([t, x]) => t === "anfrage" && x === b.anfrage_id) && b.anfrage_id !== daten?.anfrage?.id) angelegt.splice(angelegt.length - 1, 0, ["anfrage", b.anfrage_id]);
+  const { data: pos } = await service.from("beleg_position").select("id").eq("beleg_id", id);
+  for (const p of pos ?? []) angelegt.push(["beleg_position", p.id]);
+  return b;
+}
+async function fertig(wer, id) {
+  const { data, error } = await wer.client.rpc("beleg_fertigstellen", { p_id: id });
+  if (error) throw new Error(`beleg_fertigstellen: ${error.message}`);
+  return data;
+}
+
 // ---------- Aufbau ----------
 let admin, buero, ohneMfa, deaktiviert, daten;
 before(async () => {
@@ -349,20 +366,31 @@ describe("Anfragen", () => {
     assert.ok(error, "verloren ohne Grund möglich");
   });
 
-  it("Gewonnen – Auftrag anlegen: AB-Nummer, Anfrage gewonnen, nur einmal", async () => {
-    const { data: auftragId, error } = await buero.client.rpc("anfrage_auftrag_anlegen", { p_anfrage_id: anfrage.id });
+  it("Auftrag entsteht mit der AB: Nummer = AB-Nummer, Angebot angenommen, Anfrage gewonnen, nur einmal", async () => {
+    const start = angelegt.length;
+    const ag = await belegSpeichern(buero, { art: "angebot", kunde_id: daten.kunde.id, anfrage_id: anfrage.id });
+    assert.match(ag.nummer, /^AG1\d{6}$/, "Angebot hat schon als Entwurf seine Nummer");
+    await fertig(buero, ag.id);
+    const ab = await belegSpeichern(buero, { art: "auftragsbestaetigung", kunde_id: daten.kunde.id, vorgaenger_id: ag.id });
+    const { data: erg, error } = await buero.client.rpc("beleg_fertigstellen", { p_id: ab.id });
     assert.ifError(error);
-    angelegt.push(["auftrag", auftragId]);
-    const { data: a } = await service.from("auftrag").select("nummer, kunde_id, anfrage_id, titel, created_by").eq("id", auftragId).single();
-    assert.match(a.nummer, /^AB2\d{2}\d{4}$/, `Auftragsnummer aus dem AB-Nummernkreis: ${a.nummer}`);
+    angelegt.splice(start, 0, ["auftrag", erg.auftrag_id]);
+    const { data: a } = await service.from("auftrag").select("nummer, kunde_id, anfrage_id, titel, created_by").eq("id", erg.auftrag_id).single();
+    assert.match(a.nummer, /^AB2\d{6}$/, `Auftragsnummer aus dem AB-Nummernkreis: ${a.nummer}`);
+    assert.equal(a.nummer, erg.nummer, "Auftragsnummer = AB-Nummer");
     assert.equal(a.kunde_id, daten.kunde.id);
     assert.equal(a.titel, anfrage.titel);
     assert.equal(a.created_by, buero.id);
+    const { data: kette } = await service.from("beleg").select("id, art, status, anfrage_id, auftrag_id").in("id", [ag.id, ab.id]);
+    assert.ok(kette.every((b) => b.auftrag_id === erg.auftrag_id && !b.anfrage_id), "Kette hängt am Auftrag");
+    assert.equal(kette.find((b) => b.art === "angebot").status, "angenommen");
     const { data: q } = await service.from("anfrage").select("archiv, archiviert_am").eq("id", anfrage.id).single();
     assert.equal(q.archiv, "gewonnen");
     assert.ok(q.archiviert_am);
-    const zweiter = await buero.client.rpc("anfrage_auftrag_anlegen", { p_anfrage_id: anfrage.id });
-    assert.equal(zweiter.error?.code, "23505");
+    // zweite AB an derselben Anfrage: abgelehnt
+    const ab2 = await belegSpeichern(buero, { art: "auftragsbestaetigung", kunde_id: daten.kunde.id, anfrage_id: anfrage.id });
+    const zweite = await buero.client.rpc("beleg_fertigstellen", { p_id: ab2.id });
+    assert.ok(zweite.error, "zweiter Auftrag aus derselben Anfrage");
   });
 
   it("eine gewonnene Anfrage mit Auftrag lässt sich weder zurücksetzen noch löschen", async () => {
@@ -425,8 +453,8 @@ describe("Aufträge", () => {
   it("ein leerer Auftrag wird nur markiert; danach lässt sich die Anfrage zurücksetzen", async () => {
     const { data: q } = await buero.client.from("anfrage").insert({ titel: `Löschtest ${lauf}`, kunde_id: daten.kunde.id }).select().single();
     angelegt.push(["anfrage", q.id]);
-    const { data: auftragId } = await buero.client.rpc("anfrage_auftrag_anlegen", { p_anfrage_id: q.id });
-    angelegt.push(["auftrag", auftragId]);
+    await service.from("anfrage").update({ archiv: "gewonnen" }).eq("id", q.id);
+    const { id: auftragId } = await svcInsert("auftrag", { nummer: `LEER-${lauf}`, kunde_id: daten.kunde.id, anfrage_id: q.id, titel: "leer" });
     const { error } = await buero.client.rpc("loeschen", { p_tabelle: "auftrag", p_id: auftragId });
     assert.ifError(error);
     const { data: sichtbar } = await buero.client.from("auftrag").select("id").eq("id", auftragId);
@@ -775,6 +803,109 @@ describe("Einkauf", () => {
     assert.ifError((await buero.client.rpc("loeschen", { p_tabelle: "lieferant", p_id: lieferant })).error);
     const { data: k } = await service.from("lieferant_kontakt").select("deleted_at").eq("lieferant_id", lieferant);
     assert.ok(k.every((x) => x.deleted_at), "Ansprechpartner mit markiert");
+  });
+});
+
+describe("Belege", () => {
+  it("neue Belege sind immer Entwurf, ohne eigene Nummer und ohne Lexware-Daten", async () => {
+    const { data, error } = await buero.client
+      .from("beleg")
+      .insert({ art: "lieferschein", auftrag_id: daten.auftrag.id, kunde_id: daten.kunde.id, status: "fertiggestellt", nummer: "LS1999999", lexware_id: "x-1" })
+      .select()
+      .single();
+    assert.ifError(error);
+    angelegt.push(["beleg", data.id]);
+    assert.equal(data.status, "entwurf");
+    assert.equal(data.nummer, null);
+    assert.equal(data.lexware_id, null);
+  });
+
+  it("Status wechselt nur über „Fertigstellen“; Aufträge entstehen nur mit der AB", async () => {
+    const ls = await belegSpeichern(buero, { art: "lieferschein", kunde_id: daten.kunde.id, auftrag_id: daten.auftrag.id });
+    const direkt = await buero.client.from("beleg").update({ status: "fertiggestellt" }).eq("id", ls.id);
+    assert.equal(direkt.error?.code, "42501", "Entwurf direkt fertiggestellt");
+    const auftrag = await buero.client.from("auftrag").insert({ nummer: `X-${lauf}`, kunde_id: daten.kunde.id, titel: "direkt" });
+    assert.equal(auftrag.error?.code, "42501", "Auftrag ohne AB angelegt");
+  });
+
+  it("Lieferschein: Nummer beim Fertigstellen, danach gesperrt und nicht löschbar", async () => {
+    const ls = await belegSpeichern(buero, { art: "lieferschein", kunde_id: daten.kunde.id, auftrag_id: daten.auftrag.id });
+    assert.equal(ls.nummer, null, "Lieferschein-Entwurf hat schon eine Nummer");
+    const { nummer } = await fertig(buero, ls.id);
+    assert.match(nummer, /^LS1\d{6}$/);
+    const titel = await buero.client.from("beleg").update({ titel: "geändert" }).eq("id", ls.id);
+    assert.equal(titel.error?.code, "42501", "fertiger Lieferschein geändert");
+    const pos = await buero.client.from("beleg_position").insert({ beleg_id: ls.id, titel: "nachträglich" });
+    assert.ok(pos.error, "Position an fertigem Beleg ergänzt");
+    const weg = await buero.client.rpc("loeschen", { p_tabelle: "beleg", p_id: ls.id });
+    assert.ok(weg.error, "fertiger Beleg gelöscht");
+    const tags = await buero.client.from("beleg").update({ tags: ["intern"], kommentar_intern: "bleibt änderbar" }).eq("id", ls.id);
+    assert.ifError(tags.error);
+  });
+
+  it("Angebot: angenommen/abgelehnt und zurück, „nicht beauftragt“ nicht von Hand", async () => {
+    const ag = await belegSpeichern(buero, { art: "angebot", kunde_id: daten.kunde.id });
+    await fertig(buero, ag.id);
+    const nb = await buero.client.from("beleg").update({ status: "nicht_beauftragt" }).eq("id", ag.id);
+    assert.equal(nb.error?.code, "42501");
+    for (const st of ["abgelehnt", "offen", "angenommen", "offen"]) {
+      const r = await buero.client.from("beleg").update({ status: st }).eq("id", ag.id);
+      assert.ifError(r.error);
+    }
+  });
+
+  it("Versionen: übergeben friert ein, Bearbeiten legt Version 2 mit derselben Nummer an", async () => {
+    const ag = await belegSpeichern(buero, { art: "angebot", kunde_id: daten.kunde.id, datum: "2026-11-02", gueltig_bis: "2026-12-02" });
+    await fertig(buero, ag.id);
+    const { data: v, error } = await buero.client.rpc("beleg_uebergeben", { p_id: ag.id });
+    assert.ifError(error);
+    assert.equal(v, 1);
+    const { data: ver } = await service.from("beleg_version").select("id, version, daten").eq("beleg_id", ag.id);
+    const { data: vs } = await service.from("beleg_versand").select("id").eq("beleg_id", ag.id);
+    for (const x of [...ver, ...vs]) angelegt.push([x.daten ? "beleg_version" : "beleg_versand", x.id]);
+    assert.equal(ver.length, 1);
+    assert.equal(ver[0].daten.positionen.length, 1, "Version enthält die Positionen");
+    const { data: id2, error: e2 } = await buero.client.rpc("beleg_speichern", {
+      p_id: ag.id,
+      p_kopf: { art: "angebot", kunde_id: daten.kunde.id, datum: "2026-11-02", gueltig_bis: "2026-12-02" },
+      p_positionen: [{ titel: "Haustür", menge: 1, einzelpreis: 1200, steuersatz: 19 }],
+    });
+    assert.ifError(e2);
+    const { data: neu } = await service.from("beleg").select("version, nummer, datum, gueltig_bis, eingefroren_version, anfrage_id").eq("id", id2).single();
+    assert.equal(neu.anfrage_id, ag.anfrage_id, "Bezug bleibt beim erneuten Speichern ohne Angabe");
+    const { data: pos } = await service.from("beleg_position").select("id").eq("beleg_id", ag.id);
+    for (const p of pos) if (!angelegt.some(([, x]) => x === p.id)) angelegt.push(["beleg_position", p.id]);
+    assert.equal(neu.version, 2);
+    assert.equal(neu.nummer, ag.nummer, "Nummer bleibt");
+    assert.equal(neu.eingefroren_version, 1);
+    const heute = new Intl.DateTimeFormat("sv-SE", { timeZone: "Europe/Berlin" }).format(new Date());
+    assert.equal(neu.datum, heute, "Belegdatum wird auf heute gesetzt");
+    const tage = (Date.parse(neu.gueltig_bis) - Date.parse(neu.datum)) / 864e5;
+    assert.equal(tage, 30, "Gültig bis wandert mit");
+  });
+
+  it("Version und Fertigstellung lassen sich nicht direkt setzen", async () => {
+    const ag = await belegSpeichern(buero, { art: "angebot", kunde_id: daten.kunde.id });
+    const { data } = await buero.client.from("beleg").update({ version: 7, eingefroren_version: 7, fertiggestellt_am: new Date().toISOString() }).eq("id", ag.id).select("version, eingefroren_version, fertiggestellt_am").single();
+    assert.deepEqual(data, { version: 1, eingefroren_version: null, fertiggestellt_am: null });
+  });
+
+  it("PDF-Speicher: nur angemeldete Benutzer, Löschen gesperrt", async () => {
+    const pfad = `rls-${lauf}/test.pdf`;
+    const hoch = await buero.client.storage.from("belege").upload(pfad, new Blob(["%PDF-1.4 test"], { type: "application/pdf" }), { contentType: "application/pdf" });
+    assert.ifError(hoch.error);
+    const falsch = await buero.client.storage.from("belege").upload(`rls-${lauf}/bild.png`, new Blob(["x"], { type: "image/png" }), { contentType: "image/png" });
+    assert.ok(falsch.error, "anderer Dateityp angenommen");
+    const lesen = await buero.client.storage.from("belege").download(pfad);
+    assert.ifError(lesen.error);
+    const fremd = await anon.storage.from("belege").download(pfad);
+    assert.ok(fremd.error, "nicht angemeldet gelesen");
+    const ohne = await ohneMfa.client.storage.from("belege").download(pfad);
+    assert.ok(ohne.error || !ohne.data?.size, "ohne zweiten Faktor gelesen");
+    await buero.client.storage.from("belege").remove([pfad]);
+    const noch = await service.storage.from("belege").download(pfad);
+    assert.ok(!noch.error, "Benutzer konnte die Datei löschen");
+    await service.storage.from("belege").remove([pfad]);
   });
 });
 

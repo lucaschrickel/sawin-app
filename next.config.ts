@@ -26,8 +26,27 @@ const nextConfig: NextConfig = {
       },
     },
   },
+  // Schriften für die serverseitig erzeugten PDFs (werden per Dateipfad gelesen, nicht importiert)
+  outputFileTracingIncludes: {
+    "/pdf/**": ["./node_modules/@fontsource/inter/files/inter-latin-{400,600,700}-normal.woff"],
+    "/beleg/**": ["./node_modules/@fontsource/inter/files/inter-latin-{400,600,700}-normal.woff"],
+  },
   async headers() {
-    return [{ source: "/:path*", headers: securityHeaders }];
+    return [
+      // Alles außer den PDFs: nie in Frames
+      { source: "/((?!pdf/).*)", headers: securityHeaders },
+      // PDFs der App (Belegvorschau): nur in Seiten derselben Herkunft einbettbar
+      {
+        source: "/pdf/:path*",
+        headers: securityHeaders.map((h) =>
+          h.key === "X-Frame-Options"
+            ? { ...h, value: "SAMEORIGIN" }
+            : h.key === "Content-Security-Policy"
+              ? { ...h, value: h.value.replace("frame-ancestors 'none'", "frame-ancestors 'self'") }
+              : h,
+        ),
+      },
+    ];
   },
 };
 

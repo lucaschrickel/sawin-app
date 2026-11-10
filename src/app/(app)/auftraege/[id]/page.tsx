@@ -11,6 +11,11 @@ import { ladeBenutzerAuswahl } from "@/lib/anfragen";
 import { pruefeSitzung } from "@/lib/auth/sitzung";
 import { ladeAufgabenZu } from "@/lib/aufgaben";
 import { ladeAuftrag } from "@/lib/auftraege";
+import { ladeBelegeZu } from "@/lib/belege";
+import { auftragSchritte } from "@/lib/belege-status";
+import { eur } from "@/lib/format";
+import { BelegeKompakt } from "../../beleg/kompakt";
+import { BelegErstellenMenue, SchrittKnoepfe } from "../../beleg/ui";
 import { stundenText } from "@/lib/team";
 import { ladeBuchungen, ladeZeitDialogDaten, summeJeAuftrag } from "@/lib/zeiten";
 import { cn } from "@/lib/cn";
@@ -38,7 +43,7 @@ const uhrzeit = (iso: string) => kurzTermin(iso).split(" ").at(-1);
 export default async function AuftragPage({ params, searchParams }: PageProps<"/auftraege/[id]">) {
   const { id } = await params;
   const reiter = eins((await searchParams).reiter) === "historie" ? "historie" : "uebersicht";
-  const [daten, benutzer, { benutzer: ich }, aufgaben, tickets, zeiten, zeitDialog, bestellzeilen] = await Promise.all([
+  const [daten, benutzer, { benutzer: ich }, aufgaben, tickets, zeiten, zeitDialog, bestellzeilen, belege] = await Promise.all([
     ladeAuftrag(id),
     ladeBenutzerAuswahl(),
     pruefeSitzung(),
@@ -47,6 +52,7 @@ export default async function AuftragPage({ params, searchParams }: PageProps<"/
     ladeBuchungen({ von: null, bis: null, auftrag: id }).catch(() => []),
     ladeZeitDialogDaten(),
     ladeBestellzeilenZuAuftrag(id),
+    ladeBelegeZu({ auftrag_id: id }),
   ]);
   if (!daten) notFound();
   const { auftrag: a, kunde: k, anfrage, einsaetze, ursprung, nachtraege, historie } = daten;
@@ -59,6 +65,13 @@ export default async function AuftragPage({ params, searchParams }: PageProps<"/
   const lieferKw = auftragLieferKw(bestellzeilen.map((z) => ({ geliefert: z.geliefert, liefer_kw: z.bestellung!.liefer_kw, liefer_jahr: z.bestellung!.liefer_jahr })));
   const lieferterminKw = a.liefertermin ? kalenderwoche(a.liefertermin) : null;
   const kwWeichtAb = !!(lieferKw && a.liefertermin && (lieferKw.kw !== lieferterminKw || lieferKw.jahr !== Number(a.liefertermin.slice(0, 4))));
+  const ab = belege.find((b) => b.art === "auftragsbestaetigung" && b.status !== "entwurf");
+  const belegSchritte = auftragSchritte(id, belege);
+  const erstellen = ab
+    ? [{ text: "Lieferschein", sub: "Positionen aus der Auftragsbestätigung", href: `/beleg/neu?art=lieferschein&vorgaenger=${ab.id}` }]
+    : belege.some((b) => b.art === "auftragsbestaetigung")
+      ? []
+      : [{ text: "Auftragsbestätigung", sub: `Übernimmt die Auftragsnummer ${a.nummer}`, href: `/beleg/neu?art=auftragsbestaetigung&auftrag=${id}` }];
   const tab = (aktiv: boolean) => cn("-mb-px border-b-2 px-1 pb-2.5 text-[15px]", aktiv ? "border-ink font-semibold text-ink" : "border-transparent text-muted hover:text-ink");
 
   return (
@@ -214,11 +227,29 @@ export default async function AuftragPage({ params, searchParams }: PageProps<"/
             </div>
 
             <div className="flex flex-col gap-4">
-              <Karte titel="Belege" rechts={<span className="text-sm text-muted-2 tabular">0</span>}>
-                <p className="text-sm text-muted">
-                  Noch keine Belege. Die Belegkette (Angebot, AB, Lieferschein, Rechnungen) erscheint hier mit dem Beleg-Modul.
-                </p>
+              <Karte titel="Belege" rechts={<BelegErstellenMenue eintraege={erstellen} auftragId={a.id} />}>
+                {belege.length ? <BelegeKompakt belege={belege} kette={belege} heute={heute} /> : <p className="text-sm text-muted">Noch keine Belege.</p>}
+                {belegSchritte.length > 0 && (
+                  <div className="mt-3 border-t border-line-soft pt-3">
+                    <SchrittKnoepfe schritte={belegSchritte} klein />
+                  </div>
+                )}
               </Karte>
+              {ab && (
+                <Karte titel="Finanzen">
+                  <dl className="grid grid-cols-2 gap-3 text-[14.5px]">
+                    <div>
+                      <dt className="text-xs font-medium text-muted-2">Auftragswert</dt>
+                      <dd className="mt-0.5 text-lg font-semibold tabular" data-auftragswert>{eur(ab.summe_brutto)}</dd>
+                    </div>
+                    <div>
+                      <dt className="text-xs font-medium text-muted-2">netto</dt>
+                      <dd className="mt-0.5 tabular text-muted">{eur(ab.summe_netto)}</dd>
+                    </div>
+                  </dl>
+                  <p className="mt-2 text-xs text-muted-2">Abschläge und Rechnungen folgen mit der Lexware-Anbindung.</p>
+                </Karte>
+              )}
               <Karte
                 titel="Stunden"
                 rechts={

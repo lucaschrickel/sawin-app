@@ -103,7 +103,16 @@ APP_URL=http://localhost:3100 npm run test:team          # Fahrzeuge, Fahrzeug i
 APP_URL=http://localhost:3100 npm run test:service       # Service-Tickets und Service-Plan
 APP_URL=http://localhost:3100 npm run test:einkauf       # Lieferanten, Bestellungen, „Ware eingetroffen“ am Auftrag
 APP_URL=http://localhost:3100 npm run test:dashboard     # Dashboard: drei Ansichten mit echten Daten, Ansicht je Benutzer gemerkt
+APP_URL=http://localhost:3100 npm run test:oberflaeche   # Passwortfeld mit Augen-Symbol, Logo hell und dunkel
+APP_URL=http://localhost:3100 npm run test:belege        # Belege: Angebot → AB → Auftrag → Lieferschein, PDF, Versionen, Listen
+npm run test:unit                                       # Rechenmodul der Belegsummen (Rundung auf Cent), ohne App
 ```
+
+**Belege einrichten (je Instanz, einmalig in der App):** Unter Einstellungen › Firma die Firmendaten eintragen (stehen
+im Kopf, in der Absenderzeile und im Fuß jedes Beleg-PDFs, auch Bank, USt-IdNr. und Steuernummer). Unter Einstellungen ›
+Belege die Gültigkeit der Angebote und die Zahlungsbedingungen anlegen (Standard je Belegart markieren). Der private
+Speicher `belege` für die PDFs entsteht mit der Migration, es ist nichts per Klick anzulegen. Die Schrift Inter für die
+PDFs kommt aus `@fontsource/inter` und wird über `outputFileTracingIncludes` (`next.config.ts`) mit ausgeliefert.
 
 **Vor der Einladung von Mitarbeitern:** Der eingebaute E-Mail-Versand von Supabase schickt nur an Mitglieder der
 Supabase-Organisation und nur wenige E-Mails pro Stunde. Für den Betrieb unter Authentication › Emails › SMTP Settings

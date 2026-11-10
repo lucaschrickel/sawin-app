@@ -1,0 +1,192 @@
+import type { Metadata } from "next";
+import Link from "next/link";
+import { notFound } from "next/navigation";
+import { Copy, Download, ExternalLink, Pencil } from "lucide-react";
+import { Angabe, Karte } from "@/components/app/info-karte";
+import { Shell } from "@/components/app/shell";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { getCustomer } from "@/customers";
+import { STEUERART_TEXT } from "@/lib/beleg-typen";
+import { belegZuEingabe, heuteBerlin, ladeBeleg, ladeBelegTags, ladeKundeFuerBeleg, ladeZahlungsbedingungen } from "@/lib/belege";
+import { anzeigeStatus, bearbeitbar, BELEGART_TEXT, belegSchritte } from "@/lib/belege-status";
+import { eur } from "@/lib/format";
+import { tag, zeitpunkt } from "@/lib/zeit";
+import { BelegEditor } from "../editor";
+import { AKTIV, LISTE } from "../navigation";
+import { AngebotZuruecksetzen, KettenLeiste, SchrittKnoepfe, TagsKommentar, UebergebenKnopf } from "../ui";
+
+export const metadata: Metadata = { title: "Beleg" };
+
+/** Entwurf: Editor. Fertiggestellt: Belegseite mit Kette, PDF, „Nächster Schritt“, Aktionen, Daten, Versionen. */
+export default async function BelegPage({ params }: PageProps<"/beleg/[id]">) {
+  const { id } = await params;
+  const d = await ladeBeleg(id);
+  if (!d) notFound();
+  const b = d.beleg;
+  const liste = LISTE[b.art];
+  const titel = `${BELEGART_TEXT[b.art]} ${b.nummer ?? "Entwurf"}`;
+  const crumbs = [{ label: "Belege" }, { label: liste.text, href: liste.href }, { label: titel }];
+
+  if (b.status === "entwurf") {
+    const [zahlungsbedingungen, tags, kunde] = await Promise.all([ladeZahlungsbedingungen(), ladeBelegTags(), b.kunde_id ? ladeKundeFuerBeleg(b.kunde_id) : null]);
+    return (
+      <Shell active={AKTIV[b.art]} crumbs={crumbs}>
+        <BelegEditor
+          key={`${b.id}-${b.updated_at}`}
+          start={belegZuEingabe(d)}
+          modus="entwurf"
+          zahlungsbedingungen={zahlungsbedingungen}
+          kundeStart={kunde}
+          tagVorschlaege={tags}
+          herkunftListe={getCustomer().herkunft}
+          zurueck={b.auftrag ? { href: `/auftraege/${b.auftrag.id}`, text: "Auftrag" } : b.anfrage ? { href: `/anfragen/${b.anfrage.id}`, text: "Anfrage" } : liste}
+        />
+      </Shell>
+    );
+  }
+
+  const heute = heuteBerlin();
+  const status = anzeigeStatus(b, d.kette, heute);
+  const schritte = belegSchritte(b, d.kette);
+  const aenderbar = bearbeitbar(b, d.kette);
+  const tags = await ladeBelegTags();
+  const pdf = `/pdf/beleg/${b.id}`;
+  const versionierbar = b.art === "angebot" || b.art === "auftragsbestaetigung";
+  const abgelaufen = b.art === "angebot" && b.status === "offen" && b.gueltig_bis && b.gueltig_bis < heute;
+
+  return (
+    <Shell active={AKTIV[b.art]} crumbs={crumbs}>
+      <div className="mb-4 flex flex-col gap-2">
+        <div className="flex flex-wrap items-center gap-2.5">
+          {b.nummer && <span className="rounded-full bg-surface-sunken px-2.5 py-1 font-mono text-[13px]">{b.nummer}</span>}
+          <h1 className="text-4xl font-bold tracking-[-0.02em]">{BELEGART_TEXT[b.art]}</h1>
+          <Badge tone={status.ton} data-status={status.key}>{status.text}</Badge>
+          {b.version > 1 && <Badge tone="gray">Version {b.version}</Badge>}
+        </div>
+        <p className="flex flex-wrap items-center gap-x-2 text-[14.5px] text-muted">
+          {b.kunde ? <Link href={`/kunden/${b.kunde.id}`} className="text-accent-text hover:underline">{b.kunde.name}</Link> : (b.adresse_name ?? "–")}
+          {b.auftrag && (
+            <>
+              ·<Link href={`/auftraege/${b.auftrag.id}`} className="text-accent-text hover:underline" data-sprung="auftrag">Auftrag {b.auftrag.nummer}</Link>
+            </>
+          )}
+          {b.anfrage && (
+            <>
+              ·<Link href={`/anfragen/${b.anfrage.id}`} className="text-accent-text hover:underline" data-sprung="anfrage">Anfrage {b.anfrage.nummer}</Link>
+            </>
+          )}
+          · <span>{tag(b.datum)}</span>
+          {b.titel && b.titel !== BELEGART_TEXT[b.art] && <>· <span>{b.titel}</span></>}
+        </p>
+        <KettenLeiste kette={d.kette} aktuell={b.id} />
+      </div>
+
+      {schritte.length > 0 && (
+        <div className="mb-4 flex flex-wrap items-center gap-3 rounded-md bg-tone-brand-bg px-4 py-3" data-naechster-schritt>
+          <span className="text-sm font-semibold text-tone-brand-fg">Nächster Schritt</span>
+          <SchrittKnoepfe schritte={schritte} belegId={b.id} />
+        </div>
+      )}
+
+      <div className="grid items-start gap-4 min-[1100px]:grid-cols-[minmax(0,1fr)_300px]">
+        <section className="overflow-hidden rounded-lg border border-line-soft bg-surface-sunken p-3">
+          <iframe title={`PDF ${titel}`} src={`${pdf}#view=FitH`} className="aspect-[1/1.414] w-full rounded-md border border-line bg-surface" data-pdf-ansicht />
+        </section>
+
+        <aside className="flex flex-col gap-4" aria-label="Aktionen und Daten">
+          <Karte titel="Aktionen">
+            <div className="flex flex-col gap-2">
+              {aenderbar && (
+                <Button asChild variant="primary">
+                  <Link href={`/beleg/${b.id}/bearbeiten`} data-aktion="bearbeiten">
+                    <Pencil className="size-4" /> Bearbeiten
+                  </Link>
+                </Button>
+              )}
+              <Button asChild>
+                <a href={pdf} target="_blank" rel="noopener">
+                  <ExternalLink className="size-4" /> Vorschau / Drucken
+                </a>
+              </Button>
+              <Button asChild>
+                <a href={`${pdf}?download=1`} download>
+                  <Download className="size-4" /> PDF herunterladen
+                </a>
+              </Button>
+              <Button asChild variant="ghost">
+                <Link href={`/beleg/neu?art=${b.art}&kopie=${b.id}`}>
+                  <Copy className="size-4" /> Duplizieren
+                </Link>
+              </Button>
+              {b.art === "angebot" && ["angenommen", "abgelehnt"].includes(b.status) && aenderbar && <AngebotZuruecksetzen id={b.id} />}
+            </div>
+          </Karte>
+
+          <Karte titel="Daten">
+            <dl className="flex flex-col gap-3 text-[14.5px]">
+              {b.art === "lieferschein" ? (
+                <Angabe name="Positionen">{d.positionen.filter((p) => p.typ === "artikel").length}</Angabe>
+              ) : (
+                <div className="grid grid-cols-2 gap-3">
+                  <Angabe name="Netto"><span className="tabular">{eur(b.summe_netto)}</span></Angabe>
+                  <Angabe name="Brutto"><span className="tabular font-semibold" data-brutto>{eur(b.summe_brutto)}</span></Angabe>
+                </div>
+              )}
+              {b.art !== "lieferschein" && <Angabe name="Steuerart">{STEUERART_TEXT[b.steuerart]}</Angabe>}
+              {b.gueltig_bis && (
+                <Angabe name="Gültig bis">
+                  {tag(b.gueltig_bis)}
+                  {abgelaufen && <span className="font-medium text-tone-red-fg"> · abgelaufen</span>}
+                </Angabe>
+              )}
+              {b.art === "lieferschein" && b.liefertermin && <Angabe name="Lieferdatum">{tag(b.liefertermin)}</Angabe>}
+              {b.art === "auftragsbestaetigung" && (b.leistung_von || b.leistung_bis) && (
+                <Angabe name="Liefer-/Montagezeit">{[b.leistung_von, b.leistung_bis].filter(Boolean).map((x) => tag(x!)).join(" – ")}</Angabe>
+              )}
+              {b.fertiggestellt_am && <Angabe name="Fertiggestellt">{zeitpunkt(b.fertiggestellt_am)}</Angabe>}
+            </dl>
+          </Karte>
+
+          {versionierbar && (
+            <Karte titel="Versionen" rechts={<span className="text-xs text-muted-2">aktuell V{b.version}</span>}>
+              <ul className="mb-3 flex flex-col text-sm" data-versionen>
+                {(b.eingefroren_version ?? 0) < b.version && (
+                  <li className="flex justify-between gap-2 border-t border-line-soft py-1.5 first:border-t-0">
+                    <span>Version {b.version}</span>
+                    <span className="text-muted-2">noch nicht übergeben</span>
+                  </li>
+                )}
+                {d.versionen.map((v) => {
+                  const versand = d.versand.filter((x) => x.version === v.version);
+                  return (
+                    <li key={v.version} className="flex items-center justify-between gap-2 border-t border-line-soft py-1.5 first:border-t-0">
+                      <span>
+                        Version {v.version}
+                        <span className="block text-xs text-muted-2">{versand.map((x) => `${x.kanal === "email" ? "E-Mail" : "übergeben"} ${tag(x.gesendet_am)}`).join(", ") || tag(v.eingefroren_am)}</span>
+                      </span>
+                      {v.pdf_pfad && (
+                        <a href={v.version === b.version ? pdf : `${pdf}?version=${v.version}`} target="_blank" rel="noopener" className="text-sm text-accent-text hover:underline">
+                          Ansehen
+                        </a>
+                      )}
+                    </li>
+                  );
+                })}
+              </ul>
+              <UebergebenKnopf id={b.id} version={b.version} />
+            </Karte>
+          )}
+
+          <Karte titel="Ablage" rechts={<Badge tone="gray">nur App</Badge>}>
+            <p className="text-sm text-muted">Das App-PDF ist das Original. Es liegt in der App; die Ablage im OneDrive-Ordner folgt mit dem OneDrive-Modul.</p>
+          </Karte>
+
+          <Karte titel="Intern">
+            <TagsKommentar id={b.id} tags={b.tags ?? []} kommentar={b.kommentar_intern ?? ""} vorschlaege={tags} />
+          </Karte>
+        </aside>
+      </div>
+    </Shell>
+  );
+}

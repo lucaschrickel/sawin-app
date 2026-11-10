@@ -16,15 +16,26 @@ import { eurK } from "@/lib/format";
 import { heuteBerlin, tag, zeitpunkt } from "@/lib/zeit";
 import { AnfrageDialog } from "../anfrage-dialog";
 import { AnfrageAktionen, NotizFormular, StatusAuswahl } from "../ui";
+import { ladeBelegeZu } from "@/lib/belege";
+import { anzeigeStatus, belegSchritte } from "@/lib/belege-status";
+import { eur } from "@/lib/format";
+import { Plus } from "lucide-react";
+import { BelegeKompakt } from "../../beleg/kompakt";
+import { SchrittKnoepfe } from "../../beleg/ui";
 
 export const metadata: Metadata = { title: "Anfrage" };
 
 export default async function AnfragePage({ params }: PageProps<"/anfragen/[id]">) {
   const { id } = await params;
-  const [daten, benutzer, { benutzer: ich }, aufgaben] = await Promise.all([ladeAnfrage(id), ladeBenutzerAuswahl(), pruefeSitzung(), ladeAufgabenZu({ anfrage_id: id })]);
+  const [daten, benutzer, { benutzer: ich }, aufgaben, belege] = await Promise.all([ladeAnfrage(id), ladeBenutzerAuswahl(), pruefeSitzung(), ladeAufgabenZu({ anfrage_id: id }), ladeBelegeZu({ anfrage_id: id })]);
   if (!daten) notFound();
   const { anfrage: a, kunde: k, lieferadressen, auftrag, historie } = daten;
   const c = getCustomer();
+  const heute = heuteBerlin();
+  // Jede Kette ist eine Variante (ein Angebot = ein Auftrag)
+  const varianten = [...new Set(belege.map((b) => b.kette_id))].map((kid) => belege.filter((b) => b.kette_id === kid));
+  const angenommen = belege.find((b) => b.art === "angebot" && b.status === "angenommen");
+  const angebote = belege.filter((b) => b.art === "angebot");
   const zustaendig = benutzer.find((b) => b.id === a.zustaendig_id)?.name;
   const objekte = [
     ...lieferadressen.map((la) => [la.strasse, [la.plz, la.ort].filter(Boolean).join(" ")].filter(Boolean).join(", ")),
@@ -49,6 +60,17 @@ export default async function AnfragePage({ params }: PageProps<"/anfragen/[id]"
         }
         actions={
           <>
+            {!a.archiv &&
+              (angenommen ? (
+                <Link href={`/beleg/neu?art=auftragsbestaetigung&vorgaenger=${angenommen.id}`} className="inline-flex h-[42px] items-center gap-2 rounded-full bg-ink px-5 text-sm font-semibold text-surface hover:opacity-90" data-ab-erstellen>
+                  Auftragsbestätigung erstellen →
+                </Link>
+              ) : (
+                <Link href={`/beleg/neu?art=angebot&anfrage=${a.id}`} className="inline-flex h-[42px] items-center gap-2 rounded-full bg-ink px-5 text-sm font-semibold text-surface hover:opacity-90" data-neues-angebot>
+                  <Plus className="size-4" strokeWidth={2.2} />
+                  {angebote.length ? "Weitere Variante" : "Neues Angebot"}
+                </Link>
+              ))}
             {!a.archiv && <StatusAuswahl id={a.id} status={a.status} />}
             {!a.archiv && (
               <AnfrageDialog anfrage={a} objekte={objekte} benutzer={benutzer} ichId={ich.id} herkunftListe={c.herkunft} produkteListe={c.produkte} />
@@ -68,8 +90,38 @@ export default async function AnfragePage({ params }: PageProps<"/anfragen/[id]"
 
       <div className="grid items-start gap-4 lg:grid-cols-[minmax(0,1fr)_360px]">
         <div className="flex min-w-0 flex-col gap-4">
-          <Karte titel="Angebote" rechts={<span className="text-sm text-muted-2 tabular">0</span>}>
-            <p className="text-sm text-muted">Noch keine Angebote. Angebote und Varianten kommen mit dem Beleg-Modul.</p>
+          <Karte titel="Angebote" rechts={<span className="text-sm text-muted-2 tabular">{angebote.length}</span>}>
+            {varianten.length ? (
+              <>
+                {varianten.length > 1 && <p className="mb-3 text-xs text-muted-2">Jedes Angebot ist eine Variante. Die AB zum angenommenen Angebot legt den Auftrag an; die übrigen werden „Nicht beauftragt“.</p>}
+                <div className="flex flex-col gap-3">
+                  {varianten.map((kette, i) => {
+                    const ag = kette.find((b) => b.art === "angebot") ?? kette[0];
+                    const s = anzeigeStatus(ag, kette, heute);
+                    const schritte = belegSchritte(ag, kette);
+                    return (
+                      <div key={ag.kette_id} className="rounded-md border border-line-soft px-4 py-3" data-variante={i + 1}>
+                        <div className="mb-1 flex flex-wrap items-baseline justify-between gap-2">
+                          <span className="text-sm font-semibold">
+                            {varianten.length > 1 ? `Variante ${i + 1}` : "Angebot"}
+                            {ag.titel && <span className="font-normal text-muted"> · {ag.titel}</span>}
+                          </span>
+                          <span className="text-sm text-muted">{eur(ag.summe_brutto)} · {s.text}</span>
+                        </div>
+                        <BelegeKompakt belege={kette} kette={kette} heute={heute} mitDatum />
+                        {schritte.length > 0 && (
+                          <div className="mt-2 border-t border-line-soft pt-2.5">
+                            <SchrittKnoepfe schritte={schritte} belegId={ag.id} klein />
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              </>
+            ) : (
+              <p className="text-sm text-muted">{auftrag ? "Die Angebote sind mit dem Auftrag in dessen Belegkette gewandert." : "Noch keine Angebote."}</p>
+            )}
           </Karte>
           <Karte titel="Aufmaßblatt">
             <p className="text-sm text-muted">Noch kein Aufmaß. Das digitale Aufmaßblatt kommt mit dem Modul Formulare.</p>
@@ -118,7 +170,7 @@ export default async function AnfragePage({ params }: PageProps<"/anfragen/[id]"
               {a.notiz && <Angabe name="Interne Notiz"><span className="whitespace-pre-line">{a.notiz}</span></Angabe>}
             </dl>
           </Karte>
-          <AufgabenKarte aufgaben={aufgaben} bezug={{ art: "anfrage", id: a.id, text: a.titel }} kontext={{ benutzer, ichId: ich.id, heute: heuteBerlin() }} />
+          <AufgabenKarte aufgaben={aufgaben} bezug={{ art: "anfrage", id: a.id, text: a.titel }} kontext={{ benutzer, ichId: ich.id, heute }} />
         </div>
       </div>
     </Shell>

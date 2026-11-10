@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { CheckCircle2, RotateCcw, Trash2, XCircle } from "lucide-react";
+import { RotateCcw, Trash2, XCircle } from "lucide-react";
 import { useActionState, useState, useTransition } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Bestaetigen } from "@/components/ui/bestaetigen";
@@ -13,7 +13,7 @@ import { Formular } from "@/components/ui/formular";
 import { ansichtSetzen } from "@/lib/ansicht-aktion";
 import { ANFRAGE_STATUS, ANFRAGE_STATUS_TEXT, ANFRAGE_STATUS_TON, type AnfrageStatus } from "@/lib/anfragen-status";
 import { cn } from "@/lib/cn";
-import { anfrageLoeschen, auftragAnlegen, notizAnlegen, statusSetzen, verlorenSetzen, wiederherstellen, type Ergebnis } from "./aktionen";
+import { anfrageLoeschen, notizAnlegen, statusSetzen, verlorenSetzen, wiederherstellen, type Ergebnis } from "./aktionen";
 
 function Meldung({ e }: { e: Ergebnis }) {
   if (!e.fehler && !e.hinweis) return null;
@@ -148,7 +148,7 @@ export function StatusAuswahl({ id, status }: { id: string; status: AnfrageStatu
   );
 }
 
-/** Aktionen auf der Anfrageseite: Verloren, Gewonnen – Auftrag anlegen, Wiederherstellen, Löschen */
+/** Aktionen auf der Anfrageseite: Verloren, Wiederherstellen, Löschen. Gewonnen wird die Anfrage mit der AB. */
 export function AnfrageAktionen({ id, titel, archiv, hatAuftrag }: { id: string; titel: string; archiv: "gewonnen" | "verloren" | null; hatAuftrag: boolean }) {
   const [ergebnis, setErgebnis] = useState<Ergebnis>({});
   const [laeuft, starten] = useTransition();
@@ -159,22 +159,6 @@ export function AnfrageAktionen({ id, titel, archiv, hatAuftrag }: { id: string;
       {!archiv && (
         <>
           <VerlorenDialog id={id} />
-          <Bestaetigen
-            titel="Gewonnen – Auftrag anlegen?"
-            text={
-              <>
-                <b className="text-ink">{titel}</b> wird als gewonnen archiviert und ein Auftrag angelegt. Der Auftrag bekommt seine
-                Nummer aus dem Kreis der Auftragsbestätigungen; die spätere AB übernimmt sie.
-              </>
-            }
-            knopf="Auftrag anlegen"
-            ausfuehren={() => tun(() => auftragAnlegen(id))}
-          >
-            <Button variant="primary" disabled={laeuft}>
-              <CheckCircle2 className="size-[15px]" />
-              Gewonnen – Auftrag anlegen
-            </Button>
-          </Bestaetigen>
         </>
       )}
       {archiv && !hatAuftrag && (
