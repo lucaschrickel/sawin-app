@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Field, Input, Textarea } from "@/components/ui/field";
 import { FormularDialog, type FormularSteuerung } from "@/components/ui/formular-dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Formular } from "@/components/ui/formular";
 import {
   AUFGABE_STATUS,
   AUFGABE_STATUS_TEXT,
@@ -50,7 +51,7 @@ function AufgabeFormular({ aufgabe: a, bezug, benutzer, ichId, s }: DialogProps 
   const [, starten] = useTransition();
 
   return (
-    <form action={aktion} onInput={s.aenderung} className="flex flex-col gap-4">
+    <Formular aktion={aktion} onInput={s.aenderung} className="flex flex-col gap-4">
       {a && <input type="hidden" name="id" value={a.id} />}
       <input type="hidden" name="bezug_art" value={gewaehlt?.art ?? ""} />
       <input type="hidden" name="bezug_id" value={gewaehlt?.id ?? ""} />
@@ -119,7 +120,7 @@ function AufgabeFormular({ aufgabe: a, bezug, benutzer, ichId, s }: DialogProps 
           <Button type="submit" variant="primary" disabled={laeuft}>{laeuft ? "Speichern …" : a ? "Speichern" : "Aufgabe anlegen"}</Button>
         </span>
       </div>
-    </form>
+    </Formular>
   );
 }
 

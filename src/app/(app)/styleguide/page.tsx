@@ -242,7 +242,7 @@ export default function StyleguidePage() {
           <DialogDemo />
         </Section>
 
-        <Section title="Formular-Dialog" description="Dialog mit Formular, fragt beim Schließen mit ungespeicherten Änderungen nach (FormularDialog)">
+        <Section title="Formular-Dialog" description="Dialog mit Formular, fragt beim Schließen mit ungespeicherten Änderungen nach (FormularDialog) · Formulare über den Baustein Formular, der Eingaben bei einem Fehler vom Server behält">
           <FormularDialogDemo />
         </Section>
 

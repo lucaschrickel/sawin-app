@@ -7,6 +7,7 @@ import { Bestaetigen } from "@/components/ui/bestaetigen";
 import { Button } from "@/components/ui/button";
 import { Field, Input, Textarea } from "@/components/ui/field";
 import { FormularDialog, type FormularSteuerung } from "@/components/ui/formular-dialog";
+import { Formular } from "@/components/ui/formular";
 import type { Monteur, TafelEinsatz } from "@/lib/montageplan";
 import { auftraegeSuchen, einsatzLoeschen, einsatzSpeichern, monteurSpeichern, type AuftragTreffer, type Ergebnis } from "./aktionen";
 
@@ -47,7 +48,7 @@ function EinsatzFormular({ vorlage, monteure, s, beiErgebnis }: { vorlage: Dialo
     });
 
   return (
-    <form action={speichern} className="flex flex-col gap-4">
+    <Formular aktion={() => speichern()} className="flex flex-col gap-4">
       {fehler.fehler && <p role="alert" className="rounded-md bg-tone-red-bg px-3.5 py-2.5 text-sm text-tone-red-fg">{fehler.fehler}</p>}
 
       <div className="flex flex-col gap-1.5">
@@ -136,7 +137,7 @@ function EinsatzFormular({ vorlage, monteure, s, beiErgebnis }: { vorlage: Dialo
           <Button type="submit" variant="primary" disabled={laeuft}>{laeuft ? "Speichern …" : e ? "Speichern" : "Einplanen"}</Button>
         </span>
       </div>
-    </form>
+    </Formular>
   );
 }
 
@@ -204,7 +205,7 @@ function MonteurFormular({ monteur: m, s }: { monteur?: Monteur; s: FormularSteu
     return r;
   }, {});
   return (
-    <form action={aktion} onInput={s.aenderung} className="flex flex-col gap-4">
+    <Formular aktion={aktion} onInput={s.aenderung} className="flex flex-col gap-4">
       {m && <input type="hidden" name="id" value={m.id} />}
       {z.fehler && <p role="alert" className="rounded-md bg-tone-red-bg px-3.5 py-2.5 text-sm text-tone-red-fg">{z.fehler}</p>}
       <div className="grid grid-cols-[minmax(0,1fr)_120px] gap-3">
@@ -215,6 +216,6 @@ function MonteurFormular({ monteur: m, s }: { monteur?: Monteur; s: FormularSteu
         <Button onClick={s.abbrechen}>Abbrechen</Button>
         <Button type="submit" variant="primary" disabled={laeuft}>{m ? "Speichern" : "Monteur anlegen"}</Button>
       </div>
-    </form>
+    </Formular>
   );
 }

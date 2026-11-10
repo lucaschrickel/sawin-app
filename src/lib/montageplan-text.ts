@@ -1,13 +1,9 @@
 /** Texte der Plantafel, im Server und im Browser nutzbar */
+import { ABWESENHEIT_TEXT } from "@/lib/team";
+
+export { ABWESENHEIT_TEXT };
 export type Konflikt = { einsatz_id: string; mitarbeiter_id: string; art: "ueberschneidung" | "abwesend"; detail: string };
 
-export const ABWESENHEIT_TEXT: Record<string, string> = {
-  urlaub: "Urlaub",
-  krank: "Krank",
-  schulung: "Schulung",
-  ueberstundenabbau: "Überstundenabbau",
-  sonstiges: "Abwesend",
-};
 
 /** Lesbarer Konflikt, z. B. „Gleichzeitig in AB2260012“ oder „Urlaub (beantragt)“ */
 export function konfliktText(k: Pick<Konflikt, "art" | "detail">) {

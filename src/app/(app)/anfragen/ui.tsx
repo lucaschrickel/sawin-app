@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Field, Textarea } from "@/components/ui/field";
 import { FormularDialog } from "@/components/ui/formular-dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Formular } from "@/components/ui/formular";
 import { ansichtSetzen } from "@/lib/ansicht-aktion";
 import { ANFRAGE_STATUS, ANFRAGE_STATUS_TEXT, ANFRAGE_STATUS_TON, type AnfrageStatus } from "@/lib/anfragen-status";
 import { cn } from "@/lib/cn";
@@ -223,7 +224,7 @@ function VerlorenFormular({ id, fertig, abbrechen, aenderung }: { id: string; fe
     return r;
   }, {});
   return (
-    <form action={aktion} onInput={aenderung} className="flex flex-col gap-4">
+    <Formular aktion={aktion} onInput={aenderung} className="flex flex-col gap-4">
       <input type="hidden" name="id" value={id} />
       <Meldung e={{ fehler: z.fehler }} />
       <Field label="Grund *" hint="z. B. zu teuer, Mitbewerber, Projekt verschoben">
@@ -233,7 +234,7 @@ function VerlorenFormular({ id, fertig, abbrechen, aenderung }: { id: string; fe
         <Button onClick={abbrechen}>Abbrechen</Button>
         <Button type="submit" variant="primary" disabled={laeuft}>Als verloren archivieren</Button>
       </div>
-    </form>
+    </Formular>
   );
 }
 

@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogTrigger } from "@/components/ui/dialog";
 import { Field, Input, Textarea } from "@/components/ui/field";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Formular } from "@/components/ui/formular";
 import { cn } from "@/lib/cn";
 import type { Kunde, Lieferadresse } from "@/lib/kunden";
 import { kundeSpeichern, type Ergebnis } from "./aktionen";
@@ -154,7 +155,7 @@ function KundeFormular({
   };
 
   return (
-    <form action={aktion} onInput={onAenderung} className="flex flex-col gap-4">
+    <Formular aktion={aktion} onInput={onAenderung} className="flex flex-col gap-4">
       {kunde && <input type="hidden" name="id" value={kunde.id} />}
       {rueckgabe && <input type="hidden" name="_rueckgabe" value="1" />}
       {z.fehler && <p role="alert" className="rounded-md bg-tone-red-bg px-3.5 py-2.5 text-sm text-tone-red-fg">{z.fehler}</p>}
@@ -236,7 +237,7 @@ function KundeFormular({
           {laeuft ? "Speichern …" : kunde ? "Speichern" : "Kunde anlegen"}
         </Button>
       </div>
-    </form>
+    </Formular>
   );
 }
 

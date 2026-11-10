@@ -506,6 +506,38 @@ describe("Montageplan", () => {
   });
 });
 
+describe("Mitarbeiter", () => {
+  const kz = () => "M" + Array.from(randomBytes(3), (b) => "ABCDEFGHIJKLMNOPQRSTUVWXYZ"[b % 26]).join("");
+  it("Kürzel eindeutig, Urlaubsanspruch 0 bis 366 Tage", async () => {
+    const doppelt = await buero.client.from("mitarbeiter").insert({ kuerzel: daten.monteur.kuerzel, name: "Doppelt" });
+    assert.equal(doppelt.error?.code, "23505");
+    const zuViel = await buero.client.from("mitarbeiter").insert({ kuerzel: kz(), name: "Zu viel Urlaub", urlaubsanspruch_tage: 400 });
+    assert.ok(zuViel.error, "400 Urlaubstage akzeptiert");
+  });
+
+  it("mit Einsätzen, Zeiten oder Abwesenheiten nicht löschbar, nur deaktivierbar", async () => {
+    const { error } = await buero.client.rpc("loeschen", { p_tabelle: "mitarbeiter", p_id: daten.monteur.id });
+    assert.equal(error?.code, "23503");
+    assert.match(error.message, /Einsätze/);
+    assert.match(error.message, /Abwesenheiten/);
+    const { data, error: aus } = await buero.client.from("mitarbeiter").update({ aktiv: false }).eq("id", daten.monteur.id).select("aktiv").single();
+    assert.ifError(aus);
+    assert.equal(data.aktiv, false);
+    await buero.client.from("mitarbeiter").update({ aktiv: true }).eq("id", daten.monteur.id);
+  });
+
+  it("ohne Geschichte wird er nur als gelöscht markiert", async () => {
+    const { data: m, error } = await buero.client.from("mitarbeiter").insert({ kuerzel: kz(), name: `Löschbar ${lauf}`, urlaubsanspruch_tage: 20 }).select().single();
+    assert.ifError(error);
+    angelegt.push(["mitarbeiter", m.id]);
+    assert.ifError((await buero.client.rpc("loeschen", { p_tabelle: "mitarbeiter", p_id: m.id })).error);
+    const { data: sichtbar } = await buero.client.from("mitarbeiter").select("id").eq("id", m.id);
+    assert.equal(sichtbar.length, 0);
+    const { data: roh } = await service.from("mitarbeiter").select("deleted_at").eq("id", m.id).single();
+    assert.ok(roh.deleted_at);
+  });
+});
+
 describe("Soft Delete und Audit-Log", () => {
   let aufgabe;
   it("echtes Löschen ist gesperrt", async () => {

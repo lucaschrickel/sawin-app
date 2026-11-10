@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Field, Input, Textarea } from "@/components/ui/field";
 import { FormularDialog, type FormularSteuerung } from "@/components/ui/formular-dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Formular } from "@/components/ui/formular";
 import type { Auftrag } from "@/lib/auftraege";
 import { cn } from "@/lib/cn";
 import {
@@ -200,7 +201,7 @@ function AuftragFormular({ auftrag: a, benutzer, herkunftListe, produkteListe, s
   }, {});
   const f = z.felder ?? {};
   return (
-    <form action={aktion} onInput={s.aenderung} className="flex flex-col gap-4">
+    <Formular aktion={aktion} onInput={s.aenderung} className="flex flex-col gap-4">
       <input type="hidden" name="id" value={a.id} />
       {z.fehler && <Meldung e={{ fehler: z.fehler }} />}
       <Field label="Titel *" error={f.titel}>{(p) => <Input {...p} name="titel" defaultValue={a.titel} />}</Field>
@@ -247,7 +248,7 @@ function AuftragFormular({ auftrag: a, benutzer, herkunftListe, produkteListe, s
         <Button onClick={s.abbrechen}>Abbrechen</Button>
         <Button type="submit" variant="primary" disabled={laeuft}>{laeuft ? "Speichern …" : "Speichern"}</Button>
       </div>
-    </form>
+    </Formular>
   );
 }
 
@@ -260,7 +261,7 @@ export function LieferungFormular({ auftrag: a }: { auftrag: Pick<Auftrag, "id" 
     return r;
   }, {});
   return (
-    <form action={aktion} onInput={() => setGeaendert(true)} className="flex flex-col gap-3">
+    <Formular aktion={aktion} onInput={() => setGeaendert(true)} className="flex flex-col gap-3">
       <input type="hidden" name="id" value={a.id} />
       <div className="grid grid-cols-[180px_minmax(0,1fr)] gap-3 max-md:grid-cols-1">
         <Field label="Liefertermin" error={z.felder?.liefertermin}>{(p) => <Input {...p} name="liefertermin" type="date" defaultValue={a.liefertermin ?? ""} />}</Field>
@@ -277,7 +278,7 @@ export function LieferungFormular({ auftrag: a }: { auftrag: Pick<Auftrag, "id" 
         </span>
       </div>
       {z.fehler && <Meldung e={{ fehler: z.fehler }} />}
-    </form>
+    </Formular>
   );
 }
 

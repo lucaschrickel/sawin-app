@@ -2,6 +2,7 @@
 
 import { useActionState, useState } from "react";
 import { Button } from "@/components/ui/button";
+import { Formular } from "@/components/ui/formular";
 import { arbeitszeitSpeichern, type Ergebnis } from "./aktionen";
 
 const auswahl = "h-[42px] rounded-md border border-line bg-surface px-3 text-[15px]";
@@ -14,7 +15,7 @@ export function ArbeitszeitFormular({ von, bis }: { von: number; bis: number }) 
     return r;
   }, {});
   return (
-    <form action={aktion} onChange={() => setGeaendert(true)} className="flex flex-wrap items-end gap-3">
+    <Formular aktion={aktion} onChange={() => setGeaendert(true)} className="flex flex-wrap items-end gap-3">
       <label className="flex flex-col gap-1.5 text-sm font-medium text-ink-3">
         Beginn
         <select name="von" defaultValue={von} className={auswahl}>
@@ -30,6 +31,6 @@ export function ArbeitszeitFormular({ von, bis }: { von: number; bis: number }) 
       <Button type="submit" variant={geaendert ? "primary" : "secondary"} disabled={laeuft || !geaendert}>Speichern</Button>
       {!geaendert && z.hinweis && <span role="status" className="pb-2.5 text-sm text-tone-green-fg">{z.hinweis}</span>}
       {z.fehler && <p role="alert" className="basis-full rounded-md bg-tone-red-bg px-3.5 py-2.5 text-sm text-tone-red-fg">{z.fehler}</p>}
-    </form>
+    </Formular>
   );
 }

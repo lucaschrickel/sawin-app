@@ -6,6 +6,7 @@ import { ListenSuche, useListenParameter } from "@/components/app/listen-suche";
 import { Bestaetigen } from "@/components/ui/bestaetigen";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/field";
+import { Formular } from "@/components/ui/formular";
 import { konditionenSpeichern, kundeLoeschen, type Ergebnis } from "./aktionen";
 
 export function KundenSuche({ wert }: { wert: string }) {
@@ -68,7 +69,7 @@ export function KonditionenFormular({ kundeId, text }: { kundeId: string; text: 
     return r;
   }, {});
   return (
-    <form action={aktion} onInput={() => setGeaendert(true)} className="flex flex-col gap-2.5">
+    <Formular aktion={aktion} onInput={() => setGeaendert(true)} className="flex flex-col gap-2.5">
       <input type="hidden" name="kunde_id" value={kundeId} />
       <Textarea name="konditionen" aria-label="Konditionen" defaultValue={text} placeholder="z. B. 5 % Objektrabatt, 2 % Skonto 7 Tage, Rahmenvertrag" />
       {z.fehler && <p role="alert" className="text-sm text-tone-red-fg">{z.fehler}</p>}
@@ -78,6 +79,6 @@ export function KonditionenFormular({ kundeId, text }: { kundeId: string; text: 
           {laeuft ? "Speichern …" : z.ok && !geaendert ? "Gespeichert" : "Speichern"}
         </Button>
       </div>
-    </form>
+    </Formular>
   );
 }

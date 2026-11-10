@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useActionState, useEffect, useRef, useState, type ReactNode } from "react";
 import { Button } from "@/components/ui/button";
 import { Field, Input } from "@/components/ui/field";
+import { Formular } from "@/components/ui/formular";
 import {
   anmelden,
   codePruefen,
@@ -68,7 +69,7 @@ function CodeFeld() {
 export function AnmeldeFormular({ hinweis }: { hinweis?: string }) {
   const [z, aktion, laeuft] = useActionState(anmelden, leer);
   return (
-    <form action={aktion} className="flex flex-col gap-4">
+    <Formular aktion={aktion} className="flex flex-col gap-4">
       {z.fehler ? <Meldung art="fehler">{z.fehler}</Meldung> : hinweis && <Meldung>{hinweis}</Meldung>}
       <Field label="E-Mail">
         {(a) => <Input {...a} name="email" type="email" autoComplete="username" defaultValue={z.email} required autoFocus />}
@@ -82,14 +83,14 @@ export function AnmeldeFormular({ hinweis }: { hinweis?: string }) {
       <Link href="/passwort-vergessen" className="self-center text-sm text-accent-text hover:underline">
         Passwort vergessen?
       </Link>
-    </form>
+    </Formular>
   );
 }
 
 export function CodeFormular({ weiter }: { weiter: string }) {
   const [z, aktion, laeuft] = useActionState(codePruefen, leer);
   return (
-    <form action={aktion} className="flex flex-col gap-4">
+    <Formular aktion={aktion} className="flex flex-col gap-4">
       {z.fehler && <Meldung art="fehler">{z.fehler}</Meldung>}
       <input type="hidden" name="weiter" value={weiter} />
       <CodeFeld />
@@ -101,7 +102,7 @@ export function CodeFormular({ weiter }: { weiter: string }) {
         {/* bewusst kein next/link: Vorabladen würde abmelden */}
         <a href="/abmelden" className="text-accent-text hover:underline">Abbrechen</a>
       </p>
-    </form>
+    </Formular>
   );
 }
 
@@ -125,7 +126,7 @@ export function EinrichtenFormular() {
   if (!("id" in daten)) return null;
 
   return (
-    <form action={aktion} className="flex flex-col gap-4">
+    <Formular aktion={aktion} className="flex flex-col gap-4">
       {z.fehler && <Meldung art="fehler">{z.fehler}</Meldung>}
       <ol className="list-decimal space-y-1 pl-5 text-sm text-ink-2">
         <li>Authenticator-App öffnen (z. B. Microsoft oder Google Authenticator).</li>
@@ -147,7 +148,7 @@ export function EinrichtenFormular() {
       <Button type="submit" variant="accent" disabled={laeuft}>
         {laeuft ? "Prüfen …" : "Einrichtung abschließen"}
       </Button>
-    </form>
+    </Formular>
   );
 }
 
@@ -162,7 +163,7 @@ export function VergessenFormular() {
     );
   }
   return (
-    <form action={aktion} className="flex flex-col gap-4">
+    <Formular aktion={aktion} className="flex flex-col gap-4">
       {z.fehler && <Meldung art="fehler">{z.fehler}</Meldung>}
       <Field label="E-Mail">
         {(a) => <Input {...a} name="email" type="email" autoComplete="username" defaultValue={z.email} required autoFocus />}
@@ -171,14 +172,14 @@ export function VergessenFormular() {
         {laeuft ? "Senden …" : "Link senden"}
       </Button>
       <Link href="/anmelden" className="self-center text-sm text-accent-text hover:underline">Zurück zur Anmeldung</Link>
-    </form>
+    </Formular>
   );
 }
 
 export function PasswortFormular() {
   const [z, aktion, laeuft] = useActionState(passwortSetzen, leer);
   return (
-    <form action={aktion} className="flex flex-col gap-4">
+    <Formular aktion={aktion} className="flex flex-col gap-4">
       {z.fehler && <Meldung art="fehler">{z.fehler}</Meldung>}
       <Field label="Neues Passwort" hint="Mindestens 12 Zeichen, Groß- und Kleinbuchstaben und eine Ziffer">
         {(a) => <Input {...a} name="passwort" type="password" autoComplete="new-password" minLength={12} required autoFocus />}
@@ -189,6 +190,6 @@ export function PasswortFormular() {
       <Button type="submit" variant="accent" disabled={laeuft}>
         {laeuft ? "Speichern …" : "Passwort speichern"}
       </Button>
-    </form>
+    </Formular>
   );
 }

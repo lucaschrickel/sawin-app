@@ -14,12 +14,14 @@
     "auth:diff": "node scripts/supabase-config.mjs diff",
     "auth:push": "node scripts/supabase-config.mjs push",
     "admin:einladen": "node scripts/admin-einladen.mjs",
+    "admin:passwort": "node scripts/passwort-setzen.mjs",
     "test:anmeldung": "node tests/e2e/anmeldung.e2e.mjs",
     "test:kunden": "node tests/e2e/kunden.e2e.mjs",
     "test:anfragen": "node tests/e2e/anfragen.e2e.mjs",
     "test:aufgaben": "node tests/e2e/aufgaben.e2e.mjs",
     "test:auftraege": "node tests/e2e/auftraege.e2e.mjs",
-    "test:montageplan": "node tests/e2e/montageplan.e2e.mjs"
+    "test:montageplan": "node tests/e2e/montageplan.e2e.mjs",
+    "test:mitarbeiter": "node tests/e2e/mitarbeiter.e2e.mjs"
   },
   "dependencies": {
     "@fontsource-variable/inter": "^5.3.0",

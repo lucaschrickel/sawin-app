@@ -78,6 +78,7 @@ Ersten Admin einer Instanz einladen (danach lädt dieser Admin alle weiteren Ben
 ```bash
 npm run admin:einladen -- name@firma.de "Vorname Nachname"
 npm run admin:einladen -- name@firma.de "Vorname Nachname" --ohne-email   # Link in lokale Datei statt E-Mail
+npm run admin:passwort -- name@firma.de   # neues Passwort setzen (verdeckte Eingabe, nur im Terminal)
 ```
 
 Der Admin öffnet den Link aus der E-Mail, klickt „Weiter“, setzt sein Passwort und scannt den QR-Code mit der
@@ -94,6 +95,7 @@ APP_URL=http://localhost:3100 npm run test:anfragen   # Modul Anfragen
 APP_URL=http://localhost:3100 npm run test:aufgaben   # Modul Aufgaben
 APP_URL=http://localhost:3100 npm run test:auftraege  # Modul Aufträge
 APP_URL=http://localhost:3100 npm run test:montageplan # Modul Montageplan (Plantafel, echte Mausbewegungen)
+APP_URL=http://localhost:3100 npm run test:mitarbeiter # Modul Mitarbeiter
 ```
 
 **Vor der Einladung von Mitarbeitern:** Der eingebaute E-Mail-Versand von Supabase schickt nur an Mitglieder der

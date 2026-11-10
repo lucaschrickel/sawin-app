@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Field, Input, Textarea } from "@/components/ui/field";
 import { FormularDialog, type FormularSteuerung } from "@/components/ui/formular-dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Formular } from "@/components/ui/formular";
 import type { Anfrage } from "@/lib/anfragen";
 import { cn } from "@/lib/cn";
 import { utcNachBerlinLokal } from "@/lib/zeit";
@@ -78,7 +79,7 @@ function AnfrageFormular({ anfrage: a, kunde, objekte = [], benutzer, ichId, her
   };
 
   return (
-    <form action={aktion} onInput={s.aenderung} className="flex flex-col gap-4">
+    <Formular aktion={aktion} onInput={s.aenderung} className="flex flex-col gap-4">
       {a && <input type="hidden" name="id" value={a.id} />}
       {z.fehler && <p role="alert" className="rounded-md bg-tone-red-bg px-3.5 py-2.5 text-sm text-tone-red-fg">{z.fehler}</p>}
 
@@ -163,7 +164,7 @@ function AnfrageFormular({ anfrage: a, kunde, objekte = [], benutzer, ichId, her
           {laeuft ? "Speichern …" : a ? "Speichern" : "Anfrage anlegen"}
         </Button>
       </div>
-    </form>
+    </Formular>
   );
 }
 

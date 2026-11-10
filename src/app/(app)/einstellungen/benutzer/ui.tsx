@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogClose, DialogContent, DialogTrigger } from "@/components/ui/dialog";
 import { Field, Input } from "@/components/ui/field";
 import { Table, Td, Th, Tr } from "@/components/ui/table";
+import { Formular } from "@/components/ui/formular";
 import type { Benutzer } from "@/lib/auth/sitzung";
 import { cn } from "@/lib/cn";
 import { aendern, aktivSetzen, einladen, erneutEinladen, zweiFaktorZuruecksetzen, type Ergebnis } from "./aktionen";
@@ -57,7 +58,7 @@ export function EinladenDialog() {
             </div>
           </div>
         ) : (
-          <form action={aktion} className="flex flex-col gap-4">
+          <Formular aktion={aktion} className="flex flex-col gap-4">
             <Meldung e={z} />
             <Field label="Name">{(a) => <Input {...a} name="name" required autoFocus />}</Field>
             <Field label="E-Mail">{(a) => <Input {...a} name="email" type="email" required />}</Field>
@@ -77,7 +78,7 @@ export function EinladenDialog() {
                 {laeuft ? "Einladen …" : "Einladung senden"}
               </Button>
             </div>
-          </form>
+          </Formular>
         )}
       </DialogContent>
     </Dialog>

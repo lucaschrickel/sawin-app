@@ -54,7 +54,7 @@ Sonderregeln per Trigger (RLS kann Spaltenänderungen nicht prüfen):
 |---|---|
 | `benutzer` | `id` = `auth.users.id`, Name, E-Mail, `mitarbeiter_id`, `admin`, `konditionen`, `aktiv`, `dashboard_start` (gf/montage/einkauf) |
 | `benutzer_einstellung` | je Benutzer: Farbschema (hell/dunkel/system), Seitenleiste hell/eingeklappt, gemerkte Ansichten (Liste/Board) |
-| `mitarbeiter` | Kürzel (eindeutig), Name, Rolle, Telefon, `ist_monteur`, `aktiv`, Reihenfolge in der Plantafel |
+| `mitarbeiter` | Kürzel (eindeutig), Name, Rolle, Telefon, `ist_monteur`, `aktiv`, Reihenfolge in der Plantafel, eigener Urlaubsanspruch (leer = Standard). Löschen nur ohne Einsätze, Zeiten, Abwesenheiten, Kolonne und Benutzerkonto, sonst deaktivieren |
 | `kolonne` | Name, Stammfahrzeug, Reihenfolge |
 | `kolonne_mitglied` | Kolonne, Mitarbeiter (nur Monteure), Reihenfolge; ein Monteur kann in mehreren Kolonnen sein |
 | `ressource` | weitere Zeilen der Plantafel (Selbstabholer, Lager …), Notiz, Reihenfolge |
@@ -164,6 +164,8 @@ und danach wieder entfernt:
 8. **Montageplan:** Einsatz mit zwei Monteuren anlegen, Konflikte (Abwesenheit, Überschneidung), Monteur tauschen
    (alter nur markiert), Ablehnung ohne Monteur, mit Ende vor Beginn oder mit Nicht-Monteur, Löschen als Markierung,
    Arbeitszeit nur in vollen Stunden.
+9. **Mitarbeiter:** Kürzel eindeutig, Urlaubsanspruch 0 bis 366, mit Einsätzen oder Abwesenheiten nicht löschbar
+   (nur deaktivierbar), ohne Geschichte nur als gelöscht markiert.
 
 ## Nicht in diesem Schritt
 
