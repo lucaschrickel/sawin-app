@@ -51,14 +51,14 @@ const nutzer = [];
 const zeilen = []; // [tabelle, id] zum Aufräumen
 export const merken = (tabelle, id) => zeilen.push([tabelle, id]);
 
-/** Test-Admin mit eingerichtetem TOTP-Faktor (über die API, ohne Browser). */
-export async function testAdmin({ konditionen = true } = {}) {
-  const email = `e2e-${lauf}@example.com`;
+/** Test-Admin mit eingerichtetem TOTP-Faktor (über die API, ohne Browser). admin: false = Büro-Benutzer ohne Admin-Recht. */
+export async function testAdmin({ konditionen = true, admin = true } = {}) {
+  const email = admin ? `e2e-${lauf}@example.com` : `e2e-${lauf}-buero@example.com`;
   const passwort = `Test-${randomBytes(6).toString("hex")}A1`;
   const { data, error } = await service.auth.admin.createUser({ email, password: passwort, email_confirm: true });
   if (error) throw error;
   nutzer.push(data.user.id);
-  const ins = await service.from("benutzer").insert({ id: data.user.id, name: `E2E Admin ${lauf}`, email, admin: true, konditionen });
+  const ins = await service.from("benutzer").insert({ id: data.user.id, name: admin ? `E2E Admin ${lauf}` : `E2E Büro ${lauf}`, email, admin, konditionen });
   if (ins.error) throw ins.error;
   const c = createClient(URL_, PUB, { auth: { persistSession: false } });
   await c.auth.signInWithPassword({ email, password: passwort });
@@ -85,8 +85,17 @@ export async function aufraeumen() {
   const db = new pg.Client({ connectionString: DB_URL, ssl: { rejectUnauthorized: false } });
   await db.connect();
   try {
-    for (const [t, id] of [...zeilen].reverse()) await db.query(`delete from public.${pg.escapeIdentifier(t)} where id = $1`, [id]);
-    for (const id of nutzer) await db.query("delete from public.benutzer where id = $1", [id]);
+    // Jede Zeile einzeln: ein fehlerhafter Eintrag darf das übrige Aufräumen nicht verhindern
+    const fehler = [];
+    for (const [t, id] of [...zeilen].reverse()) {
+      if (!/^[0-9a-f-]{36}$/i.test(String(id))) continue;
+      await db.query(`delete from public.${pg.escapeIdentifier(t)} where id = $1`, [id]).catch((e) => fehler.push(`${t}: ${e.message}`));
+    }
+    for (const id of nutzer) {
+      await db.query("delete from public.benutzer_einstellung where benutzer_id = $1", [id]).catch(() => {});
+      await db.query("delete from public.benutzer where id = $1", [id]).catch((e) => fehler.push(`benutzer: ${e.message}`));
+    }
+    if (fehler.length) console.error(`Aufräumen unvollständig: ${fehler.join("; ")}`);
   } finally {
     await db.end();
   }

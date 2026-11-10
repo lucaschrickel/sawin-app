@@ -3,7 +3,7 @@
 import { useActionState, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Formular } from "@/components/ui/formular";
-import { arbeitszeitSpeichern, type Ergebnis } from "./aktionen";
+import { arbeitszeitSpeichern, urlaubsanspruchSpeichern, type Ergebnis } from "./aktionen";
 
 const auswahl = "h-[42px] rounded-md border border-line bg-surface px-3 text-[15px]";
 
@@ -27,6 +27,26 @@ export function ArbeitszeitFormular({ von, bis }: { von: number; bis: number }) 
         <select name="bis" defaultValue={bis} className={auswahl}>
           {Array.from({ length: 11 }, (_, i) => i + 12).map((h) => <option key={h} value={h}>{h}:00 Uhr</option>)}
         </select>
+      </label>
+      <Button type="submit" variant={geaendert ? "primary" : "secondary"} disabled={laeuft || !geaendert}>Speichern</Button>
+      {!geaendert && z.hinweis && <span role="status" className="pb-2.5 text-sm text-tone-green-fg">{z.hinweis}</span>}
+      {z.fehler && <p role="alert" className="basis-full rounded-md bg-tone-red-bg px-3.5 py-2.5 text-sm text-tone-red-fg">{z.fehler}</p>}
+    </Formular>
+  );
+}
+
+export function UrlaubsanspruchFormular({ tage }: { tage: number }) {
+  const [geaendert, setGeaendert] = useState(false);
+  const [z, aktion, laeuft] = useActionState<Ergebnis, FormData>(async (v, fd) => {
+    const r = await urlaubsanspruchSpeichern(v, fd);
+    if (r.ok) setGeaendert(false);
+    return r;
+  }, {});
+  return (
+    <Formular aktion={aktion} onInput={() => setGeaendert(true)} className="flex flex-wrap items-end gap-3">
+      <label className="flex flex-col gap-1.5 text-sm font-medium text-ink-3">
+        Tage je Jahr
+        <input name="tage" inputMode="numeric" defaultValue={tage} className="h-[42px] w-28 rounded-md border border-line bg-surface px-3 text-[15px]" />
       </label>
       <Button type="submit" variant={geaendert ? "primary" : "secondary"} disabled={laeuft || !geaendert}>Speichern</Button>
       {!geaendert && z.hinweis && <span role="status" className="pb-2.5 text-sm text-tone-green-fg">{z.hinweis}</span>}

@@ -60,7 +60,7 @@ Sonderregeln per Trigger (RLS kann Spaltenänderungen nicht prüfen):
 | `ressource` | weitere Zeilen der Plantafel (Selbstabholer, Lager …), Notiz, Reihenfolge |
 | `fahrzeug` | Kennzeichen, Typ, Kolonne, km-Stand, Hinweise, TÜV/HU, Service, UVV |
 | `fahrzeug_werkstatt` | Fahrzeug, von, bis, Notiz |
-| `abwesenheit` | Mitarbeiter, Art (urlaub, krank, schulung, ueberstunden, sonstiges), von, bis, Status (beantragt, genehmigt, abgelehnt), Notiz, entschieden von/am |
+| `abwesenheit` | Mitarbeiter, Art (urlaub, krank, schulung, ueberstunden, sonstiges), von, bis, Status (beantragt, genehmigt, abgelehnt), Notiz, entschieden von/am. Entschiedene Abwesenheiten (außer Krankmeldungen) löscht nur ein Admin (Trigger `abwesenheit_loeschen_pruefen`) |
 | `zeitbuchung` | Mitarbeiter, Auftrag **oder** Ticket **oder** ohne Bezug, Datum, Beginn, Ende (`ende > beginn`), Pause (min), Art (montage, aufmass, service, lager, fahrt, buero), Tätigkeit, Freigabe (offen/freigegeben). Montage, Aufmaß und Service brauchen einen Auftrag oder ein Ticket; freigegebene Buchungen sind gesperrt (Trigger `zeitbuchung_regeln`) |
 
 ### Stammdaten und Einstellungen
@@ -169,6 +169,8 @@ und danach wieder entfernt:
 10. **Zeiterfassung:** Montage, Aufmaß und Service nur mit Auftrag, Lager, Fahrt und Büro auch ohne; Ende vor Beginn
     und zu lange Pause abgelehnt; Freigabe hält Benutzer und Zeitpunkt fest; freigegebene Buchungen gesperrt (auch
     gegen Löschen), bis die Freigabe zurückgenommen ist.
+11. **Abwesenheiten löschen:** eine entschiedene Abwesenheit löscht nur ein Admin (nur als Markierung), einen Antrag
+    und eine Krankmeldung jeder Benutzer.
 
 ## Nicht in diesem Schritt
 

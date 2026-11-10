@@ -19,3 +19,14 @@ export async function arbeitszeitSpeichern(_: Ergebnis, fd: FormData): Promise<E
   refresh();
   return { ok: true, hinweis: "Gespeichert." };
 }
+
+/** Standard-Urlaubsanspruch je Jahr (ein Mitarbeiter kann einen eigenen Wert haben) */
+export async function urlaubsanspruchSpeichern(_: Ergebnis, fd: FormData): Promise<Ergebnis> {
+  const { supabase } = await pruefeSitzung();
+  const tage = Number(fd.get("tage"));
+  if (!Number.isInteger(tage) || tage < 0 || tage > 366) return { fehler: "Bitte ganze Tage zwischen 0 und 366 eingeben." };
+  const { error } = await supabase.from("einstellung").update({ urlaubsanspruch_tage: tage }).eq("einzig", true);
+  if (error) return { fehler: "Der Urlaubsanspruch konnte nicht gespeichert werden." };
+  refresh();
+  return { ok: true, hinweis: "Gespeichert." };
+}

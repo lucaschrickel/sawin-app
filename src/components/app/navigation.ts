@@ -81,7 +81,7 @@ const ALLE: NavGroup[] = [
       { key: "mitarbeiter", href: "/mitarbeiter", label: "Mitarbeiter", icon: BookUser, bereit: true },
       { key: "fahrzeuge", href: "/fahrzeuge", label: "Fahrzeuge", icon: Van },
       { key: "zeiten", href: "/zeiten", label: "Zeiterfassung", icon: Clock, bereit: true },
-      { key: "abwesenheiten", href: "/abwesenheiten", label: "Abwesenheiten", icon: UserX },
+      { key: "abwesenheiten", href: "/abwesenheiten", label: "Abwesenheiten", icon: UserX, bereit: true },
     ],
   },
   {

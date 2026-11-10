@@ -11,6 +11,8 @@ export type FormularSteuerung = {
   fertig: () => void;
   /** „Abbrechen“: fragt bei ungespeicherten Änderungen nach */
   abbrechen: () => void;
+  /** gespeichert, Dialog bleibt aber offen (z. B. um eine Warnung zu zeigen): Schließen fragt nicht mehr nach */
+  gespeichert: () => void;
 };
 
 type Props = {
@@ -60,7 +62,7 @@ export function FormularDialog({ titel, beschreibung, breit, ausloeser, beiSchli
           </div>
         )}
         <div key={schluessel}>
-          {children({ aenderung: () => setGeaendert(true), fertig: schliessen, abbrechen: () => oeffnenAendern(false) })}
+          {children({ aenderung: () => setGeaendert(true), fertig: schliessen, abbrechen: () => oeffnenAendern(false), gespeichert: () => setGeaendert(false) })}
         </div>
       </DialogContent>
     </Dialog>

@@ -590,7 +590,8 @@ Die Monteur-App kommt in Version 2.
 - **Abwesenheiten:** Anträge trägt in Version 1 das Büro ein.
   - Arten: Urlaub, Krank, Schulung, Überstundenabbau, Sonstiges.
   - Status: Beantragt, Genehmigt, Abgelehnt. Genehmigen, Ablehnen und „Direkt genehmigen“ beim Eintragen nur durch
-    `admin`. Ausnahme: Eine Krankmeldung gilt sofort als genehmigt.
+    `admin`. Ausnahme: Eine Krankmeldung gilt sofort als genehmigt. Eine genehmigte oder abgelehnte Abwesenheit löscht nur `admin`;
+    beantragte und Krankmeldungen darf jeder löschen (Entscheidung 10.11.2026).
   - Genehmigungsübersicht: offene Anträge mit Person, Art, Zeitraum, Arbeitstagen, Resturlaub danach und Hinweis,
     wenn die Person in dem Zeitraum eingeplant ist.
   - Urlaubskonto je Mitarbeiter und Jahr: Anspruch (Standard 30 Tage, in den Einstellungen änderbar), genehmigt,

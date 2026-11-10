@@ -10,6 +10,8 @@ import { kalenderwoche, lokalKurz, montagVon, plusTage } from "@/lib/woche";
 import { heuteBerlin, tag } from "@/lib/zeit";
 import { ladeBuchungen, ladeZeitDialogDaten } from "@/lib/zeiten";
 import { ZeitDialog } from "../../zeiten/zeit-dialog";
+import { AbwesenheitDialog } from "../../abwesenheiten/ui";
+import { pruefeSitzung } from "@/lib/auth/sitzung";
 import { MitarbeiterAktionen, MitarbeiterDialog } from "../ui";
 
 export const metadata: Metadata = { title: "Mitarbeiter" };
@@ -19,7 +21,7 @@ export default async function MitarbeiterSeite({ params }: PageProps<"/mitarbeit
   const daten = await ladeMitarbeiter(id);
   if (!daten) notFound();
   const { mitarbeiter: m, einsaetze, abwesenheiten, benutzer, anspruchStandard, jahr, montag } = daten;
-  const [zeiten, zeitDialog] = await Promise.all([ladeBuchungen({ von: montag, bis: plusTage(montag, 6), mitarbeiter: m.id }), ladeZeitDialogDaten()]);
+  const [zeiten, zeitDialog, { benutzer: ich }] = await Promise.all([ladeBuchungen({ von: montag, bis: plusTage(montag, 6), mitarbeiter: m.id }), ladeZeitDialogDaten(), pruefeSitzung()]);
   const anspruch = m.urlaubsanspruch_tage ?? anspruchStandard;
   const urlaub = abwesenheiten.filter((a) => a.art === "urlaub");
   const genehmigt = urlaub.filter((a) => a.status === "genehmigt").reduce((s, a) => s + arbeitstageImJahr(a.von, a.bis, jahr), 0);
@@ -109,7 +111,20 @@ export default async function MitarbeiterSeite({ params }: PageProps<"/mitarbeit
             <Link href={`/zeiten?mitarbeiter=${m.id}`} className="mt-2 inline-block text-sm text-accent-text hover:underline">In der Zeiterfassung öffnen</Link>
           </Karte>
 
-          <Karte titel={`Abwesenheiten ${jahr}`}>
+          <Karte
+            titel={`Abwesenheiten ${jahr}`}
+            rechts={
+              m.aktiv ? (
+                <AbwesenheitDialog
+                  mitarbeiter={[{ id: m.id, name: m.name }]}
+                  admin={ich.admin}
+                  heute={heuteBerlin()}
+                  vorlage={{ mitarbeiter_id: m.id }}
+                  ausloeser={<button type="button" className="rounded-full border border-line px-3 py-1 text-sm font-medium hover:border-line-strong">Abwesenheit eintragen</button>}
+                />
+              ) : undefined
+            }
+          >
             {abwesenheiten.length ? (
               <ul className="flex flex-col">
                 {abwesenheiten.map((a) => (

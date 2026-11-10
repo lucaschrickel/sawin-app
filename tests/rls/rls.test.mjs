@@ -255,6 +255,24 @@ describe("Abwesenheiten genehmigen", () => {
     assert.ifError(error);
     assert.equal(data.status, "abgelehnt");
   });
+
+  it("eine entschiedene Abwesenheit löscht nur der Admin (nur als Markierung)", async () => {
+    const buerolöschen = await buero.client.rpc("loeschen", { p_tabelle: "abwesenheit", p_id: antrag.id });
+    assert.equal(buerolöschen.error?.code, "42501");
+    assert.ifError((await admin.client.rpc("loeschen", { p_tabelle: "abwesenheit", p_id: antrag.id })).error);
+    const { data: roh } = await service.from("abwesenheit").select("deleted_at").eq("id", antrag.id).single();
+    assert.ok(roh.deleted_at);
+  });
+
+  it("einen eigenen Antrag und eine Krankmeldung darf jeder löschen", async () => {
+    const { data: a } = await buero.client.from("abwesenheit").insert({ mitarbeiter_id: daten.monteur.id, art: "schulung", von: "2027-03-01", bis: "2027-03-02" }).select().single();
+    angelegt.push(["abwesenheit", a.id]);
+    assert.ifError((await buero.client.rpc("loeschen", { p_tabelle: "abwesenheit", p_id: a.id })).error);
+    const { data: k } = await buero.client.from("abwesenheit").insert({ mitarbeiter_id: daten.monteur.id, art: "krank", von: "2027-03-03", bis: "2027-03-03" }).select().single();
+    angelegt.push(["abwesenheit", k.id]);
+    assert.equal(k.status, "genehmigt");
+    assert.ifError((await buero.client.rpc("loeschen", { p_tabelle: "abwesenheit", p_id: k.id })).error);
+  });
 });
 
 describe("Kunden", () => {
