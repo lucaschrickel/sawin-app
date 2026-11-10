@@ -108,6 +108,8 @@ export type PdfPosition = {
   einzelpreis: number;
   rabatt_prozent: number;
   steuersatz: number;
+  /** Abzug eines Abschlags in der Schlussrechnung (ohne Gesamtrabatt) */
+  abzug_beleg_id?: string | null;
 };
 
 const tag = (iso: string | null) => (iso ? `${iso.slice(8, 10)}.${iso.slice(5, 7)}.${iso.slice(0, 4)}` : "");
@@ -154,7 +156,7 @@ function spalten(preise: boolean, rabatt: boolean, ust: boolean) {
 
 function BelegDokument({ b, positionen, firma, logo, entwurf }: { b: PdfBeleg; positionen: PdfPosition[]; firma: PdfFirma; logo: LogoPfade; entwurf: boolean }) {
   const preise = b.art !== "lieferschein";
-  const s: Summen = belegSummen(positionen, b);
+  const s: Summen = belegSummen(positionen.map((p) => ({ ...p, abzug: !!p.abzug_beleg_id })), b);
   const mitRabatt = positionen.some((p) => p.typ === "artikel" && p.rabatt_prozent > 0);
   const saetze = new Set(positionen.filter((p) => p.typ === "artikel").map((p) => p.steuersatz));
   const sp = spalten(preise, mitRabatt, !s.ohne_steuer && saetze.size > 1);

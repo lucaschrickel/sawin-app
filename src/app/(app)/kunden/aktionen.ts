@@ -3,9 +3,10 @@
 import { refresh } from "next/cache";
 import { redirect } from "next/navigation";
 import { getCustomer } from "@/customers";
+import { kontaktAktualisieren } from "@/lib/lexware/uebertragung";
 import { pruefeSitzung } from "@/lib/auth/sitzung";
 
-export type Ergebnis = { fehler?: string; ok?: boolean; felder?: Record<string, string>; id?: string; name?: string };
+export type Ergebnis = { fehler?: string; ok?: boolean; felder?: Record<string, string>; id?: string; name?: string; hinweis?: string };
 
 const text = (fd: FormData, n: string) => String(fd.get(n) ?? "").trim();
 const EMAIL = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
@@ -57,8 +58,10 @@ export async function kundeSpeichern(_: Ergebnis, fd: FormData): Promise<Ergebni
   // Aus einem anderen Dialog heraus (z. B. Anfrage): neuen Kunden zurückgeben statt zur Kundenseite zu springen
   if (!id && fd.get("_rueckgabe") === "1") return { ok: true, id: String(data), name: kunde.name };
   if (!id) redirect(`/kunden/${data}`);
+  // Liegt der Kunde schon in Lexware, gehen Änderungen dorthin (nur App → Lexware)
+  const hinweis = await kontaktAktualisieren(id);
   refresh();
-  return { ok: true };
+  return hinweis ? { ok: true, hinweis } : { ok: true };
 }
 
 /** Kunde löschen (Markierung). Die Datenbank lehnt ab, wenn noch Anfragen, Aufträge, Belege oder Tickets existieren. */

@@ -19,17 +19,19 @@ type AppShellProps = {
   eingeklappt: boolean;
   /** automatische Abmeldung nach so vielen Minuten ohne Eingabe */
   inaktivMinuten: number;
+  /** Lexware-Anbindung eingerichtet (Schlüssel auf dem Server gesetzt) */
+  lexware: boolean;
   children: ReactNode;
 };
 
 /** App-Rahmen: dunkle Seitenleiste, helles Inhaltsfeld, Kopfzeile mit Suche. */
-export function AppShell({ active, crumbs, brand, user, zaehler, eingeklappt, inaktivMinuten, children }: AppShellProps) {
+export function AppShell({ active, crumbs, brand, user, zaehler, eingeklappt, inaktivMinuten, lexware, children }: AppShellProps) {
   const [open, setOpen] = useState(false);
 
   return (
     <div className="flex min-h-screen py-3 pr-3 max-[960px]:p-0">
       <Inaktivitaet minuten={inaktivMinuten} />
-      <Seitenleiste active={active} brand={brand} user={user} zaehler={zaehler} eingeklappt={eingeklappt} offen={open} />
+      <Seitenleiste active={active} brand={brand} user={user} zaehler={zaehler} eingeklappt={eingeklappt} offen={open} lexware={lexware} />
 
       {open && (
         <div className="fixed inset-0 z-[55] bg-black/40 min-[961px]:hidden" onClick={() => setOpen(false)} aria-hidden="true" />

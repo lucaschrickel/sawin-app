@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { ShoppingCart } from "lucide-react";
-import { BalkenListe, DashKarte, HinweisZeile, Platzhalter, Ring, RingKarte } from "@/components/app/dashboard-bausteine";
+import { BalkenListe, DashKarte, HinweisZeile, Ring, RingKarte } from "@/components/app/dashboard-bausteine";
+import { eur } from "@/lib/format";
 import { KpiCard } from "@/components/app/kpi-card";
 import { Badge, StatusDot } from "@/components/ui/badge";
 import { Table, Td, Th } from "@/components/ui/table";
@@ -41,15 +42,26 @@ export function Geschaeftsfuehrung({ d, jetzt }: { d: Awaited<ReturnType<typeof 
           spark={d.anfragen.jeWoche}
           sparkTitel={wochenTitel(plusTage(montag, -35), d.anfragen.jeWoche, "neue Anfrage", "neue Anfragen")}
         />
-        <Platzhalter titel="Auftragsbestand, noch nicht berechnet" text={`${mehrzahl(d.auftraegeOffen, "offener Auftrag", "offene Aufträge")} · Wert folgt mit dem Beleg-Modul`} />
-        <Platzhalter titel="Offene Forderungen" />
+        <KpiCard href="/auftraege" label="Auftragsbestand, noch nicht berechnet" value={eur(d.belege.bestand)} note={`${mehrzahl(d.belege.bestandAuftraege, "Auftrag", "Aufträge")} mit offenem Wert`} />
+        <KpiCard
+          href="/belege/forderungen"
+          label="Offene Forderungen"
+          value={eur(d.belege.forderungen)}
+          warnung={d.belege.ueberfaellig > 0}
+          note={d.belege.ueberfaellig ? <span className="font-medium text-tone-red-fg">{mehrzahl(d.belege.ueberfaellig, "überfällig", "überfällig")}</span> : mehrzahl(d.belege.forderungenAnzahl, "Rechnung offen", "Rechnungen offen")}
+        />
         <KpiCard href="/montageplan" label="Montagen nächste 14 Tage" value={String(d.montagen.in14)} note={naechsteText} spark={d.montagen.jeWoche} sparkAktuell={0} sparkTitel={wochenTitel(montag, d.montagen.jeWoche, "Montage", "Montagen")} />
       </div>
 
       <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(0,2fr)] gap-4 max-[1280px]:grid-cols-2 max-[640px]:grid-cols-1">
-        <DashKarte titel="Angenommene Angebote">
-          <p className="mt-2 text-sm text-muted">Quote aus angenommenen und abgelehnten Angeboten.</p>
-          <p className="mt-auto pt-4 text-[12.5px] text-muted-2" data-platzhalter>Folgt mit dem Beleg-Modul</p>
+        <DashKarte titel="Angenommene Angebote" mehr={{ href: "/belege/angebote", text: "Angebote" }}>
+          <div className="mb-2 text-4xl font-bold tracking-[-0.02em] tabular" data-angebotsquote>
+            {d.belege.quote.prozent == null ? "–" : `${d.belege.quote.prozent} %`}
+          </div>
+          <p className="text-sm text-muted">
+            {d.belege.quote.angenommen} angenommen, {d.belege.quote.abgelehnt} abgelehnt
+          </p>
+          <p className="mt-auto pt-4 text-xs text-muted-2">angenommen ÷ (angenommen + abgelehnt), letzte 12 Monate</p>
         </DashKarte>
         <DashKarte titel="Anfragen online" mehr={{ href: "/anfragen", text: "Anfragen" }}>
           <div className="mb-3 text-4xl font-bold tracking-[-0.02em] tabular" data-online-anteil>
@@ -64,8 +76,16 @@ export function Geschaeftsfuehrung({ d, jetzt }: { d: Awaited<ReturnType<typeof 
           <p className="mt-3 text-xs text-muted-2">Online zählt: {d.herkunft.online.join(", ")} · {mehrzahl(d.herkunft.gesamt, "Anfrage", "Anfragen")} gesamt</p>
         </DashKarte>
         <DashKarte titel="Auftragswert je Monat" className="max-[1280px]:col-span-2 max-[640px]:col-span-1">
-          <p className="mt-2 text-sm text-muted">Beauftragt laut Auftragsbestätigung, je Monat der letzten 12 Monate.</p>
-          <p className="mt-auto pt-4 text-[12.5px] text-muted-2" data-platzhalter>Folgt mit dem Beleg-Modul</p>
+          <p className="mt-1 mb-3 text-sm text-muted">Beauftragt laut Auftragsbestätigung (brutto), letzte 6 Monate.</p>
+          <BalkenListe
+            einheit=" €"
+            zeilen={d.belege.jeMonat.map((m) => ({
+              name: new Date(`${m.monat}-15T12:00:00Z`).toLocaleDateString("de-DE", { month: "long", year: "numeric" }),
+              titel: m.monat,
+              n: Math.round(m.wert),
+              zusatz: `${m.anzahl} AB`,
+            }))}
+          />
         </DashKarte>
       </div>
 

@@ -26,14 +26,14 @@ Eine Codebasis, je Kunde eine eigene Instanz. Diese Datei gilt für jede Arbeit 
   Masken** (Listen, Detailseiten, Einstellungen); Kennzahlen gibt es nur im Dashboard. Zählwerte stehen höchstens als
   Zahl an Filtern, Reitern oder Menüpunkten.
 
-## Architektur (festgelegt am 17.10.2026, ergänzt am 20.10., 25.10., 29.10., 31.10. und 09.11.2026)
+## Architektur (festgelegt am 17.10.2026, ergänzt am 20.10., 25.10., 29.10., 31.10., 09.11. und 10.11.2026)
 
 - **Frontend:** Next.js (App Router, TypeScript, Tailwind v4), gehostet auf Vercel, ein Projekt je Kunde.
   Bis zur Übergabe im Team von Luca. Funktionen laufen in der Region `fra1`, nie in der Standardregion `iad1`.
 - **Backend:** Supabase im Konto des Kunden, Region Frankfurt, je Kunde zwei Projekte: Staging und Produktion.
   Supabase liefert Anmeldung (Auth), Datenbank (Postgres mit RLS), Dateien (Storage), Realtime (Chat) und
   Edge Functions.
-- **Belege und Nummern (Stand 09.11.2026, vorläufig bis zum Lexware-Test):**
+- **Belege und Nummern (Stand 10.11.2026, nach dem Lexware-Test):**
   - **App-Belege:** Angebot, Auftragsbestätigung (AB), Teil-Auftragsbestätigung (Teil-AB), Lieferschein und
     Zahlungsbestätigung führt die App selbst, mit eigener Nummer und eigenem PDF. Sie gehen **nicht** an Lexware.
   - **Lexware-Belege:** Rechnung, Abschlagsrechnung und Gutschrift. Erst „Fertigstellen“ legt sie über die
@@ -70,10 +70,25 @@ Eine Codebasis, je Kunde eine eigene Instanz. Diese Datei gilt für jede Arbeit 
     die `kette_id` ihres Vorgängers (`vorgaenger_id` in der App). Belege ohne Angebot (z. B. Rechnung am Ticket)
     bilden eine eigene Kette. Zwischen Lexware-Belegen (Rechnung → Gutschrift) setzt die App zusätzlich
     `precedingSalesVoucherId`.
-  - **Abschlagsrechnungen** legt das Büro in Lexware an (die Lexware-Schnittstelle kann sie nur lesen, nicht
-    anlegen). Die App übernimmt sie über Lexware-Event-Subscriptions und ordnet sie dem Auftrag zu (Zuordnungsweg siehe
-    Lexware-Test (h) und (i)). **Beliebig viele Abschläge je Auftrag**, nummeriert „1.“, „2.“, „3.“ … in der
-    Reihenfolge der Übernahme.
+  - **Abschlagsrechnungen (Entscheidung 10.11.2026, ersetzt die Übernahme aus Lexware):** Die App legt jeden
+    Abschlag selbst als **normale Lexware-Rechnung** an, Titel „1. Abschlagsrechnung“, „2. Abschlagsrechnung“ … (Lexware
+    erlaubt 25 Zeichen; der Bezug auf die AB steht in der Einleitung). Keine Lexware-Abschlagsrechnungen, keine
+    Event-Subscription. Eingabe als **Prozent vom Auftragswert (brutto) oder als Bruttobetrag**; bei mehreren
+    Steuersätzen wird der Abschlag im Verhältnis der Bruttobeträge je Satz aufgeteilt (eine Position je Satz, richtiger
+    Steuersatz; bei § 13b netto). Netto/Brutto und Steuerart wie in der AB. Die App merkt sich jeden Abschlag am
+    Auftrag mit den Beträgen **laut Lexware** (netto, Steuer und brutto je Satz in `beleg.steuern`, Lexware-Nummer,
+    Datum, `abschlag_nr`). **Beliebig viele Abschläge je Auftrag**, nummeriert in der Reihenfolge der Übertragung.
+    Übersteigt die Summe der Abschläge den Auftragswert, warnt der Editor und der Bestätigungsdialog (kein Verbot).
+  - **Schlussrechnung:** volle Leistung (Positionen der AB bzw. des Lieferscheins), darunter **jeder Abschlag als
+    Minusposition** mit Nummer, Datum, Nettobetrag und Steuer (je Satz eine Position, `beleg_position.abzug_beleg_id`,
+    vom Server bei jedem Speichern neu gesetzt, nicht abwählbar). Ein Gesamtrabatt wirkt nicht auf die Abzüge (an
+    Lexware als Minusposition je Satz statt als Belegrabatt). **Centgenau:** Lexware rechnet die Steuer je Satz auf die
+    Summe des Belegs. Damit Netto, Steuer und Restbetrag der Schlussrechnung exakt „AB − Abschläge“ ergeben, wählt die App
+    beim Anlegen eines Abschlags den Betrag je Satz so, dass Steuer(Rest) = Steuer(AB) − Σ Steuer(Abschläge) gilt –
+    möglichst nah am gewünschten Betrag. Meist ist er exakt (19 %: rund 60 % netto, 70 % brutto), sonst weicht er um
+    1–2 Cent ab (7 %: bis etwa 5 Cent); der Editor zeigt die Anpassung an. Rechenmodul `src/lib/abschlag.ts` mit
+    Unit-Tests (`tests/unit/abschlag.test.ts`, 3.000 Zufallsfälle). Weichen die Positionen der Schlussrechnung von der
+    AB ab, kann ein Rundungscent entstehen; der Editor weist darauf hin.
   - **Zahlungen:** Zahlungseingänge kommen aus Lexware und setzen „Bezahlt“ bzw. verringern den offenen Betrag
     (Teilzahlungen). Zusätzlich kann das Büro in der App **„Als bezahlt markieren“** (Datum, Betrag, Zahlungsart;
     Teilzahlung möglich), z. B. bei Bar- oder Kartenzahlung. Weil Lexware Zahlungen über die Schnittstelle nicht
@@ -86,10 +101,10 @@ Eine Codebasis, je Kunde eine eigene Instanz. Diese Datei gilt für jede Arbeit 
     sie nicht als zweite Rechnung gilt (§ 14c UStG). Sie hängt in der Belegkette hinter der Rechnung, wird gedruckt und
     gesendet wie die anderen Belege; die Rechnung geht dabei als eigenes, unverändertes Lexware-PDF mit.
   - Den Status Angenommen/Abgelehnt/Nicht beauftragt eines Angebots führt die App selbst.
-  - **Offene Entscheidung nach dem Lexware-Test:** Muss Sawin Angebote und ABs auch in Lexware sehen, oder verlangt
-    Lexware für Rechnungen einen Lexware-Vorgänger, dann gehen AG/AB beim Fertigstellen zusätzlich an Lexware. Die
-    App-Nummer bleibt dann führend (in Lexware als Referenz im Titel), und „AB bearbeiten“ ist nur bis zur
-    Übertragung möglich. Vor dieser Entscheidung keine Lexware-Anbindung für AG/AB bauen.
+  - **AG/AB bleiben in der App (Lexware-Test 10.11.2026):** Lexware verlangt für Rechnungen keinen Lexware-Vorgänger;
+    Rechnung, Abschläge und Schlussrechnung mit Abzug funktionieren ohne AB in Lexware. Angebote und ABs gehen deshalb
+    nicht an Lexware. Möchte Sawin sie trotzdem in Lexware sehen, wäre das eine neue Entscheidung (App-Nummer führend,
+    „AB bearbeiten“ nur bis zur Übertragung).
 - **Einsätze** sind eine eigene Tabelle `einsatz` (Beginn, Ende, Fahrzeug, Ressource, `fest`, `farbe`, Team über
   `einsatz_monteur`) mit `auftrag_id` oder `ticket_id`. Ein Auftrag oder Ticket kann beliebig viele Einsätze haben
   (z. B. Montage über zwei getrennte Tage, zweiter Trupp).
@@ -216,10 +231,13 @@ Die Monteur-App kommt in Version 2.
   Nicht mehr genutzte Lieferadressen markiert man in der Kundenmaske als **„Alt“** (Feld `alt_seit`, wieder
   „Reaktivieren“ möglich). Alte Adressen stehen zugeklappt und grau in der Kundenmaske, werden nicht mehr
   vorgeschlagen oder vorbelegt; bestehende Belege behalten ihren Text. Gelöscht wird nichts.
-- Übertragung an Lexware erst beim ersten **fertiggestellten Lexware-Beleg** (Rechnung, Gutschrift) für
-  diesen Kunden. Danach laufen Änderungen nur in Richtung App → Lexware, nie zurück. Offen: Für eine
-  Abschlagsrechnung, die das Büro in Lexware anlegt, muss der Kontakt dort schon bestehen; wie er ohne Dublette
-  dorthin kommt, klärt Lexware-Test (s).
+- Übertragung an Lexware erst beim ersten **fertiggestellten Lexware-Beleg** (Abschlag, Rechnung, Gutschrift) für
+  diesen Kunden; die App speichert die Lexware-Kontakt-ID. Danach laufen Änderungen nur in Richtung App → Lexware, nie
+  zurück (beim Speichern des Kunden und vor jedem Lexware-Beleg, erkannt über eine Prüfsumme `lexware_hash`).
+  Lexware-Kontakt: Firma (mit Ansprechpartner; § 13b-Kunden mit `allowTaxFreeInvoices`) bzw. Person, nur die
+  Rechnungsadresse (Lexware erlaubt nur eine Lieferadresse am Kontakt; das Objekt steht auf dem Beleg). Die
+  Kundennummer vergibt Lexware selbst (über die API nicht setzbar); auf dem Lexware-PDF steht deshalb die
+  Lexware-Kundennummer.
 - Die Kundenseite zeigt alle Anfragen, Aufträge, Service-Tickets und Belege des Kunden.
 - **Konditionen:** Freitextfeld je Kunde (z. B. aktuelle Rabatte). Sehen und ändern dürfen es nur Benutzer mit dem
   Recht „Konditionen sehen“. Die Konditionen liegen in einer eigenen Tabelle mit eigener RLS-Policy, nicht als Spalte
@@ -402,7 +420,7 @@ Die Monteur-App kommt in Version 2.
 - **Interner Kommentar:** je Beleg, auch nach dem Fertigstellen änderbar. Nicht auf dem PDF, nicht an Lexware.
 - **Tags:** freie Schlagworte je Beleg mit Vorschlägen aus bereits vergebenen Tags. Nur intern, auch nach dem
   Fertigstellen änderbar, in den Beleglisten filterbar. Nicht auf dem PDF, nicht an Lexware.
-- **Duplizieren** (nicht bei Abschlagsrechnungen): erzeugt einen neuen Entwurf mit allen Positionen und Texten. Belegart, Kunde und Bezug sind im
+- **Duplizieren** (nicht bei Abschlagsrechnungen, Rechnungen und Gutschriften): erzeugt einen neuen Entwurf mit allen Positionen und Texten. Belegart, Kunde und Bezug sind im
   Editor änderbar, Kommentar und Tags werden übernommen. Eine Kopie beginnt eine neue Kette.
 - **Belegkette:** Angebot → AB → (Teil-AB) → Lieferschein → Abschläge → Schlussrechnung → Gutschrift. Positionen und
   Texte werden übernommen. Die Kette ist überall nachvollziehbar, aber klein dargestellt: als kompakte Liste in
@@ -444,9 +462,12 @@ Die Monteur-App kommt in Version 2.
     bereits berechnet“); der Abzug lässt sich nicht abwählen. Gibt es weder Abschläge noch Teilrechnungen, heißt sie
     „Rechnung“. Eine zweite Schlussrechnung lässt die App nicht fertigstellen; Korrekturen laufen über eine Gutschrift.
   - **Gutschrift** entsteht nur aus einer Rechnung oder Abschlagsrechnung (nie leer, nie aus AB oder Lieferschein).
-  - **Abschlagsrechnungen** werden nicht dupliziert (sie entstehen nur in Lexware). Je Auftrag beliebig viele. Sawins
-    übliche Zahlungsbedingung: Elemente 50 % bei Auftragserteilung, 50 % vor Montage, Montage nach Fertigstellung.
+  - **Abschlagsrechnungen** entstehen am Auftrag (Prozent oder Betrag, siehe Architektur) und werden nicht
+    dupliziert. Je Auftrag beliebig viele, nach der Schlussrechnung keine mehr. Sawins übliche Zahlungsbedingung:
+    Elemente 50 % bei Auftragserteilung, 50 % vor Montage, Montage nach Fertigstellung (Vorschlag im Editor: 50 %).
     Am Auftrag stehen unter Finanzen Abschlagsrechnungen („2 von 3 bezahlt“) und Rechnungen getrennt, je mit Status.
+  - **Rechnung und Gutschrift werden nicht dupliziert** (Stand 10.11.2026): Eine Rechnung entsteht am Auftrag oder
+    Ticket, eine Gutschrift aus der Rechnung bzw. dem Abschlag.
 - **Als bezahlt markieren:** Dialog mit Zahlungseingang am, Betrag (vorbelegt mit dem offenen Betrag, Teilzahlung
   möglich), Zahlungsart und den Häkchen „Zahlungsbestätigung erstellen“ und „danach per E-Mail senden“ (Rechnung als
   eigenes PDF im Anhang). Abgleich mit Lexware siehe Architektur.
@@ -686,44 +707,55 @@ Maßstab ist OWASP ASVS Level 1. Vor dem Start mit Echtdaten müssen alle Mindes
 
 - Es gibt keine Lexware-Sandbox. Entwicklung und Staging arbeiten **nur gegen ein eigenes Lexware-Testkonto (Tarif XL)**.
   Der API-Schlüssel von Sawins echtem Lexware wird erst beim Go-live in Produktion gesetzt.
-- An Lexware gehen nur Rechnung, Abschlagsrechnung (lesend, angelegt in Lexware) und Gutschrift; Angebot, AB,
-  Teil-AB und Lieferschein bleiben bis zur Entscheidung nach dem Test in der App (siehe Architektur).
+- An Lexware gehen nur Rechnung, Abschlagsrechnung (von der App als normale Rechnung angelegt) und Gutschrift
+  (`precedingSalesVoucherId` = Rechnung bzw. Abschlag); Angebot, AB, Teil-AB und Lieferschein bleiben in der App.
+- Ablauf „Fertigstellen“ (`src/lib/lexware/uebertragung.ts`): Bestätigungsdialog → Entwurf speichern →
+  `lexware_start` (Regeln, Sperre gegen doppelte Übertragung, Abschlagsnummer) → Kontakt sichern → Beleg mit
+  `finalize=true` anlegen → Nummer, Beträge je Satz und Original-PDF übernehmen (`lexware_fertig`). Gab es schon einen
+  Versuch oder kam keine Antwort, sucht die App vorher in Lexware einen passenden Beleg (Kontakt, Datum, Betrag), damit
+  nichts doppelt entsteht. Fehler stehen am Entwurf (`lexware_status` = fehler, `lexware_fehler`) und werden mit
+  „Fertigstellen“ wiederholt. Fehlt das PDF, holt die App es beim Öffnen nach; bis dahin zeigt sie die eigene Vorschau
+  mit Wasserzeichen „Entwurf“ (wird nie versendet).
+- Ergebnisse von Lexware (Nummer, Status, Beträge, PDF-Pfad, Kontakt-ID) schreibt nur der Server über die
+  Datenbankfunktionen `lexware_*` mit der Service-Rolle; Benutzer können sie nicht aufrufen. Der handelnde Benutzer
+  wird mitgegeben und steht im Audit-Log (`app.handelnder()`).
 - Finalisierte Rechnungen und Gutschriften sind endgültig und nicht löschbar.
 - Rate-Limit: höchstens 2 Anfragen pro Sekunde. Alle Aufrufe über eine zentrale Funktion mit Drosselung und
-  Wiederholung bei HTTP 429 (exponentielles Backoff).
+  Wiederholung bei HTTP 429 (exponentielles Backoff): `src/lib/lexware/client.ts`.
 - API-Gateway: `https://api.lexware.io`.
 - Positionen: Titelzeile in `name`, Beschreibung als reiner Text in `description` (Formatierung aus der App wird
   umgewandelt: Aufzählungen als „• “, Nummerierung als „1. “, Farbe und Fett entfallen). Angebote mit `expirationDate`.
-- Belegfelder: Adresse je Beleg in `address`, Einleitung in `introduction`, Nachbemerkung in `remark`,
+- Datum immer mit Uhrzeit und Zeitzone (`2026-11-10T00:00:00.000+01:00`), ein reines Datum lehnt Lexware ab.
+- Belegfelder: Adresse je Beleg in `address` (mit `contactId`, Felder des Belegs überschreiben die Kontaktadresse),
+  Bauvorhaben und Objekt / Lieferanschrift als erste Zeilen der Einleitung, Einleitung in `introduction`, Nachbemerkung in `remark`,
   Zahlungsbedingung (gefüllter Text) in `paymentConditions`, Liefer-/Leistungsdatum in `shippingConditions` (bei Rechnungen Pflicht),
   Steuerart in `taxConditions.taxType` (`net`, `gross`, `constructionService13b`, `vatfree`), Positionsrabatt in
   `discountPercentage`, Gesamtrabatt in `totalPrice.totalDiscountPercentage` bzw. `totalDiscountAbsolute`,
   Freitextzeilen als Position vom Typ `text`.
 - Tags, interner Kommentar, Kunden- und Lieferanten-Konditionen, `kette_id`, Pipeline-Stufen, Einsatzfarben und
   Zahlungsbestätigungen gehen nie an Lexware.
-- **Im Testkonto vor dem Bau prüfen:** (a) ob ein angelegtes Angebot wirklich nicht mehr änderbar ist,
-  (b) ob Abschlagsrechnungen wirklich nur lesbar sind, (c) welche Folgebelege `precedingSalesVoucherId` je
-  Belegart akzeptiert, (d) Längengrenzen für `name` und `description`, (e) ob optionale Positionen im Angebot
-  übertragen werden können, (f) welche Steuerarten (inkl. § 13b) je Belegart angenommen werden,
-  (g) Längengrenze und Format der Zahlungsbedingung, (h) ob in Lexware angelegte Abschlagsrechnungen einen
-  Vorgängerbeleg tragen, über den die App sie einer Kette zuordnen kann, (i) wenn AG/AB nicht in Lexware liegen:
-  über welches Feld (Titel, Referenz, Einleitung) das Büro die Auftragsnummer am Abschlag mitgibt und ob die App sie
-  per API zuverlässig lesen kann, (j) ob eine Rechnung ohne Lexware-Vorgänger (ohne AB in Lexware) alle Funktionen
-  behält, insbesondere den Abzug von Abschlägen in der Schlussrechnung, (k) ob Lexware für die Zahlung einer
-  Abschlagsrechnung ein Event liefert (für die Pipeline-Stufe „Abschlag bezahlt“), (l) ob `description` Zeilenumbrüche
-  und Zeichen wie „•“ unverändert übernimmt, (m) wie Rechnungs- und Lieferadresse am Lexware-Kontakt abgebildet
-  werden (`addresses.billing` / `addresses.shipping`, mehrere Lieferadressen?) und ob die Lieferanschrift auf der
-  Rechnung erscheinen kann, (n) ob ein **fertig gefüllter** Zahlungsbedingungstext in `paymentConditions` unverändert
-  gedruckt wird oder ob Lexware eigene Platzhalter verlangt, (o) wie Zahlungsziel, Skontoziel und Skonto in
-  `paymentConditions` (`paymentTermDuration`, `paymentDiscountConditions`) übergeben werden und ob Lexware damit
-  Fälligkeit und Skonto selbst berechnet, (p) wohin Bauvorhaben und Objekt in Lexware gehen (Titel, Einleitung oder
-  eigenes Feld), damit sie auf der Lexware-Rechnung stehen, (q) ob Zahlungen wirklich nur lesbar sind
-  (`/v1/payments`) und welches Event Lexware bei einer Zahlung, Teilzahlung oder Ausbuchung schickt, damit die App
-  App-Buchungen zuverlässig abgleichen kann (Betrag, Datum, Zuordnung zum Beleg), (r) ob Abschlagsrechnungen
-  wirklich nicht per API angelegt werden können und ob Lexware mehr als zwei Abschläge je Schlussrechnung abzieht,
-  (s) wie der Kontakt für eine in Lexware angelegte Abschlagsrechnung entsteht, ohne dass bei der späteren
-  Übertragung durch die App eine Dublette entsteht (Übertragung schon beim Fertigstellen der AB, Knopf „An Lexware
-  übertragen“ am Kunden oder Zuordnung über die Kundennummer).
+- **Ergebnisse im Testkonto (10.11.2026).** Mit der neuen Abschlag-Regel entfallen die Punkte (b), (h), (i), (k),
+  (r) und (s) (keine Lexware-Abschlagsrechnungen mehr), ebenso (a) und (e) (Angebote gehen nicht an Lexware).
+  - (c) Gutschrift mit `precedingSalesVoucherId` einer Rechnung: angenommen, beide Belege verweisen aufeinander
+    (`relatedVouchers`); die Gutschrift verringert den offenen Betrag der Rechnung.
+  - (d) Grenzen: Titel 25 Zeichen, `name` 255, `description`, `introduction` und `remark` je 2000 Zeichen,
+    Einzelpreis höchstens 4 Nachkommastellen, Einheit (`unitName`) Pflicht. Negativer Gesamtbetrag wird abgelehnt.
+  - (f) Steuerarten: `net`, `gross` und gemischte Sätze gehen; `constructionService13b` nur an einen Firmenkontakt
+    mit `allowTaxFreeInvoices` (USt-IdNr. nicht nötig), Positionen mit 0 %; `vatfree` lehnt dieses Konto ab
+    („No vatfree invoices allowed for this organization“) – vor dem Go-live mit Sawins Konto und Steuerberater klären.
+  - (g), (n), (o) Ein fertig gefüllter Zahlungsbedingungstext wird unverändert übernommen (500 Zeichen geprüft);
+    `paymentTermDuration` und `paymentDiscountConditions` werden gespeichert, Lexware berechnet die Fälligkeit.
+  - (j) Rechnung ohne Lexware-Vorgänger: voll nutzbar; Minuspositionen (Abzug der Abschläge) sind erlaubt.
+  - (l) `description` übernimmt Zeilenumbrüche, „•“, „1. “, Umlaute und Sonderzeichen unverändert.
+  - (m) Am Kontakt nur eine Rechnungs- und höchstens eine Lieferadresse; die Lieferanschrift erscheint nicht als
+    eigenes Feld auf der Rechnung, deshalb steht sie in der Einleitung (p). Die Kundennummer vergibt Lexware.
+  - (p) Bauvorhaben und Objekt / Lieferanschrift: erste Zeilen der Einleitung (auf dem PDF geprüft).
+  - (q) `/v1/payments/{id}` liefert offenen Betrag und Zahlungsposten (lesend); der Zahlungsabgleich folgt mit
+    „Als bezahlt markieren“. Welches Event Lexware bei Zahlungen schickt, ist noch zu prüfen.
+  - Rundung: Lexware rundet jede Zeile auf Cent und rechnet die Steuer je Satz auf die Summe, netto wie brutto, auch
+    mit Positions- und Gesamtrabatt – genau wie `src/lib/beleg-summen.ts` (geprüft, centgleich).
+  - PDF: `GET /v1/invoices/{id}/file` bzw. `/v1/credit-notes/{id}/file` liefert das Original, erst nach dem
+    Fertigstellen (Entwürfe haben kein PDF).
 
 ## Designsystem
 
@@ -778,11 +810,11 @@ Maßstab ist OWASP ASVS Level 1. Vor dem Start mit Echtdaten müssen alle Mindes
       Sitzungen in Supabase (Pro-Tarif) auf 60 Minuten gesetzt; Schutz vor geleakten Passwörtern (HaveIBeenPwned,
       Pro-Tarif) aktiv, damit die Advisors ohne Warnung sind
 - [ ] Backups aktiv (Pro-Tarif, PITR) und eine Wiederherstellung einmal getestet
-- [ ] Lexware-Testpunkte (a) bis (s) geprüft und die offene Entscheidung zu AG/AB in Lexware getroffen
-      und in dieser Datei festgehalten
-- [ ] Belegerstellung vollständig gegen das Lexware-Testkonto durchgespielt (Angebot → AB → Auftrag, Teil-AB,
-      Lieferschein, Abschlag aus Lexware übernommen und dem richtigen Auftrag zugeordnet, Zahlung übernommen,
-      Schlussrechnung mit Abzug, Gutschrift), inklusive Austausch der Entwurfs-Vorschau durch das Lexware-PDF
+- [x] Lexware-Testpunkte geprüft und die Entscheidung zu AG/AB festgehalten (10.11.2026, siehe Lexware-Regeln);
+      offen nur noch `vatfree` und das Zahlungs-Event (q)
+- [ ] Belegerstellung vollständig gegen das Lexware-Testkonto durchgespielt: Angebot → AB → Auftrag, zwei Abschläge,
+      Schlussrechnung mit Abzug, Gutschrift und Ticket-Rechnung mit Austausch der Vorschau durch das Lexware-PDF
+      erledigt (`npm run test:lexware`, 10.11.2026); offen: Teil-AB, Lieferschein → Teilrechnung, Zahlung übernommen
 - [ ] Nummernkreise der App-Belege mit Sawin abgestimmt (Startwerte je Belegart nach der Airtable-Übernahme)
 - [ ] E-Mail-Versand über Microsoft Graph mit Sawins Postfach getestet (PDF-Gruppen, BCC an angebot@/auftrag@, Protokoll)
 - [ ] Steuerarten (Standard, § 13b, steuerfrei), Pflichtangaben auf Rechnungen und das Muster der

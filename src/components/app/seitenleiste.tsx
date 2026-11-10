@@ -32,13 +32,15 @@ type Props = {
   eingeklappt: boolean;
   /** auf dem Handy eingeblendet */
   offen: boolean;
+  /** Lexware-Anbindung eingerichtet */
+  lexware?: boolean;
 };
 
 /**
  * Seitenleiste wie in der Demo: Gruppen und Reihenfolge aus NAVIGATION, Zähler an den Menüpunkten, noch nicht gebaute
  * Module ausgegraut als „folgt“. Einklappbar auf eine Symbolleiste (Knopf neben dem Logo), je Benutzer gemerkt.
  */
-export function Seitenleiste({ active, brand, user, zaehler, eingeklappt, offen }: Props) {
+export function Seitenleiste({ active, brand, user, zaehler, eingeklappt, offen, lexware = false }: Props) {
   const mini = useSyncExternalStore(abonnieren, () => zuletzt, () => null) ?? eingeklappt;
   const umschalten = () => {
     setzen(!mini);
@@ -151,9 +153,9 @@ export function Seitenleiste({ active, brand, user, zaehler, eingeklappt, offen 
       ))}
 
       <div className={cn("mt-auto flex flex-col gap-2.5 border-t border-frame-line pt-3.5", mini ? "items-center max-[960px]:items-stretch" : "px-1")}>
-        <div className="flex items-center gap-2 text-xs text-[#bdb9b3]" title="Die Lexware-Anbindung folgt">
-          <span className="size-2 shrink-0 rounded-full bg-frame-muted" aria-hidden="true" />
-          <span className={nurSymbol("sr-only max-[960px]:not-sr-only")}>Buchhaltung: Lexware nicht verbunden</span>
+        <div className="flex items-center gap-2 text-xs text-[#bdb9b3]" title={lexware ? "Rechnungen, Abschläge und Gutschriften gehen an Lexware" : "Kein Lexware-Schlüssel eingerichtet"} data-lexware-status={lexware ? "verbunden" : "aus"}>
+          <span className={cn("size-2 shrink-0 rounded-full", lexware ? "bg-tone-green-fg" : "bg-frame-muted")} aria-hidden="true" />
+          <span className={nurSymbol("sr-only max-[960px]:not-sr-only")}>{lexware ? "Buchhaltung: Lexware verbunden" : "Buchhaltung: Lexware nicht verbunden"}</span>
         </div>
         <div className={cn("flex items-center gap-2.5", mini && "flex-col max-[960px]:flex-row")}>
           <Avatar initials={user.initials} size="lg" className="bg-accent text-accent-ink" />

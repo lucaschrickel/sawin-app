@@ -1,11 +1,14 @@
 import { druckDaten, erzeugePdf, pdfAblegen, pdfLaden } from "@/lib/beleg-ablage";
 import { ladeBeleg } from "@/lib/belege";
+import { LEXWARE_BELEGARTEN } from "@/lib/belege-status";
+import { lexwarePdfNachladen } from "@/lib/lexware/uebertragung";
 import { pruefeSitzung } from "@/lib/auth/sitzung";
 import { pdfDateiname } from "@/lib/pdf/beleg-pdf";
 
 /**
  * PDF eines Belegs. Entwurf: frisch erzeugt mit Wasserzeichen „ENTWURF“. Fertiggestellt: das abgelegte Original
- * (fehlt es, wird es erzeugt und abgelegt). ?version=n: eingefrorene Version. ?download=1: als Datei speichern.
+ * (fehlt es, wird es erzeugt und abgelegt). Rechnung, Abschlag, Gutschrift: das Original-PDF von Lexware (fehlt es,
+ * wird es bei Lexware abgeholt; bis dahin die App-Vorschau mit Wasserzeichen „ENTWURF“, die nie versendet wird). ?version=n: eingefrorene Version. ?download=1: als Datei speichern.
  */
 export async function GET(request: Request, ctx: RouteContext<"/pdf/beleg/[id]">) {
   const { id } = await ctx.params;
@@ -23,6 +26,17 @@ export async function GET(request: Request, ctx: RouteContext<"/pdf/beleg/[id]">
     name = pdfDateiname({ ...d.beleg, version });
   } else if (d.beleg.status === "entwurf") {
     pdf = await erzeugePdf(druckDaten(d), true);
+  } else if (LEXWARE_BELEGARTEN.includes(d.beleg.art)) {
+    if (d.beleg.pdf_pfad) pdf = await pdfLaden(d.beleg.pdf_pfad);
+    if (!pdf && d.beleg.lexware_id) {
+      try {
+        const pfad = await lexwarePdfNachladen(d);
+        if (pfad) pdf = await pdfLaden(pfad);
+      } catch {
+        // Lexware gerade nicht erreichbar: Vorschau der App mit Wasserzeichen
+      }
+    }
+    if (!pdf) pdf = await erzeugePdf(druckDaten(d), true);
   } else {
     if (d.beleg.pdf_pfad) pdf = await pdfLaden(d.beleg.pdf_pfad);
     if (!pdf) {

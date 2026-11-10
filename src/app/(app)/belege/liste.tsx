@@ -22,11 +22,25 @@ export type ListenDef = { key: string; titel: string; arten: Belegart[]; aktiv: 
 
 const ANGEBOT_STATUS: [string, string][] = [["", "Alle"], ["entwurf", "Entwürfe"], ["offen", "Offen"], ["abgelaufen", "Abgelaufen"], ["angenommen", "Angenommen"], ["abgelehnt", "Abgelehnt"]];
 const APP_STATUS: [string, string][] = [["", "Alle"], ["entwurf", "Entwürfe"], ["fertig", "Fertiggestellt"]];
+const RECHNUNG_STATUS: [string, string][] = [["", "Alle"], ["entwurf", "Entwürfe"], ["offen", "Offen"], ["ueberfaellig", "Überfällig"], ["bezahlt", "Bezahlt"]];
 
 export const LISTEN: Record<string, ListenDef> = {
   alle: { key: "alle", titel: "Alle Belege", arten: [...BELEGARTEN], aktiv: "belege", status: APP_STATUS },
   angebote: { key: "angebote", titel: "Angebote", arten: ["angebot"], aktiv: "angebote", status: ANGEBOT_STATUS },
   lieferscheine: { key: "lieferscheine", titel: "Lieferscheine", arten: ["lieferschein"], aktiv: "lieferscheine", status: APP_STATUS },
+  abschlaege: { key: "abschlaege", titel: "Abschlagsrechnungen", arten: ["abschlagsrechnung"], aktiv: "abschlaege", status: RECHNUNG_STATUS },
+  rechnungen: { key: "rechnungen", titel: "Rechnungen", arten: ["rechnung", "zahlungsbestaetigung"], aktiv: "rechnungen", status: RECHNUNG_STATUS },
+  gutschriften: { key: "gutschriften", titel: "Gutschriften", arten: ["gutschrift"], aktiv: "gutschriften", status: RECHNUNG_STATUS },
+  // Ohne eigenen Menüpunkt: Ziel der Verweise aus Dashboard und Glocke
+  forderungen: { key: "forderungen", titel: "Offene Forderungen", arten: ["rechnung", "abschlagsrechnung"], aktiv: "rechnungen", status: [["", "Alle"], ["offen", "Offen"], ["ueberfaellig", "Überfällig"]] },
+};
+
+const UNTERTITEL: Record<string, string> = {
+  lieferscheine: "Lieferscheine entstehen am Auftrag aus der Auftragsbestätigung.",
+  abschlaege: "Abschläge entstehen am Auftrag (Prozent oder Betrag) und werden in Lexware als Rechnung angelegt.",
+  rechnungen: "Rechnungen entstehen am Auftrag oder Service-Ticket und werden in Lexware angelegt.",
+  gutschriften: "Gutschriften entstehen aus einer Rechnung oder einem Abschlag und werden in Lexware angelegt.",
+  forderungen: "Rechnungen und Abschläge mit offenem Betrag.",
 };
 
 const eins = (v: string | string[] | undefined) => (Array.isArray(v) ? v[0] : v) ?? "";
@@ -46,9 +60,10 @@ export async function BelegListe({ liste, searchParams }: { liste: string; searc
   for (const b of alle) ketten.set(b.kette_id, [...(ketten.get(b.kette_id) ?? []), b]);
   const mitStatus = alle.map((b) => ({ b, s: anzeigeStatus(b, ketten.get(b.kette_id) ?? [b], heute) }));
   const zeilen = mitStatus.filter(({ b, s }) => {
+    if (def.key === "forderungen" && (b.status === "entwurf" || b.status === "bezahlt" || (b.offen_betrag ?? b.summe_brutto) <= 0)) return false;
     if (status === "entwurf" && b.status !== "entwurf") return false;
     if (status === "fertig" && b.status === "entwurf") return false;
-    if (["offen", "abgelaufen", "angenommen", "abgelehnt"].includes(status) && s.key !== status) return false;
+    if (["offen", "abgelaufen", "angenommen", "abgelehnt", "ueberfaellig", "bezahlt"].includes(status) && s.key !== status) return false;
     if (tagFilter && !(b.tags ?? []).includes(tagFilter)) return false;
     if (q) {
       const text = [b.nummer, b.kunde?.name, b.adresse_name, b.titel, b.auftrag?.nummer, b.anfrage?.titel, (b.tags ?? []).join(" "), b.kommentar_intern].join(" ").toLowerCase();
@@ -65,7 +80,7 @@ export async function BelegListe({ liste, searchParams }: { liste: string; searc
     <Shell active={def.aktiv} crumbs={[{ label: "Belege" }, { label: def.titel }]}>
       <PageHeader
         title={def.titel}
-        sub={def.key === "lieferscheine" ? "Lieferscheine entstehen am Auftrag aus der Auftragsbestätigung." : "Klick zeigt die Vorschau rechts, Doppelklick öffnet den Beleg."}
+        sub={UNTERTITEL[def.key] ?? "Klick zeigt die Vorschau rechts, Doppelklick öffnet den Beleg."}
         actions={def.key === "alle" ? <NeuMenue /> : def.key === "angebote" ? <NeuKnopf art="angebot" /> : null}
       />
       <Filterleiste
@@ -90,7 +105,7 @@ export async function BelegListe({ liste, searchParams }: { liste: string; searc
             datum: tag(b.datum),
             kunde: b.kunde?.name ?? b.adresse_name ?? "–",
             titel: b.titel && b.titel !== BELEGART_TEXT[b.art] ? b.titel : "",
-            betrag: b.art === "lieferschein" ? "–" : eur(b.summe_brutto),
+            betrag: b.art === "lieferschein" ? "–" : def.key === "forderungen" ? eur(b.offen_betrag ?? b.summe_brutto) : eur(b.summe_brutto),
             status: s,
           }))}
           leer={q || status || tagFilter || artFilter ? "Keine Belege für diese Auswahl." : "Noch keine Belege."}
@@ -130,7 +145,7 @@ export async function VorschauLeiste({ detail: d, vorschlaege }: { detail: NonNu
         <a href={`/pdf/beleg/${b.id}`} target="_blank" rel="noopener" className={icon} aria-label="Vorschau und Drucken" title="Vorschau und Drucken">
           <Printer className="size-4" />
         </a>
-        {b.art !== "abschlagsrechnung" && b.art !== "zahlungsbestaetigung" && (
+        {!["abschlagsrechnung", "zahlungsbestaetigung", "rechnung", "gutschrift"].includes(b.art) && (
           <Link href={`/beleg/neu?art=${b.art}&kopie=${b.id}`} className={icon} aria-label="Duplizieren" title="Duplizieren">
             <Copy className="size-4" />
           </Link>
@@ -162,6 +177,12 @@ export async function VorschauLeiste({ detail: d, vorschlaege }: { detail: NonNu
             <dd>{tag(b.liefertermin)}</dd>
           </>
         )}
+        {b.faellig_am && b.status !== "entwurf" && b.art !== "gutschrift" && (
+          <>
+            <dt className="text-muted">Fällig</dt>
+            <dd className={status.key === "ueberfaellig" ? "text-tone-red-fg" : undefined}>{tag(b.faellig_am)}</dd>
+          </>
+        )}
         {b.art !== "lieferschein" && (
           <>
             <dt className="text-muted">Betrag</dt>
@@ -172,6 +193,8 @@ export async function VorschauLeiste({ detail: d, vorschlaege }: { detail: NonNu
         <dd>
           {b.auftrag ? (
             <Link href={`/auftraege/${b.auftrag.id}`} className="text-accent-text hover:underline">Auftrag {b.auftrag.nummer}</Link>
+          ) : b.ticket ? (
+            <Link href={`/service/${b.ticket.id}`} className="text-accent-text hover:underline">Ticket {b.ticket.nummer}</Link>
           ) : b.anfrage ? (
             <Link href={`/anfragen/${b.anfrage.id}`} className="text-accent-text hover:underline">Anfrage {b.anfrage.nummer}</Link>
           ) : (

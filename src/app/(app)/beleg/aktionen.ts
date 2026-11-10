@@ -3,7 +3,10 @@
 import { refresh } from "next/cache";
 import { pruefeSitzung } from "@/lib/auth/sitzung";
 import { pdfAblegen } from "@/lib/beleg-ablage";
+import { abrechnungAnwenden } from "@/lib/beleg-abrechnung";
 import { aufbereiten, meldung } from "@/lib/beleg-eingabe";
+import { LEXWARE_BELEGARTEN } from "@/lib/belege-status";
+import { anLexwareUebertragen, lexwarePdfNachladen } from "@/lib/lexware/uebertragung";
 import type { EditorZustand } from "@/lib/beleg-typen";
 import { ladeBeleg, ladeKundeFuerBeleg, kundeVorbelegung, type KundeFuerBeleg } from "@/lib/belege";
 
@@ -12,7 +15,9 @@ export type Ergebnis = { fehler?: string; ok?: boolean; hinweis?: string; id?: s
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const kurz = (s: unknown, max: number) => String(s ?? "").slice(0, max);
 
-async function speichern(z: EditorZustand): Promise<{ fehler: string } | { id: string }> {
+async function speichern(eingabe: EditorZustand): Promise<{ fehler: string } | { id: string }> {
+  const z = await abrechnungAnwenden(eingabe);
+  if ("fehler" in z) return z;
   const daten = aufbereiten(z);
   if ("fehler" in daten) return daten;
   const { supabase } = await pruefeSitzung();
@@ -42,6 +47,12 @@ export async function belegFertigstellen(z: EditorZustand): Promise<Ergebnis> {
   if (z.positionen.some((p) => p.typ === "artikel" && !p.titel.trim())) return { fehler: "Jede Position braucht einen Titel." };
   const r = await speichern(z);
   if ("fehler" in r) return r;
+  if (LEXWARE_BELEGARTEN.includes(z.kopf.art)) {
+    // Rechnung, Abschlag, Gutschrift: in Lexware anlegen (nach dem Bestätigungsdialog im Editor)
+    const u = await anLexwareUebertragen(r.id);
+    refresh();
+    return u.ok ? { ok: true, id: r.id, nummer: u.nummer, hinweis: u.hinweis } : { fehler: u.fehler, id: r.id };
+  }
   const { supabase } = await pruefeSitzung();
   const { data, error } = await supabase.rpc("beleg_fertigstellen", { p_id: r.id });
   if (error) return { fehler: meldung(error, "Der Beleg konnte nicht fertiggestellt werden."), id: r.id };
@@ -126,3 +137,17 @@ export async function nachtragAnlegen(auftragId: string): Promise<Ergebnis> {
   return { ok: true, id: data.id };
 }
 
+
+/** Original-PDF eines Lexware-Belegs (erneut) von Lexware holen */
+export async function lexwarePdfHolen(id: string): Promise<Ergebnis> {
+  if (!UUID.test(id)) return { fehler: "Beleg nicht gefunden." };
+  const d = await ladeBeleg(id);
+  if (!d?.beleg.lexware_id) return { fehler: "Der Beleg liegt nicht in Lexware." };
+  try {
+    await lexwarePdfNachladen(d);
+  } catch (e) {
+    return { fehler: `Das PDF konnte nicht von Lexware geholt werden: ${e instanceof Error ? e.message : "unbekannter Fehler"}` };
+  }
+  refresh();
+  return { ok: true };
+}

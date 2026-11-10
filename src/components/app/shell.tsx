@@ -31,6 +31,7 @@ export async function Shell(props: { active: string; crumbs: { label: string; hr
       zaehler={zaehler}
       eingeklappt={einstellung?.seitenleiste_eingeklappt ?? false}
       inaktivMinuten={INAKTIV_MINUTEN}
+      lexware={!!process.env.LEXWARE_API_KEY?.trim()}
     />
   );
 }

@@ -6,6 +6,8 @@ import { auftragBestellstatus, type AuftragBestellstatus } from "@/lib/einkauf-s
 import { ladeKalender } from "@/lib/kalender";
 import { ladeEinsaetze, type TafelEinsatz } from "@/lib/montageplan";
 import { PRUEFTERMINE, pruefAmpel } from "@/lib/pruefung";
+import { rund } from "@/lib/beleg-summen";
+import { anzeigeStatus, auftragFinanzen, type BelegKurz } from "@/lib/belege-status";
 import { AUFTRAG_PHASEN, type AuftragPhase } from "@/lib/status";
 import { kalenderwoche, montagVon, plusTage } from "@/lib/woche";
 import { berlinNachUtc, heuteBerlin, utcNachBerlinLokal } from "@/lib/zeit";
@@ -116,15 +118,43 @@ export async function ladeGeschaeftsfuehrung() {
   const { supabase } = await pruefeSitzung();
   const z = zeit();
   const c = getCustomer();
-  const [anfragen, auftraege, einsaetze, abwesenheiten, namenListe] = await Promise.all([
+  const [anfragen, auftraege, einsaetze, abwesenheiten, namenListe, belegDaten] = await Promise.all([
     supabase.from("anfrage").select("id, herkunft, eingang, archiv").limit(5000).returns<{ id: string; herkunft: string | null; eingang: string; archiv: string | null }[]>(),
     supabase.from("auftrag").select("id, phase").neq("phase", "abgeschlossen").returns<{ id: string; phase: AuftragPhase }[]>(),
     ladeEinsaetze(utc(z.montag), utc(plusTage(z.montag, 42))),
     supabase.from("abwesenheit").select("id, mitarbeiter_id, status, von, bis").in("status", ["beantragt", "genehmigt"]).gte("bis", z.heute),
     ladeNamen(),
+    supabase
+      .from("beleg")
+      .select("id, art, nummer, status, datum, kette_id, vorgaenger_id, titel, summe_brutto, gueltig_bis, teil, faellig_am, offen_betrag, abschlag_nr, auftrag_id")
+      .in("art", ["angebot", "auftragsbestaetigung", "abschlagsrechnung", "rechnung", "gutschrift"])
+      .neq("status", "entwurf")
+      .limit(20000)
+      .returns<(BelegKurz & { auftrag_id: string | null })[]>(),
   ]);
   const namen = new Map(namenListe.map((m) => [m.id, m.name]));
   const [konflikte, termine] = await Promise.all([konfliktIds(utc(z.heute), utc(plusTage(z.montag, 42))), termineAm(z.heute, namen)]);
+
+  // Belege: Auftragsbestand (noch nicht berechnet), offene Forderungen, Angebotsquote, Auftragswert je Monat
+  const belege = (belegDaten.data ?? []).map((b) => ({ ...b, summe_brutto: Number(b.summe_brutto), offen_betrag: b.offen_betrag == null ? null : Number(b.offen_betrag) }));
+  const jeAuftrag = new Map<string, typeof belege>();
+  for (const b of belege) if (b.auftrag_id) jeAuftrag.set(b.auftrag_id, [...(jeAuftrag.get(b.auftrag_id) ?? []), b]);
+  const finanzen = [...jeAuftrag.values()].map((bs) => auftragFinanzen(bs)).filter((x) => x.ab);
+  const forderungen = belege.filter((b) => (b.art === "rechnung" || b.art === "abschlagsrechnung") && b.status === "offen" && (b.offen_betrag ?? b.summe_brutto) > 0);
+  const ueberfaellig = forderungen.filter((b) => anzeigeStatus(b, [b], z.heute).key === "ueberfaellig");
+  const vor12 = plusTage(z.heute, -365);
+  const angebote = belege.filter((b) => b.art === "angebot" && b.datum >= vor12);
+  const angenommen = angebote.filter((b) => b.status === "angenommen").length;
+  const abgelehnt = angebote.filter((b) => b.status === "abgelehnt").length;
+  const monate = [5, 4, 3, 2, 1, 0].map((i) => {
+    const d = new Date(Date.UTC(Number(z.heute.slice(0, 4)), Number(z.heute.slice(5, 7)) - 1 - i, 1));
+    return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, "0")}`;
+  });
+  const abs = belege.filter((b) => b.art === "auftragsbestaetigung");
+  const jeMonat = monate.map((m) => {
+    const im = abs.filter((b) => b.datum.slice(0, 7) === m);
+    return { monat: m, wert: rund(im.reduce((x, b) => x + b.summe_brutto, 0)), anzahl: im.length };
+  });
   const hinweise = await ladeHinweise(z, einsaetze, konflikte);
 
   // Anfragen: offen, neu je Woche (6 Wochen bis heute), Herkunft über alle Anfragen
@@ -171,6 +201,15 @@ export async function ladeGeschaeftsfuehrung() {
     termine,
     hinweise,
     phasen,
+    belege: {
+      bestand: rund(finanzen.reduce((x, f) => x + f.bestand, 0)),
+      bestandAuftraege: finanzen.filter((f) => f.bestand > 0).length,
+      forderungen: rund(forderungen.reduce((x, b) => x + (b.offen_betrag ?? b.summe_brutto), 0)),
+      forderungenAnzahl: forderungen.length,
+      ueberfaellig: ueberfaellig.length,
+      quote: { angenommen, abgelehnt, prozent: angenommen + abgelehnt ? Math.round((angenommen / (angenommen + abgelehnt)) * 100) : null },
+      jeMonat,
+    },
   };
 }
 

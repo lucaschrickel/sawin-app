@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { cn } from "@/lib/cn";
 import { BELEGART_KURZ, type BelegKurz, type Schritt } from "@/lib/belege-status";
-import { angebotStatus, belegUebergeben, belegVerwerfen, nachtragAnlegen, tagsKommentarSpeichern } from "./aktionen";
+import { angebotStatus, belegUebergeben, belegVerwerfen, lexwarePdfHolen, nachtragAnlegen, tagsKommentarSpeichern } from "./aktionen";
 import { TagEingabe } from "./editor";
 
 /** Sprungleiste der Kette: aktueller Beleg dunkel, Entwürfe gestrichelt, abgelehnte durchgestrichen */
@@ -138,6 +138,33 @@ export function UebergebenKnopf({ id, version }: { id: string; version: number }
         Als übergeben markieren
       </Button>
       <p className="mt-1.5 text-xs text-muted-2">{meldung ?? `Friert Version ${version} ein (Post, persönlich). Bearbeiten legt danach Version ${version + 1} an, die Nummer bleibt.`}</p>
+    </div>
+  );
+}
+
+/** Original-PDF eines Lexware-Belegs (erneut) bei Lexware abholen */
+export function LexwarePdfKnopf({ id }: { id: string }) {
+  const router = useRouter();
+  const [laeuft, starte] = useTransition();
+  const [meldung, setMeldung] = useState<string | null>(null);
+  return (
+    <div>
+      <Button
+        size="sm"
+        className="w-full"
+        disabled={laeuft}
+        data-aktion="lexware-pdf"
+        onClick={() =>
+          starte(async () => {
+            const r = await lexwarePdfHolen(id);
+            setMeldung(r.fehler ?? null);
+            router.refresh();
+          })
+        }
+      >
+        PDF von Lexware holen
+      </Button>
+      {meldung && <p className="mt-1.5 text-xs text-tone-red-fg">{meldung}</p>}
     </div>
   );
 }

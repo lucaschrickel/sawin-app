@@ -1,3 +1,4 @@
+import { abrechnungAnwenden } from "@/lib/beleg-abrechnung";
 import { erzeugePdf } from "@/lib/beleg-ablage";
 import { aufbereiten } from "@/lib/beleg-eingabe";
 import type { EditorZustand } from "@/lib/beleg-typen";
@@ -17,6 +18,9 @@ export async function POST(request: Request) {
     return new Response("Ungültige Daten", { status: 400 });
   }
   if (!z?.kopf || !Array.isArray(z.positionen)) return new Response("Ungültige Daten", { status: 400 });
+  const mitAbrechnung = await abrechnungAnwenden(z);
+  if ("fehler" in mitAbrechnung) return new Response(mitAbrechnung.fehler, { status: 422 });
+  z = mitAbrechnung;
   // Für die Vorschau reicht ein Kunde nicht als Pflicht: ohne Kunde bleibt die Adresse leer
   const daten = aufbereiten({ ...z, kopf: { ...z.kopf, kunde_id: z.kopf.kunde_id || "00000000-0000-4000-8000-000000000000" } });
   if ("fehler" in daten) return new Response(daten.fehler, { status: 422 });

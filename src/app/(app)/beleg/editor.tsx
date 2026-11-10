@@ -11,11 +11,13 @@ import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { cn } from "@/lib/cn";
 import { eur } from "@/lib/format";
 import { belegSummen, rund, zahl, type Steuerart } from "@/lib/beleg-summen";
+import { abschlagBerechnen, abschlagPositionen, schlussAbweichungen, type AbschlagErgebnis } from "@/lib/abschlag";
 import {
   EINHEITEN,
   HINWEIS_13B,
   HINWEIS_STEUERFREI,
   leerePosition,
+  neuerSchluessel,
   PLATZHALTER,
   STEUERART_TEXT,
   STEUERSAETZE,
@@ -24,8 +26,8 @@ import {
   type KopfEingabe,
   type PositionEingabe,
 } from "@/lib/beleg-typen";
-import { BELEGART_TEXT } from "@/lib/belege-status";
-import type { KundeFuerBeleg, Zahlungsbedingung } from "@/lib/belege";
+import { BELEGART_TEXT, LEXWARE_BELEGARTEN } from "@/lib/belege-status";
+import type { AbrechnungKontext, KundeFuerBeleg, Zahlungsbedingung } from "@/lib/belege";
 import { KundeDialog } from "../kunden/kunde-dialog";
 import { kundenSuchen, type KundeTreffer } from "../anfragen/aktionen";
 import { belegFertigstellen, belegSpeichern, belegVerwerfen, kundeFuerEditor } from "./aktionen";
@@ -40,7 +42,35 @@ type Props = {
   tagVorschlaege: string[];
   herkunftListe: string[];
   zurueck: { href: string; text: string };
+  /** Abschlag und Schlussrechnung: Werte der AB und angelegte Abschläge */
+  abrechnung?: AbrechnungKontext | null;
+  /** Stand der Übertragung an Lexware (Entwurf nach einem fehlgeschlagenen Versuch) */
+  lexware?: { status: string | null; fehler: string | null } | null;
 };
+
+const datumDe = (iso: string) => iso.split("-").reverse().join(".");
+
+/** Positionen der Abschlagsrechnung aus der Eingabe (Prozent bzw. Betrag), wie sie auch der Server rechnet */
+function abschlagZeilen(kopf: KopfEingabe, abrechnung: AbrechnungKontext | null | undefined, alt: PositionEingabe[]): PositionEingabe[] {
+  if (!abrechnung) return alt;
+  const wert = zahl(kopf.abschlag_wert);
+  if (!(wert > 0)) return [];
+  const eingabe = { art: kopf.abschlag_art, wert };
+  const e = abschlagBerechnen(eingabe, abrechnung.wert, abrechnung.abschlaege.map((a) => a.steuern));
+  return abschlagPositionen(e, eingabe, abrechnung.ab).map((p, i) => ({
+    key: alt[i]?.key ?? neuerSchluessel(),
+    id: alt[i]?.id ?? null,
+    typ: "artikel",
+    titel: p.titel,
+    beschreibung: p.beschreibung,
+    optional: false,
+    menge: "1",
+    einheit: p.einheit,
+    einzelpreis: String(p.einzelpreis).replace(".", ","),
+    rabatt_prozent: "",
+    steuersatz: String(p.steuersatz),
+  }));
+}
 
 const feld =
   "w-full rounded-sm border border-line bg-surface px-2.5 text-[14px] text-ink outline-none placeholder:text-muted-2 focus:border-(--focus-ring) focus:shadow-[0_0_0_1px_var(--focus-ring)] disabled:bg-surface-muted disabled:text-muted";
@@ -70,9 +100,11 @@ function Karte({ titel, rechts, children }: { titel?: string; rechts?: ReactNode
   );
 }
 
-export function BelegEditor({ start, hinweis, modus, zahlungsbedingungen, kundeStart, tagVorschlaege, herkunftListe, zurueck }: Props) {
+export function BelegEditor({ start, hinweis, modus, zahlungsbedingungen, kundeStart, tagVorschlaege, herkunftListe, zurueck, abrechnung, lexware }: Props) {
   const router = useRouter();
-  const [z, setZ] = useState<EditorZustand>(start);
+  const [z, setZ] = useState<EditorZustand>(() =>
+    start.kopf.art === "abschlagsrechnung" ? { ...start, positionen: abschlagZeilen(start.kopf, abrechnung, start.positionen) } : start,
+  );
   const [geaendert, setGeaendert] = useState(false);
   const [gespeichertUm, setGespeichertUm] = useState<string | null>(modus === "neu" ? null : "");
   const [fehler, setFehler] = useState<string | null>(null);
@@ -84,6 +116,12 @@ export function BelegEditor({ start, hinweis, modus, zahlungsbedingungen, kundeS
   const art = k.art;
   const ls = art === "lieferschein";
   const frei = k.steuerart !== "standard";
+  const lexArt = LEXWARE_BELEGARTEN.includes(art);
+  const abschlag = art === "abschlagsrechnung";
+  const gutschrift = art === "gutschrift";
+  const hatAbzug = z.positionen.some((p) => p.abzug_beleg_id);
+  /** Steuerart und Netto/Brutto kommen aus AB bzw. Rechnung */
+  const steuerFest = abschlag || gutschrift || hatAbzug;
 
   const setKopf = useCallback((aenderung: Partial<KopfEingabe>) => {
     setZ((alt) => ({ ...alt, kopf: { ...alt.kopf, ...aenderung } }));
@@ -98,11 +136,36 @@ export function BelegEditor({ start, hinweis, modus, zahlungsbedingungen, kundeS
   const summen = useMemo(
     () =>
       belegSummen(
-        z.positionen.map((p) => ({ typ: p.typ, optional: art === "angebot" && p.optional, menge: zahl(p.menge), einzelpreis: zahl(p.einzelpreis), rabatt_prozent: zahl(p.rabatt_prozent), steuersatz: zahl(p.steuersatz) })),
+        z.positionen.map((p) => ({ typ: p.typ, optional: art === "angebot" && p.optional, menge: zahl(p.menge), einzelpreis: zahl(p.einzelpreis), rabatt_prozent: zahl(p.rabatt_prozent), steuersatz: zahl(p.steuersatz), abzug: !!p.abzug_beleg_id })),
         { steuerart: k.steuerart, preise_brutto: k.preise_brutto, gesamtrabatt_prozent: zahl(k.gesamtrabatt_prozent) },
       ),
     [z.positionen, k.steuerart, k.preise_brutto, k.gesamtrabatt_prozent, art],
   );
+
+  // Abschlag: Ergebnis der Berechnung (Beträge je Satz, Rest, Warnung)
+  const abschlagErgebnis = useMemo<AbschlagErgebnis | null>(() => {
+    if (!abschlag || !abrechnung) return null;
+    const wert = zahl(k.abschlag_wert);
+    if (!(wert > 0)) return null;
+    return abschlagBerechnen({ art: k.abschlag_art, wert }, abrechnung.wert, abrechnung.abschlaege.map((a) => a.steuern));
+  }, [abschlag, abrechnung, k.abschlag_art, k.abschlag_wert]);
+  const setAbschlag = (aenderung: Partial<KopfEingabe>) => {
+    setZ((alt) => {
+      const kopf = { ...alt.kopf, ...aenderung };
+      return { kopf, positionen: abschlagZeilen(kopf, abrechnung, alt.positionen) };
+    });
+    setGeaendert(true);
+  };
+
+  // Schlussrechnung: volle Leistung (ohne Abzüge) und Prüfung, ob Netto, Steuer und Rest centgenau stimmen
+  const schluss = useMemo(() => {
+    if (!hatAbzug || !abrechnung) return null;
+    const voll = belegSummen(
+      z.positionen.filter((p) => !p.abzug_beleg_id).map((p) => ({ typ: p.typ, menge: zahl(p.menge), einzelpreis: zahl(p.einzelpreis), rabatt_prozent: zahl(p.rabatt_prozent), steuersatz: zahl(p.steuersatz) })),
+      { steuerart: k.steuerart, preise_brutto: k.preise_brutto, gesamtrabatt_prozent: zahl(k.gesamtrabatt_prozent) },
+    );
+    return { voll, abweichungen: schlussAbweichungen(voll.steuern, abrechnung.abschlaege.map((a) => a.steuern), summen.steuern) };
+  }, [hatAbzug, abrechnung, z.positionen, k.steuerart, k.preise_brutto, k.gesamtrabatt_prozent, summen.steuern]);
 
   // ---------- Verlassen mit ungespeicherten Änderungen: Speichern | Verwerfen | Abbrechen ----------
   const geaendertRef = useRef(geaendert);
@@ -171,7 +234,12 @@ export function BelegEditor({ start, hinweis, modus, zahlungsbedingungen, kundeS
       setFehler(null);
       const r = await belegFertigstellen(z);
       if (r.fehler || !r.id) {
-        if (r.id && !k.id) setKopf({ id: r.id });
+        if (r.id && !k.id && lexArt) {
+          // Lexware-Beleg: Entwurf ist gespeichert, die Belegseite zeigt den Fehler und erlaubt das Wiederholen
+          setGeaendert(false);
+          geaendertRef.current = false;
+          router.replace(`/beleg/${r.id}`);
+        } else if (r.id && !k.id) setKopf({ id: r.id });
         return setFehler(r.fehler ?? "Der Beleg konnte nicht fertiggestellt werden.");
       }
       nachSpeichern(r.id);
@@ -199,12 +267,16 @@ export function BelegEditor({ start, hinweis, modus, zahlungsbedingungen, kundeS
     });
   };
   const kundeWaehlen = (id: string) => starte(async () => kundeUebernehmen(await kundeFuerEditor(id), id !== k.kunde_id));
-  const kundeFest = !!k.vorgaenger_id || k.bezug.art === "auftrag" || modus === "bearbeiten";
+  const kundeFest = !!k.vorgaenger_id || k.bezug.art === "auftrag" || k.bezug.art === "ticket" || lexArt || modus === "bearbeiten";
 
   // ---------- Steuer und Brutto/Netto ----------
-  const steuerartSetzen = (s: Steuerart) => setKopf({ steuerart: s, preise_brutto: s === "standard" ? k.preise_brutto : false });
+  const steuerartSetzen = (s: Steuerart) => {
+    setKopf({ steuerart: s, preise_brutto: s === "standard" ? k.preise_brutto : false });
+    // Zurück auf Standard: Positionen ohne Satz (aus § 13b bzw. steuerfrei) bekommen wieder 19 %
+    if (s === "standard" && frei) setPositionen((ps) => ps.map((p) => (p.typ === "artikel" && zahl(p.steuersatz) === 0 ? { ...p, steuersatz: "19" } : p)));
+  };
   const bruttoSetzen = (brutto: boolean) => {
-    if (brutto === k.preise_brutto || frei) return;
+    if (brutto === k.preise_brutto || frei || steuerFest) return;
     setZ((alt) => ({
       kopf: { ...alt.kopf, preise_brutto: brutto },
       positionen: alt.positionen.map((p) => {
@@ -269,16 +341,16 @@ export function BelegEditor({ start, hinweis, modus, zahlungsbedingungen, kundeS
           </div>
         </div>
         {!ls && (
-          <div role="radiogroup" aria-label="Preise" className="inline-flex rounded-full border border-line bg-surface p-0.5 text-sm" title={frei ? "Bei § 13b und steuerfrei immer netto" : undefined}>
+          <div role="radiogroup" aria-label="Preise" className="inline-flex rounded-full border border-line bg-surface p-0.5 text-sm" title={frei ? "Bei § 13b und steuerfrei immer netto" : steuerFest ? "Wie in der Auftragsbestätigung bzw. Rechnung" : undefined}>
             {(["netto", "brutto"] as const).map((m) => (
               <button
                 key={m}
                 type="button"
                 role="radio"
                 aria-checked={(m === "brutto") === k.preise_brutto}
-                disabled={frei}
+                disabled={frei || steuerFest}
                 onClick={() => bruttoSetzen(m === "brutto")}
-                className={cn("rounded-full px-3 py-1 capitalize", (m === "brutto") === k.preise_brutto ? "bg-ink font-semibold text-surface" : "text-muted hover:text-ink", frei && "cursor-not-allowed opacity-60")}
+                className={cn("rounded-full px-3 py-1 capitalize", (m === "brutto") === k.preise_brutto ? "bg-ink font-semibold text-surface" : "text-muted hover:text-ink", (frei || steuerFest) && "cursor-not-allowed opacity-60")}
               >
                 {m}
               </button>
@@ -288,6 +360,14 @@ export function BelegEditor({ start, hinweis, modus, zahlungsbedingungen, kundeS
       </div>
 
       {hinweis && <p className="rounded-md bg-tone-brand-bg px-4 py-2.5 text-sm text-tone-brand-fg">{hinweis}</p>}
+      {lexware?.status === "fehler" && !fehler && (
+        <p role="alert" className="rounded-md bg-tone-red-bg px-4 py-2.5 text-sm text-tone-red-fg" data-lexware-fehler>
+          Die letzte Übertragung an Lexware ist fehlgeschlagen: {lexware.fehler ?? "unbekannter Fehler"}. Mit „Fertigstellen“ erneut versuchen; ein schon angelegter Beleg wird dabei erkannt und nicht doppelt angelegt.
+        </p>
+      )}
+      {lexware?.status === "uebertragung" && (
+        <p className="rounded-md bg-tone-amber-bg px-4 py-2.5 text-sm text-tone-amber-fg">Der Beleg wird gerade an Lexware übertragen. Bitte die Seite in einer Minute neu laden.</p>
+      )}
       {fehler && (
         <p role="alert" className="rounded-md bg-tone-red-bg px-4 py-2.5 text-sm text-tone-red-fg">
           {fehler}
@@ -353,7 +433,7 @@ export function BelegEditor({ start, hinweis, modus, zahlungsbedingungen, kundeS
               <div className="flex flex-col gap-3">
                 <div className="grid grid-cols-2 gap-2">
                   <Beschriftet name={`${BELEGART_TEXT[art]}-Nr.`}>
-                    <input className={eingabe} disabled value={k.nummer ?? ""} placeholder={art === "angebot" ? "beim ersten Speichern" : "beim Fertigstellen"} />
+                    <input className={eingabe} disabled value={k.nummer ?? ""} placeholder={art === "angebot" ? "beim ersten Speichern" : lexArt ? "von Lexware" : "beim Fertigstellen"} />
                   </Beschriftet>
                   <Beschriftet name="Kunden-Nr.">
                     <input className={eingabe} disabled value={k.kunde_nummer} />
@@ -392,6 +472,16 @@ export function BelegEditor({ start, hinweis, modus, zahlungsbedingungen, kundeS
                     </Beschriftet>
                   </div>
                 )}
+                {art === "rechnung" && (
+                  <div className="grid grid-cols-2 gap-2">
+                    <Beschriftet name="Leistungsdatum">
+                      <input type="date" className={eingabe} value={k.leistung_von} onChange={(e) => setKopf({ leistung_von: e.target.value })} name="leistung_von" required />
+                    </Beschriftet>
+                    <Beschriftet name="bis (Zeitraum, optional)">
+                      <input type="date" className={eingabe} value={k.leistung_bis} onChange={(e) => setKopf({ leistung_bis: e.target.value })} name="leistung_bis" />
+                    </Beschriftet>
+                  </div>
+                )}
                 {ls && (
                   <Beschriftet name="Lieferdatum">
                     <input type="date" className={eingabe} value={k.liefertermin} onChange={(e) => setKopf({ liefertermin: e.target.value })} name="liefertermin" />
@@ -399,7 +489,7 @@ export function BelegEditor({ start, hinweis, modus, zahlungsbedingungen, kundeS
                 )}
                 {!ls && (
                   <Beschriftet name="Steuerart">
-                    <select className={eingabe} value={k.steuerart} onChange={(e) => steuerartSetzen(e.target.value as Steuerart)} name="steuerart">
+                    <select className={eingabe} value={k.steuerart} disabled={steuerFest} onChange={(e) => steuerartSetzen(e.target.value as Steuerart)} name="steuerart">
                       {(Object.keys(STEUERART_TEXT) as Steuerart[]).map((s) => (
                         <option key={s} value={s}>{STEUERART_TEXT[s]}</option>
                       ))}
@@ -414,8 +504,8 @@ export function BelegEditor({ start, hinweis, modus, zahlungsbedingungen, kundeS
           {/* Titel, Bauvorhaben, Objekt, Einleitung */}
           <Karte>
             <div className="flex flex-col gap-3">
-              <Beschriftet name="Belegtitel">
-                <input className={eingabe} value={k.titel} onChange={(e) => setKopf({ titel: e.target.value })} name="titel" />
+              <Beschriftet name={abschlag ? "Belegtitel (Nummer des Abschlags vergibt die App beim Fertigstellen)" : lexArt ? "Belegtitel (in Lexware höchstens 25 Zeichen)" : "Belegtitel"}>
+                <input className={eingabe} value={k.titel} disabled={abschlag} maxLength={lexArt ? 25 : undefined} onChange={(e) => setKopf({ titel: e.target.value })} name="titel" />
               </Beschriftet>
               <div className="grid gap-2 md:grid-cols-2">
                 <Beschriftet name="Bauvorhaben">
@@ -436,7 +526,10 @@ export function BelegEditor({ start, hinweis, modus, zahlungsbedingungen, kundeS
             </div>
           </Karte>
 
-          {/* Positionen */}
+          {/* Positionen (Abschlag: aus Prozent bzw. Betrag berechnet) */}
+          {abschlag ? (
+            <AbschlagKarte k={k} abrechnung={abrechnung} ergebnis={abschlagErgebnis} onChange={setAbschlag} />
+          ) : (
           <Karte
             titel="Positionen"
             rechts={<span className="text-xs text-muted-2">{ls ? "Lieferscheine zeigen keine Preise" : frei ? "ohne Umsatzsteuer" : k.preise_brutto ? "Preise brutto, inkl. USt" : "Preise netto, zzgl. USt"}</span>}
@@ -478,6 +571,7 @@ export function BelegEditor({ start, hinweis, modus, zahlungsbedingungen, kundeS
                 {(() => {
                   const nummern = z.positionen.reduce<(number | null)[]>((acc, p) => [...acc, p.typ === "artikel" ? acc.filter((x) => x !== null).length + 1 : null], []);
                   return z.positionen.map((p, i) => {
+                    if (p.abzug_beleg_id) return null;
                     const nr = nummern[i];
                     const betrag = summen.zeilen[i];
                     const optional = art === "angebot" && p.optional;
@@ -596,6 +690,24 @@ export function BelegEditor({ start, hinweis, modus, zahlungsbedingungen, kundeS
                 ))}
               </datalist>
             </div>
+            {hatAbzug && (
+              <div className="mt-3 rounded-md border border-line-soft bg-surface-muted px-3 py-2.5" data-abzuege>
+                <p className="mb-1.5 text-[12.5px] font-semibold text-ink-3">abzgl. bereits berechnet · nicht abwählbar</p>
+                <ul className="flex flex-col gap-1.5 text-sm">
+                  {z.positionen.map((p, i) =>
+                    p.abzug_beleg_id ? (
+                      <li key={p.key} className="flex justify-between gap-3" data-abzug>
+                        <span className="min-w-0">
+                          <span className="font-medium">{p.titel}</span>
+                          <span className="block text-xs text-muted">{p.beschreibung}</span>
+                        </span>
+                        <span className="whitespace-nowrap tabular">{eur(summen.zeilen[i] ?? 0)}</span>
+                      </li>
+                    ) : null,
+                  )}
+                </ul>
+              </div>
+            )}
             <div className="mt-3 flex flex-wrap items-center gap-2">
               <Button size="sm" variant="primary" data-neue-position onClick={() => setPositionen((ps) => [...ps, leerePosition()])}>
                 <Plus className="size-4" /> Position
@@ -637,7 +749,14 @@ export function BelegEditor({ start, hinweis, modus, zahlungsbedingungen, kundeS
                 </div>
               </div>
             )}
+            {schluss && schluss.abweichungen.length > 0 && (
+              <p className="mt-3 rounded-md bg-tone-amber-bg px-3 py-2 text-sm text-tone-amber-fg" data-rundung>
+                Die Positionen weichen von der Auftragsbestätigung ab. Die Umsatzsteuer des Restbetrags weicht deshalb um{" "}
+                {schluss.abweichungen.map((a) => `${eur(rund(a.lexware.steuer - a.erwartet.steuer))} (${a.satz} %)`).join(", ")} von „Steuer gesamt − Steuer der Abschläge“ ab.
+              </p>
+            )}
           </Karte>
+          )}
 
           {/* Lieferbedingungen, Zahlungsbedingung, Nachbemerkung */}
           <Karte>
@@ -647,7 +766,7 @@ export function BelegEditor({ start, hinweis, modus, zahlungsbedingungen, kundeS
                   <textarea rows={3} className={flaeche} value={k.lieferbedingungen} onChange={(e) => setKopf({ lieferbedingungen: e.target.value })} name="lieferbedingungen" />
                 </Beschriftet>
               )}
-              {!ls && (
+              {!ls && !gutschrift && (
                 <>
                   <div className="grid gap-2 md:grid-cols-[minmax(0,1fr)_88px_100px_88px]">
                     <Beschriftet name="Zahlungsbedingung">
@@ -725,9 +844,39 @@ export function BelegEditor({ start, hinweis, modus, zahlungsbedingungen, kundeS
                 </>
               ) : (
                 <>
-                  <Button variant="primary" disabled={laeuft} onClick={fertigstellen} data-aktion="fertigstellen">
-                    <Lock className="size-4" /> Fertigstellen
-                  </Button>
+                  {lexArt ? (
+                    <Bestaetigen
+                      titel={`${BELEGART_TEXT[art]} in Lexware anlegen?`}
+                      knopf="In Lexware anlegen"
+                      ausfuehren={fertigstellen}
+                      text={
+                        <div className="flex flex-col gap-2" data-lexware-bestaetigung>
+                          <p>
+                            {abschlag && abschlagErgebnis ? `${(abrechnung?.abschlaege.length ?? 0) + 1}. Abschlagsrechnung` : BELEGART_TEXT[art]} über <b>{eur(summen.brutto)}</b> wird in Lexware angelegt. Lexware vergibt die Nummer und liefert das PDF.
+                          </p>
+                          <p>
+                            Danach ist der Beleg <b>endgültig und nicht löschbar</b>. Korrekturen laufen über eine Gutschrift. Versendet wird nur das Lexware-PDF.
+                          </p>
+                          {abschlagErgebnis?.ueberschritten && (
+                            <p className="font-medium text-tone-amber-fg" data-warnung-ueberschritten>
+                              Achtung: Mit diesem Abschlag übersteigen die Abschläge den Auftragswert um {eur(-abschlagErgebnis.rest)}.
+                            </p>
+                          )}
+                          {schluss && schluss.abweichungen.length > 0 && (
+                            <p className="font-medium text-tone-amber-fg">Achtung: Die Umsatzsteuer des Restbetrags weicht wegen geänderter Positionen um einen Rundungsbetrag ab.</p>
+                          )}
+                        </div>
+                      }
+                    >
+                      <Button variant="primary" disabled={laeuft || (abschlag && !abschlagErgebnis)} data-aktion="fertigstellen">
+                        <Lock className="size-4" /> Fertigstellen
+                      </Button>
+                    </Bestaetigen>
+                  ) : (
+                    <Button variant="primary" disabled={laeuft} onClick={fertigstellen} data-aktion="fertigstellen">
+                      <Lock className="size-4" /> Fertigstellen
+                    </Button>
+                  )}
                   <Button disabled={laeuft} onClick={() => speichern()} data-aktion="speichern">
                     <Save className="size-4" /> Entwurf speichern
                   </Button>
@@ -736,11 +885,13 @@ export function BelegEditor({ start, hinweis, modus, zahlungsbedingungen, kundeS
                   </Button>
                   {k.id && (
                     <>
-                      <Button asChild variant="ghost">
-                        <Link href={`/beleg/neu?art=${art}&kopie=${k.id}`}>
-                          <Copy className="size-4" /> Duplizieren
-                        </Link>
-                      </Button>
+                      {!lexArt && (
+                        <Button asChild variant="ghost">
+                          <Link href={`/beleg/neu?art=${art}&kopie=${k.id}`}>
+                            <Copy className="size-4" /> Duplizieren
+                          </Link>
+                        </Button>
+                      )}
                       <Bestaetigen
                         titel="Entwurf verwerfen?"
                         text={art === "angebot" ? `Der Entwurf wird verworfen. Seine Nummer ${k.nummer ?? ""} wird nicht wiederverwendet.` : "Der Entwurf wird verworfen. Er hat noch keine Nummer."}
@@ -772,6 +923,13 @@ export function BelegEditor({ start, hinweis, modus, zahlungsbedingungen, kundeS
               <p className="text-sm text-muted">{z.positionen.filter((p) => p.typ === "artikel").length} Positionen · ohne Preise</p>
             ) : (
               <dl className="flex flex-col gap-1 text-sm">
+                {schluss && (
+                  <>
+                    <div className="flex justify-between"><dt className="text-muted">Leistung gesamt</dt><dd className="tabular">{eur(schluss.voll.brutto)}</dd></div>
+                    <div className="flex justify-between"><dt className="text-muted">abzgl. Abschläge</dt><dd className="tabular">{eur(rund(summen.brutto - schluss.voll.brutto))}</dd></div>
+                    <div className="mb-1 border-b border-line-soft pb-1 text-xs text-muted-2">Restbetrag dieser Schlussrechnung:</div>
+                  </>
+                )}
                 {summen.rabatt !== 0 && (
                   <>
                     <div className="flex justify-between"><dt className="text-muted">Zwischensumme</dt><dd className="tabular">{eur(summen.zwischensumme)}</dd></div>
@@ -1033,5 +1191,79 @@ export function TagEingabe({ tags, vorschlaege, onChange }: { tags: string[]; vo
         ))}
       </datalist>
     </div>
+  );
+}
+
+/** Abschlagsrechnung: Eingabe als Prozent vom Auftragswert (brutto) oder als Bruttobetrag, mit Übersicht */
+function AbschlagKarte({
+  k,
+  abrechnung,
+  ergebnis,
+  onChange,
+}: {
+  k: KopfEingabe;
+  abrechnung: AbrechnungKontext | null | undefined;
+  ergebnis: AbschlagErgebnis | null;
+  onChange: (a: Partial<KopfEingabe>) => void;
+}) {
+  if (!abrechnung)
+    return (
+      <Karte titel="Abschlag">
+        <p className="text-sm text-tone-red-fg">Der Auftrag hat keine fertiggestellte Auftragsbestätigung.</p>
+      </Karte>
+    );
+  const zeile = (name: ReactNode, betrag: ReactNode, fett = false, data?: string) => (
+    <div className={cn("flex justify-between gap-3", fett && "font-semibold")} {...(data ? { [data]: "" } : {})}>
+      <dt className={fett ? "" : "text-muted"}>{name}</dt>
+      <dd className="tabular">{betrag}</dd>
+    </div>
+  );
+  return (
+    <Karte titel="Abschlag" rechts={<span className="text-xs text-muted-2">Auftragsbestätigung {abrechnung.ab.nummer} vom {datumDe(abrechnung.ab.datum)}</span>}>
+      <div className="flex flex-wrap items-end gap-3">
+        <div role="radiogroup" aria-label="Eingabe des Abschlags" className="inline-flex rounded-full border border-line bg-surface p-0.5 text-sm">
+          {(["prozent", "betrag"] as const).map((a) => (
+            <button
+              key={a}
+              type="button"
+              role="radio"
+              aria-checked={k.abschlag_art === a}
+              onClick={() => a !== k.abschlag_art && onChange({ abschlag_art: a, abschlag_wert: "" })}
+              className={cn("rounded-full px-3 py-1", k.abschlag_art === a ? "bg-ink font-semibold text-surface" : "text-muted hover:text-ink")}
+            >
+              {a === "prozent" ? "Prozent" : "Betrag brutto"}
+            </button>
+          ))}
+        </div>
+        <Beschriftet name={k.abschlag_art === "prozent" ? "Abschlag in % vom Auftragswert (brutto)" : "Abschlag in € (brutto)"}>
+          <input inputMode="decimal" className={cn(eingabe, "w-44 text-right")} value={k.abschlag_wert} onChange={(e) => onChange({ abschlag_wert: e.target.value })} name="abschlag_wert" data-feld="abschlag" />
+        </Beschriftet>
+      </div>
+      <dl className="mt-4 flex max-w-md flex-col gap-1.5 text-sm" data-abschlag-uebersicht>
+        {zeile(`Auftragswert (AB ${abrechnung.ab.nummer})`, eur(abrechnung.ab.brutto))}
+        {abrechnung.abschlaege.map((a) => zeile(`${a.nr ?? ""}. Abschlag ${a.nummer ?? ""} vom ${datumDe(a.datum)}`, eur(-a.brutto)))}
+        {ergebnis && (
+          <>
+            {ergebnis.zeilen.length > 1 &&
+              ergebnis.zeilen.map((z) => zeile(`davon ${z.satz} %: netto ${eur(z.netto)} + USt ${eur(z.steuer)}`, eur(z.brutto)))}
+            {zeile("Dieser Abschlag netto", eur(ergebnis.netto))}
+            {zeile("zzgl. Umsatzsteuer", eur(ergebnis.steuer))}
+            {zeile("Dieser Abschlag brutto", <span data-abschlag-brutto>{eur(ergebnis.brutto)}</span>, true)}
+            {zeile("Rest des Auftrags danach", eur(ergebnis.rest))}
+          </>
+        )}
+      </dl>
+      {ergebnis && ergebnis.abweichung !== 0 && (
+        <p className="mt-2 text-xs text-muted" data-abschlag-angepasst>
+          Auf {eur(ergebnis.brutto)} statt {eur(ergebnis.ziel)} angepasst, damit die Umsatzsteuer der Schlussrechnung centgenau aufgeht.
+        </p>
+      )}
+      {ergebnis?.ueberschritten && (
+        <p role="alert" className="mt-2 rounded-md bg-tone-amber-bg px-3 py-2 text-sm text-tone-amber-fg">
+          Die Abschläge übersteigen den Auftragswert um {eur(-ergebnis.rest)}.
+        </p>
+      )}
+      {!ergebnis && <p className="mt-2 text-sm text-muted">Bitte {k.abschlag_art === "prozent" ? "den Prozentsatz" : "den Betrag"} eingeben.</p>}
+    </Karte>
   );
 }

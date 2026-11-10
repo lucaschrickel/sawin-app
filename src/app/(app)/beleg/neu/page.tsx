@@ -2,8 +2,8 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { Shell } from "@/components/app/shell";
 import { getCustomer } from "@/customers";
-import { ladeBelegTags, ladeKundeFuerBeleg, ladeZahlungsbedingungen, neuerBelegZustand } from "@/lib/belege";
-import { APP_BELEGARTEN, BELEGART_TEXT, type Belegart } from "@/lib/belege-status";
+import { ladeAbrechnung, ladeBelegTags, ladeKundeFuerBeleg, ladeZahlungsbedingungen, neuerBelegZustand } from "@/lib/belege";
+import { BELEGART_TEXT, EDITOR_BELEGARTEN, type Belegart } from "@/lib/belege-status";
 import { BelegEditor } from "../editor";
 import { AKTIV, LISTE } from "../navigation";
 
@@ -14,8 +14,8 @@ const eins = (v: string | string[] | undefined) => (Array.isArray(v) ? v[0] : v)
 /** Neuer Beleg: öffnet direkt den Vollbild-Editor (kein Dialog davor). Kunde und Bezug werden im Editor gewählt. */
 export default async function NeuerBelegPage({ searchParams }: PageProps<"/beleg/neu">) {
   const sp = await searchParams;
-  const art = (APP_BELEGARTEN as string[]).includes(eins(sp.art) ?? "") ? (eins(sp.art) as Belegart) : "angebot";
-  const p = { art, vorgaenger: eins(sp.vorgaenger), anfrage: eins(sp.anfrage), auftrag: eins(sp.auftrag), kunde: eins(sp.kunde), kopie: eins(sp.kopie) };
+  const art = (EDITOR_BELEGARTEN as string[]).includes(eins(sp.art) ?? "") ? (eins(sp.art) as Belegart) : "angebot";
+  const p = { art, vorgaenger: eins(sp.vorgaenger), anfrage: eins(sp.anfrage), auftrag: eins(sp.auftrag), ticket: eins(sp.ticket), kunde: eins(sp.kunde), kopie: eins(sp.kopie) };
   const [start, zahlungsbedingungen, tags] = await Promise.all([neuerBelegZustand(p), ladeZahlungsbedingungen(), ladeBelegTags()]);
   const zurueck = p.vorgaenger
     ? { href: `/beleg/${p.vorgaenger}`, text: "Vorgängerbeleg" }
@@ -25,7 +25,9 @@ export default async function NeuerBelegPage({ searchParams }: PageProps<"/beleg
         ? { href: `/anfragen/${p.anfrage}`, text: "Anfrage" }
         : p.auftrag
           ? { href: `/auftraege/${p.auftrag}`, text: "Auftrag" }
-          : LISTE[art];
+          : p.ticket
+            ? { href: `/service/${p.ticket}`, text: "Service-Ticket" }
+            : LISTE[art];
   const crumbs = [{ label: "Belege" }, { label: LISTE[art].text, href: LISTE[art].href }, { label: `${BELEGART_TEXT[art]} erstellen` }];
 
   if ("fehler" in start)
@@ -35,7 +37,11 @@ export default async function NeuerBelegPage({ searchParams }: PageProps<"/beleg
         <Link href={zurueck.href} className="mt-3 inline-block text-sm text-accent-text hover:underline">Zurück</Link>
       </Shell>
     );
-  const kunde = start.zustand.kopf.kunde_id ? await ladeKundeFuerBeleg(start.zustand.kopf.kunde_id) : null;
+  const kopf = start.zustand.kopf;
+  const [kunde, abrechnung] = await Promise.all([
+    kopf.kunde_id ? ladeKundeFuerBeleg(kopf.kunde_id) : null,
+    (kopf.art === "abschlagsrechnung" || kopf.art === "rechnung") && kopf.bezug.art === "auftrag" && kopf.bezug.id ? ladeAbrechnung(kopf.bezug.id) : null,
+  ]);
   return (
     <Shell active={AKTIV[start.zustand.kopf.art]} crumbs={crumbs}>
       <BelegEditor
@@ -48,6 +54,7 @@ export default async function NeuerBelegPage({ searchParams }: PageProps<"/beleg
         tagVorschlaege={tags}
         herkunftListe={getCustomer().herkunft}
         zurueck={zurueck}
+        abrechnung={abrechnung}
       />
     </Shell>
   );

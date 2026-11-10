@@ -10,6 +10,7 @@ import { pruefeSitzung } from "@/lib/auth/sitzung";
 import { ladeAufgabenZu } from "@/lib/aufgaben";
 import { cn } from "@/lib/cn";
 import { heute as ladeHeute } from "@/lib/heute";
+import { ladeBelegeZu } from "@/lib/belege";
 import { ladeTicket } from "@/lib/service";
 import { AUFTRAG_PHASE_TEXT, AUFTRAG_PHASE_TON } from "@/lib/status";
 import { ABRECHNUNG_TEXT, TICKET_ART_TEXT, TICKET_PRIO_TEXT, TICKET_PRIO_TON, TICKET_STATUS_TEXT, TICKET_STATUS_TON } from "@/lib/ticket-status";
@@ -18,6 +19,8 @@ import { lokalKurz, montagVon } from "@/lib/woche";
 import { tag, zeitpunkt } from "@/lib/zeit";
 import { ladeBuchungen, ladeZeitDialogDaten, summeJeAuftrag } from "@/lib/zeiten";
 import { AufgabenKarte } from "../../aufgaben/ui";
+import { BelegeKompakt } from "../../beleg/kompakt";
+import { SchrittKnoepfe } from "../../beleg/ui";
 import { ZeitDialog } from "../../zeiten/zeit-dialog";
 import { TicketDialog, TicketLoeschen, TicketNotizFormular, TicketStatusAuswahl, TicketStatusleiste } from "../ui";
 
@@ -29,13 +32,14 @@ export default async function TicketSeite({ params, searchParams }: PageProps<"/
   const { id } = await params;
   const reiter = eins((await searchParams).reiter) === "historie" ? "historie" : "uebersicht";
   const heute = await ladeHeute();
-  const [daten, benutzer, { benutzer: ich }, aufgaben, zeiten, zeitDialog] = await Promise.all([
+  const [daten, benutzer, { benutzer: ich }, aufgaben, zeiten, zeitDialog, belege] = await Promise.all([
     ladeTicket(id),
     ladeBenutzerAuswahl(),
     pruefeSitzung(),
     ladeAufgabenZu({ ticket_id: id }),
     ladeBuchungen({ von: null, bis: null, ticket: id }).catch(() => []),
     ladeZeitDialogDaten(),
+    ladeBelegeZu({ ticket_id: id }),
   ]);
   if (!daten) notFound();
   const { ticket: t, kunde: k, auftrag: a, einsaetze, historie } = daten;
@@ -126,11 +130,29 @@ export default async function TicketSeite({ params, searchParams }: PageProps<"/
                   <Link href={`/auftraege/${a.id}`} className="text-sm hover:underline"><span className="font-mono">{a.nummer}</span> · {a.titel}</Link>
                 </Karte>
               )}
-              <Karte titel="Belege" rechts={<span className="text-sm text-muted-2 tabular">0</span>}>
-                <p className="text-sm text-muted">
-                  Noch keine Belege. Die Rechnung zum Ticket kommt mit dem Beleg-Modul{t.status === "erledigt" ? " und ist dann der nächste Schritt" : ""}.
-                  {(t.abrechnung === "garantie" || t.abrechnung === "kulanz") && ` Abrechnung: ${ABRECHNUNG_TEXT[t.abrechnung]}.`}
-                </p>
+              <Karte titel="Belege" rechts={<span className="text-sm text-muted-2 tabular">{belege.length}</span>}>
+                {belege.length ? (
+                  <BelegeKompakt belege={belege} heute={heute} />
+                ) : (
+                  <p className="text-sm text-muted">
+                    Noch keine Belege.
+                    {(t.abrechnung === "garantie" || t.abrechnung === "kulanz") && ` Abrechnung: ${ABRECHNUNG_TEXT[t.abrechnung]}.`}
+                  </p>
+                )}
+                {(() => {
+                  // Rechnung direkt am Ticket; hervorgehoben erst, wenn das Ticket erledigt ist
+                  const entwurf = belege.find((b) => b.art === "rechnung" && b.status === "entwurf");
+                  const fertig = belege.some((b) => b.art === "rechnung" && b.status !== "entwurf");
+                  if (fertig && !entwurf) return null;
+                  const schritt = entwurf
+                    ? { text: "Rechnung weiter bearbeiten", href: `/beleg/${entwurf.id}`, ton: "primary" as const }
+                    : { text: "Rechnung erstellen", href: `/beleg/neu?art=rechnung&ticket=${t.id}`, ton: t.status === "erledigt" ? ("primary" as const) : ("secondary" as const) };
+                  return (
+                    <div className="mt-3 border-t border-line-soft pt-3" data-ticket-rechnung>
+                      <SchrittKnoepfe schritte={[schritt]} klein />
+                    </div>
+                  );
+                })()}
               </Karte>
               <AufgabenKarte aufgaben={aufgaben} bezug={{ art: "ticket", id: t.id, text: `${t.nummer} · ${t.thema}` }} kontext={{ benutzer, ichId: ich.id, heute }} />
             </div>

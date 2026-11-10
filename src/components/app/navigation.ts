@@ -54,9 +54,9 @@ export const NAVIGATION: NavGroup[] = [
       { key: "angebote", href: "/belege/angebote", label: "Angebote", icon: FileText, bereit: true, zaehler: "angebote" },
       { key: "auftraege", href: "/auftraege", label: "Aufträge", icon: Briefcase, bereit: true, zaehler: "auftraege" },
       { key: "lieferscheine", href: "/belege/lieferscheine", label: "Lieferscheine", icon: Truck, bereit: true },
-      { key: "abschlaege", href: "/belege/abschlaege", label: "Abschlagsrechnungen", icon: Receipt },
-      { key: "rechnungen", href: "/belege/rechnungen", label: "Rechnungen", icon: Receipt },
-      { key: "gutschriften", href: "/belege/gutschriften", label: "Gutschriften", icon: Undo2 },
+      { key: "abschlaege", href: "/belege/abschlaege", label: "Abschlagsrechnungen", icon: Receipt, bereit: true },
+      { key: "rechnungen", href: "/belege/rechnungen", label: "Rechnungen", icon: Receipt, bereit: true },
+      { key: "gutschriften", href: "/belege/gutschriften", label: "Gutschriften", icon: Undo2, bereit: true },
     ],
   },
   {

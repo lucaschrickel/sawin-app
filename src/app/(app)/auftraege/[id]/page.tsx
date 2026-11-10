@@ -12,7 +12,7 @@ import { pruefeSitzung } from "@/lib/auth/sitzung";
 import { ladeAufgabenZu } from "@/lib/aufgaben";
 import { ladeAuftrag } from "@/lib/auftraege";
 import { ladeBelegeZu } from "@/lib/belege";
-import { auftragSchritte } from "@/lib/belege-status";
+import { anzeigeStatus, auftragFinanzen, auftragSchritte } from "@/lib/belege-status";
 import { eur } from "@/lib/format";
 import { BelegeKompakt } from "../../beleg/kompakt";
 import { BelegErstellenMenue, SchrittKnoepfe } from "../../beleg/ui";
@@ -67,8 +67,22 @@ export default async function AuftragPage({ params, searchParams }: PageProps<"/
   const kwWeichtAb = !!(lieferKw && a.liefertermin && (lieferKw.kw !== lieferterminKw || lieferKw.jahr !== Number(a.liefertermin.slice(0, 4))));
   const ab = belege.find((b) => b.art === "auftragsbestaetigung" && b.status !== "entwurf");
   const belegSchritte = auftragSchritte(id, belege);
+  const fin = auftragFinanzen(belege);
+  const schluss = fin.rechnungen.find((b) => !b.teil);
+  const gutschriftAus = [...fin.abschlaege, ...fin.rechnungen].map((b) => ({ text: `Gutschrift zu ${b.nummer ?? ""}`, sub: `aus ${b.art === "rechnung" ? "der Rechnung" : "dem Abschlag"}, wird in Lexware angelegt`, href: `/beleg/neu?art=gutschrift&vorgaenger=${b.id}` }));
   const erstellen = ab
-    ? [{ text: "Lieferschein", sub: "Positionen aus der Auftragsbestätigung", href: `/beleg/neu?art=lieferschein&vorgaenger=${ab.id}` }]
+    ? schluss
+      ? gutschriftAus
+      : [
+          { text: "Lieferschein", sub: "Positionen aus der Auftragsbestätigung", href: `/beleg/neu?art=lieferschein&vorgaenger=${ab.id}` },
+          { text: "Abschlagsrechnung", sub: "Prozent oder Betrag vom Auftragswert, wird in Lexware angelegt", href: `/beleg/neu?art=abschlagsrechnung&auftrag=${id}` },
+          {
+            text: fin.abschlaege.length ? "Schlussrechnung" : "Rechnung",
+            sub: fin.abschlaege.length ? "zieht alle Abschläge ab, wird in Lexware angelegt" : "Positionen aus der Auftragsbestätigung, wird in Lexware angelegt",
+            href: `/beleg/neu?art=rechnung&auftrag=${id}`,
+          },
+          ...gutschriftAus,
+        ]
     : belege.some((b) => b.art === "auftragsbestaetigung")
       ? []
       : [{ text: "Auftragsbestätigung", sub: `Übernimmt die Auftragsnummer ${a.nummer}`, href: `/beleg/neu?art=auftragsbestaetigung&auftrag=${id}` }];
@@ -243,11 +257,47 @@ export default async function AuftragPage({ params, searchParams }: PageProps<"/
                       <dd className="mt-0.5 text-lg font-semibold tabular" data-auftragswert>{eur(ab.summe_brutto)}</dd>
                     </div>
                     <div>
-                      <dt className="text-xs font-medium text-muted-2">netto</dt>
-                      <dd className="mt-0.5 tabular text-muted">{eur(ab.summe_netto)}</dd>
+                      <dt className="text-xs font-medium text-muted-2">noch nicht berechnet</dt>
+                      <dd className="mt-0.5 text-lg tabular" data-auftragsbestand>{eur(fin.bestand)}</dd>
                     </div>
                   </dl>
-                  <p className="mt-2 text-xs text-muted-2">Abschläge und Rechnungen folgen mit der Lexware-Anbindung.</p>
+                  {[
+                    { titel: "Abschlagsrechnungen", liste: fin.abschlaege, rechts: fin.abschlaege.length ? `${fin.abschlaegeBezahlt} von ${fin.abschlaege.length} bezahlt` : "" },
+                    { titel: "Rechnungen", liste: fin.rechnungen, rechts: "" },
+                    { titel: "Gutschriften", liste: fin.gutschriften, rechts: "" },
+                  ]
+                    .filter((g) => g.liste.length)
+                    .map((g) => (
+                      <div key={g.titel} className="mt-3 border-t border-line-soft pt-2.5" data-finanzen={g.titel}>
+                        <div className="mb-1 flex justify-between text-xs font-medium text-muted-2">
+                          <span>{g.titel}</span>
+                          <span>{g.rechts}</span>
+                        </div>
+                        <ul className="flex flex-col gap-1 text-sm">
+                          {g.liste.map((b) => {
+                            const st = anzeigeStatus(b, belege, heute);
+                            return (
+                              <li key={b.id} className="flex items-center justify-between gap-2">
+                                <Link href={`/beleg/${b.id}`} className="min-w-0 truncate hover:underline">
+                                  {b.abschlag_nr ? `${b.abschlag_nr}. ` : ""}
+                                  <span className="font-mono text-[13px]">{b.nummer}</span>
+                                </Link>
+                                <span className="flex items-center gap-2">
+                                  <span className="tabular">{eur(b.art === "gutschrift" ? -b.summe_brutto : b.summe_brutto)}</span>
+                                  <Badge tone={st.ton}>{st.text}</Badge>
+                                </span>
+                              </li>
+                            );
+                          })}
+                        </ul>
+                      </div>
+                    ))}
+                  {fin.offen > 0 && (
+                    <p className="mt-3 flex justify-between border-t border-line-soft pt-2.5 text-sm">
+                      <span className="text-muted">offen</span>
+                      <span className="font-semibold tabular" data-offen>{eur(fin.offen)}</span>
+                    </p>
+                  )}
                 </Karte>
               )}
               <Karte

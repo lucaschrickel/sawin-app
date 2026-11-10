@@ -20,9 +20,11 @@ export type PositionEingabe = {
   einzelpreis: string;
   rabatt_prozent: string;
   steuersatz: string;
+  /** Schlussrechnung: Abzug dieser Abschlagsrechnung (von der App erzeugt, nicht änderbar) */
+  abzug_beleg_id?: string | null;
 };
 
-export type BezugWahl = { art: "anfrage" | "auftrag" | "neu" | "keiner"; id: string | null; text: string };
+export type BezugWahl = { art: "anfrage" | "auftrag" | "ticket" | "neu" | "keiner"; id: string | null; text: string };
 
 export type KopfEingabe = {
   id: string | null;
@@ -63,6 +65,9 @@ export type KopfEingabe = {
   /** AB: geplanter Liefer- bzw. Montagezeitraum; Rechnung: Leistungszeitraum */
   leistung_von: string;
   leistung_bis: string;
+  /** Abschlagsrechnung: Eingabe als Prozent vom Auftragswert (brutto) oder als Bruttobetrag */
+  abschlag_art: "prozent" | "betrag";
+  abschlag_wert: string;
   tags: string[];
   kommentar_intern: string;
 };
@@ -149,12 +154,16 @@ export const STANDARD_TEXTE: Partial<Record<Belegart, { einleitung?: string; nac
   auftragsbestaetigung: { einleitung: "Sehr geehrte Damen und Herren,\nvielen Dank für Ihren Auftrag. Hiermit bestätigen wir Ihnen die folgenden Leistungen:" },
   lieferschein: { einleitung: "Wir liefern Ihnen folgende Positionen:", nachbemerkung: "Ware vollständig und unbeschädigt erhalten: ______________________ (Datum, Unterschrift)" },
   rechnung: { einleitung: "Sehr geehrte Damen und Herren,\nfür die erbrachten Leistungen erlauben wir uns, folgende Rechnung zu stellen:", nachbemerkung: "Vielen Dank für Ihren Auftrag." },
+  abschlagsrechnung: { einleitung: "Sehr geehrte Damen und Herren,\nwie vereinbart berechnen wir Ihnen folgenden Abschlag:", nachbemerkung: "Vielen Dank für Ihren Auftrag." },
   gutschrift: { einleitung: "Zu unserer Rechnung erhalten Sie folgende Korrektur:" },
 };
 
 let schluessel = 0;
 /** Schlüssel für neue Positionszeilen (bleibt beim Umsortieren gleich) */
 export const neuerSchluessel = () => `p${Date.now().toString(36)}${(schluessel++).toString(36)}`;
+
+/** Belegarten, die über Lexware fertiggestellt werden (Nummer und PDF von Lexware) */
+export const LEXWARE_ARTEN: Belegart[] = ["rechnung", "abschlagsrechnung", "gutschrift"];
 
 export const leerePosition = (typ: "artikel" | "text" = "artikel"): PositionEingabe => ({
   key: neuerSchluessel(),

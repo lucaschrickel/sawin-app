@@ -27,7 +27,7 @@ Vorlage: `.env.example`. Lokal in `.env.local` (nie einchecken), auf Vercel in d
 | `SUPABASE_DB_URL` | nur lokal / Deployment-Rechner | Verbindung zur Datenbank für Migrationen: Supabase › Connect › Session pooler (mit Passwort). Nicht auf Vercel setzen. |
 | `SUPABASE_ACCESS_TOKEN` | nur lokal | Persönliches Token (Supabase › Account › Access Tokens) zum Einspielen der Auth-Einstellungen. Nicht auf Vercel setzen. |
 | `SUPABASE_AUTH_SITE_URL` | nur lokal (beim Einspielen) | Adresse der App für Links in Auth-E-Mails, z. B. `http://localhost:3000` (Staging lokal) oder die Vercel-Adresse |
-| `LEXWARE_API_KEY` | nur Server | Staging: Testkonto, Produktion: Schlüssel des Kunden (erst beim Go-live) |
+| `LEXWARE_API_KEY` | nur Server | Lexware Office › Erweiterungen › Public API: Schlüssel erzeugen. Staging: eigenes Testkonto, Produktion: Schlüssel des Kunden (erst beim Go-live). Ohne Schlüssel zeigt die Seitenleiste „Lexware nicht verbunden“ und Rechnungen lassen sich nicht fertigstellen. |
 | `MS_GRAPH_TENANT_ID`, `MS_GRAPH_CLIENT_ID`, `MS_GRAPH_CLIENT_SECRET` | nur Server | App-Registrierung in Microsoft Entra für OneDrive und E-Mail |
 
 ## Datenbank
@@ -105,7 +105,8 @@ APP_URL=http://localhost:3100 npm run test:einkauf       # Lieferanten, Bestellu
 APP_URL=http://localhost:3100 npm run test:dashboard     # Dashboard: drei Ansichten mit echten Daten, Ansicht je Benutzer gemerkt
 APP_URL=http://localhost:3100 npm run test:oberflaeche   # Passwortfeld mit Augen-Symbol, Logo hell und dunkel
 APP_URL=http://localhost:3100 npm run test:belege        # Belege: Angebot → AB → Auftrag → Lieferschein, PDF, Versionen, Listen
-npm run test:unit                                       # Rechenmodul der Belegsummen (Rundung auf Cent), ohne App
+APP_URL=http://localhost:3100 npm run test:lexware      # Lexware-Testkonto: Angebot → AB → 2 Abschläge → Schlussrechnung → Gutschrift, Ticket-Rechnung
+npm run test:unit                                       # Belegsummen und Abschläge (Rundung auf Cent, Schlussrechnung centgenau), ohne App
 ```
 
 **Belege einrichten (je Instanz, einmalig in der App):** Unter Einstellungen › Firma die Firmendaten eintragen (stehen
@@ -126,3 +127,22 @@ einen eigenen SMTP-Zugang eintragen (z. B. Microsoft 365 des Betriebs oder ein V
   Belegart prüfen (Vorgabe: `AG1JJNNNN`, `AB2JJNNNN`, `LS1JJNNNN`, `ZB1JJNNNN`, `ST-JJ-NNNN`, `BE-JJ-NNN`).
 - Interne Kopie (BCC) je Belegart in `belegart_einstellung` eintragen (bei Sawin: Angebot an `angebot@…`, AB und
   Teil-AB an `auftrag@…`).
+
+## Lexware
+
+- **Konto:** Lexware Office des Kunden (Tarif mit Public API). Bis zum Go-live arbeitet Staging nur gegen ein eigenes
+  Testkonto; Sawins Schlüssel wird erst in Produktion gesetzt (`LEXWARE_API_KEY`, nur Server).
+- **Was übertragen wird:** Rechnungen, Abschläge (als normale Rechnung „1. Abschlagsrechnung“ …) und Gutschriften,
+  jeweils beim „Fertigstellen“ nach einem Bestätigungsdialog. Der Kunde wird beim ersten dieser Belege als Kontakt
+  angelegt; danach gehen Änderungen nur von der App nach Lexware. Angebote, ABs und Lieferscheine bleiben in der App.
+- **Serverseitige Rechte:** Die Lexware-Ergebnisse (Nummer, Beträge, PDF, Kontakt-ID) schreibt der Server mit dem
+  Supabase-Secret-Key (`SUPABASE_SERVICE_ROLE_KEY`) über die Datenbankfunktionen `lexware_*`. Benutzer können diese
+  Funktionen nicht aufrufen; im Audit-Log steht trotzdem der Benutzer, der „Fertigstellen“ geklickt hat. Der
+  Secret Key muss deshalb auch auf Vercel (nur Server, nie `NEXT_PUBLIC_`) gesetzt sein.
+- **Drosselung:** höchstens 2 Anfragen pro Sekunde je Server-Instanz, bei HTTP 429 Wiederholung mit Backoff.
+- **Fehler:** Lehnt Lexware einen Beleg ab, bleibt er Entwurf, die Meldung steht auf der Belegseite, und
+  „Fertigstellen“ versucht es erneut. Ein schon angelegter Beleg wird dabei gefunden (Kontakt, Datum, Betrag) und
+  nicht doppelt angelegt. Fehlt das Original-PDF, holt die App es beim Öffnen nach („PDF von Lexware holen“).
+- **Beim Go-live in Sawins Lexware prüfen:** ob `vatfree` (steuerfreie Rechnung) für das Konto erlaubt ist, ob die
+  Kontakte mit § 13b („Steuerfreie Rechnungen erlauben“) passen, und welche Nummernkreise Lexware für Rechnungen und
+  Gutschriften verwendet. Die Kundennummer auf dem Lexware-PDF vergibt Lexware selbst.

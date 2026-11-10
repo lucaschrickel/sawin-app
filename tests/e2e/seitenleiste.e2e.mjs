@@ -17,7 +17,7 @@ const DEMO = [
   ["Team und Ressourcen", ["Kalender", "Mitarbeiter", "Fahrzeuge", "Zeiterfassung", "Abwesenheiten"]],
   ["System", ["Einstellungen"]],
 ];
-const FERTIG = ["Dashboard", "Aufgaben", "Kunden", "Anfragen", "Alle Belege", "Angebote", "Lieferscheine", "Aufträge", "Montageplan", "Service-Tickets", "Service-Plan", "Kalender", "Mitarbeiter", "Fahrzeuge", "Zeiterfassung", "Abwesenheiten", "Lieferanten", "Bestellungen", "Einstellungen"];
+const FERTIG = ["Dashboard", "Aufgaben", "Kunden", "Anfragen", "Alle Belege", "Angebote", "Lieferscheine", "Abschlagsrechnungen", "Rechnungen", "Gutschriften", "Aufträge", "Montageplan", "Service-Tickets", "Service-Plan", "Kalender", "Mitarbeiter", "Fahrzeuge", "Zeiterfassung", "Abwesenheiten", "Lieferanten", "Bestellungen", "Einstellungen"];
 const ZUSATZ = (process.env.FERTIG_ZUSATZ ?? "").split(",").filter(Boolean); // später gebaute Module
 
 try {
@@ -39,7 +39,8 @@ try {
   const folgt = await b.js(`JSON.stringify([...document.querySelectorAll('aside [data-folgt]')].map((x) => ({ t: x.textContent.trim(), a: x.getAttribute('aria-disabled'), tag: x.tagName })))`);
   const folgtListe = JSON.parse(folgt);
   pruefe("übrige Module ausgegraut mit „folgt“, nicht anklickbar", folgtListe.length === 22 - erwartet.length && folgtListe.every((x) => x.t.endsWith("folgt") && x.a === "true" && x.tag === "SPAN"), folgt);
-  pruefe("Fuß: Lexware nicht verbunden, Rolle „Admin · Büro“", (await b.text()).includes("Lexware nicht verbunden") && (await b.text()).includes("Admin · Büro"));
+  const lexwareText = process.env.LEXWARE_API_KEY ? "Lexware verbunden" : "Lexware nicht verbunden";
+  pruefe(`Fuß: „${lexwareText}“, Rolle „Admin · Büro“`, (await b.text()).includes(lexwareText) && (await b.text()).includes("Admin · Büro"));
 
   // 3. Zähler: Anfragen offen, Abwesenheiten zur Genehmigung (rot)
   const zahl = (key) => b.js(`Number(document.querySelector("aside [data-zaehler='${key}']")?.textContent ?? 0)`);

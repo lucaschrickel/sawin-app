@@ -8,6 +8,9 @@
     3. Netto-Eingabe: Steuer je Satz = Netto des Satzes × Satz, auf Cent gerundet.
        Brutto-Eingabe: Steuer je Satz = Brutto des Satzes × Satz ÷ (100 + Satz), auf Cent gerundet; Netto = Brutto − Steuer.
     4. Optionale Positionen und Freitext zählen nicht. Bei § 13b und steuerfrei ist der Satz 0 und es gilt immer netto.
+    5. Abzugspositionen der Schlussrechnung (bereits berechnete Abschläge) sind vom Gesamtrabatt ausgenommen.
+  Lexware rechnet genauso (geprüft im Testkonto am 10.11.2026: Zeilen auf Cent, Steuer je Satz auf die Summe, netto
+  wie brutto, Gesamtrabatt je Satz), deshalb stimmen die Summen der App mit denen des Lexware-Belegs überein.
   Gerundet wird kaufmännisch (halbe Cent vom Nullpunkt weg), auch bei negativen Beträgen.
 */
 
@@ -20,6 +23,8 @@ export type SummenPosition = {
   einzelpreis: number;
   rabatt_prozent: number;
   steuersatz: number;
+  /** Abzug eines bereits berechneten Abschlags (Schlussrechnung): ohne Gesamtrabatt */
+  abzug?: boolean;
 };
 
 export type SummenKopf = { steuerart: Steuerart; preise_brutto: boolean; gesamtrabatt_prozent: number };
@@ -73,20 +78,24 @@ export function belegSummen(positionen: SummenPosition[], kopf: SummenKopf): Sum
   const gr = Math.min(Math.max(zahl(kopf.gesamtrabatt_prozent), 0), 100) / 100;
 
   const zeilen = positionen.map((p) => (p.typ === "text" ? null : zeilenBetrag(p)));
-  const jeSatz = new Map<number, number>();
+  const jeSatz = new Map<number, { summe: number; abzug: number }>();
   let zwischensumme = 0;
   positionen.forEach((p, i) => {
     if (p.typ === "text" || p.optional) return;
     const satz = frei ? 0 : zahl(p.steuersatz);
     const b = zeilen[i] ?? 0;
-    jeSatz.set(satz, rund((jeSatz.get(satz) ?? 0) + b));
+    const alt = jeSatz.get(satz) ?? { summe: 0, abzug: 0 };
+    jeSatz.set(satz, p.abzug ? { ...alt, abzug: rund(alt.abzug + b) } : { ...alt, summe: rund(alt.summe + b) });
     zwischensumme = rund(zwischensumme + b);
   });
 
+  let rabatt = 0;
   const steuern: SteuerZeile[] = [...jeSatz.entries()]
     .sort((a, b) => b[0] - a[0])
-    .map(([satz, summe]) => {
-      const nachRabatt = rund(summe * (1 - gr));
+    .map(([satz, { summe, abzug }]) => {
+      const ohneAbzug = rund(summe * (1 - gr));
+      rabatt = rund(rabatt + summe - ohneAbzug);
+      const nachRabatt = rund(ohneAbzug + abzug);
       if (bruttoEingabe) {
         const steuer = rund((nachRabatt * satz) / (100 + satz));
         return { satz, netto: rund(nachRabatt - steuer), steuer, brutto: nachRabatt };
@@ -98,13 +107,12 @@ export function belegSummen(positionen: SummenPosition[], kopf: SummenKopf): Sum
   const netto = rund(steuern.reduce((s, z) => s + z.netto, 0));
   const steuer = rund(steuern.reduce((s, z) => s + z.steuer, 0));
   const brutto = rund(netto + steuer);
-  const nachRabattEingabe = bruttoEingabe ? brutto : netto;
   return {
     brutto_eingabe: bruttoEingabe,
     ohne_steuer: frei,
     zeilen,
     zwischensumme,
-    rabatt: rund(zwischensumme - nachRabattEingabe),
+    rabatt,
     netto,
     steuern: steuern.filter((z) => z.netto !== 0 || z.steuer !== 0 || steuern.length === 1),
     steuer,

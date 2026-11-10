@@ -1,4 +1,5 @@
 import type { Tone } from "@/components/ui/badge";
+import { rund } from "./beleg-summen";
 
 /*
   Belegarten, Status, Kette und „Nächster Schritt“ (CLAUDE.md „Belege“, Demo: bStatus, belegSteps, nextSteps).
@@ -17,8 +18,14 @@ export const BELEGARTEN = [
 ] as const;
 export type Belegart = (typeof BELEGARTEN)[number];
 
-/** Belegarten, die die App in Schritt 1 selbst führt (eigene Nummer, eigenes PDF) */
+/** Belegarten, die die App selbst führt (eigene Nummer, eigenes PDF) */
 export const APP_BELEGARTEN: Belegart[] = ["angebot", "auftragsbestaetigung", "lieferschein"];
+
+/** Belegarten, die der Editor anlegt: App-Belege und Lexware-Belege (Rechnung, Abschlag, Gutschrift) */
+export const EDITOR_BELEGARTEN: Belegart[] = ["angebot", "auftragsbestaetigung", "lieferschein", "abschlagsrechnung", "rechnung", "gutschrift"];
+
+/** Belegarten, die über Lexware fertiggestellt werden */
+export const LEXWARE_BELEGARTEN: Belegart[] = ["abschlagsrechnung", "rechnung", "gutschrift"];
 
 export const BELEGART_TEXT: Record<Belegart, string> = {
   angebot: "Angebot",
@@ -90,6 +97,9 @@ export type BelegKurz = {
   summe_brutto: number;
   gueltig_bis: string | null;
   teil?: boolean;
+  faellig_am?: string | null;
+  offen_betrag?: number | null;
+  abschlag_nr?: number | null;
 };
 
 /** Belege in Kettenfolge (Art, dann Datum, dann Nummer) */
@@ -131,6 +141,7 @@ export function anzeigeStatus(b: BelegKurz, kette: BelegKurz[], heute: string): 
       return S("erstellt", "Erstellt", "blue");
     default:
       if (b.status === "bezahlt") return S("bezahlt", "Bezahlt", "green");
+      if (b.art !== "gutschrift" && b.faellig_am && b.faellig_am < heute && (b.offen_betrag ?? 1) > 0) return S("ueberfaellig", "Überfällig", "red");
       return S("offen", "Offen", "blue");
   }
 }
@@ -174,11 +185,20 @@ export function belegSchritte(b: BelegKurz, kette: BelegKurz[]): Schritt[] {
       return [{ text: "Auftragsbestätigung erstellen", href: neu("auftragsbestaetigung", b.id), ton: "primary" }];
     return [];
   }
+  const fertig = kette.filter((f) => f.status !== "entwurf");
+  const schluss = fertig.find((f) => f.art === "rechnung" && !f.teil);
+  const abschlaege = fertig.filter((f) => f.art === "abschlagsrechnung");
+  const rechnungText = abschlaege.length ? "Schlussrechnung erstellen" : "Rechnung erstellen";
   if (b.art === "auftragsbestaetigung") {
-    if (!kette.some((f) => f.art === "lieferschein" && f.status !== "entwurf"))
-      return [{ text: "Lieferschein erstellen", href: neu("lieferschein", b.id), ton: "primary" }];
-    return [];
+    if (schluss) return [];
+    const schritte: Schritt[] = [];
+    if (!fertig.some((f) => f.art === "lieferschein")) schritte.push({ text: "Lieferschein erstellen", href: neu("lieferschein", b.id), ton: "primary" });
+    schritte.push({ text: rechnungText, href: neu("rechnung", b.id), ton: schritte.length ? "secondary" : "primary" });
+    schritte.push({ text: "Abschlagsrechnung", href: neu("abschlagsrechnung", b.id), ton: "secondary" });
+    return schritte;
   }
+  if (b.art === "lieferschein" && !schluss) return [{ text: rechnungText, href: neu("rechnung", b.id), ton: "primary" }];
+  if (b.art === "rechnung") return [{ text: "Gutschrift erstellen", href: neu("gutschrift", b.id), ton: "secondary" }];
   return [];
 }
 
@@ -195,7 +215,43 @@ export function auftragSchritte(auftragId: string, belege: BelegKurz[]): Schritt
       schritte.push({ text: "Auftragsbestätigung erstellen", href: `/beleg/neu?art=auftragsbestaetigung&auftrag=${auftragId}`, ton: "primary" });
     return schritte;
   }
+  const fertig = belege.filter((b) => b.status !== "entwurf");
+  const schluss = fertig.find((b) => b.art === "rechnung" && !b.teil);
+  const ton = (): Schritt["ton"] => (schritte.length ? "secondary" : "primary");
+  if (schluss) {
+    // Nach der Schlussrechnung nur noch Gutschriften
+    if (!entwuerfe.some((b) => b.art === "gutschrift")) schritte.push({ text: `Gutschrift zu ${schluss.nummer ?? "Rechnung"}`, href: neu("gutschrift", schluss.id), ton: "secondary" });
+    return schritte;
+  }
   if (!belege.some((b) => b.art === "lieferschein"))
-    schritte.push({ text: "Lieferschein", href: neu("lieferschein", ab.id), ton: schritte.length ? "secondary" : "primary" });
+    schritte.push({ text: "Lieferschein", href: neu("lieferschein", ab.id), ton: ton() });
+  if (!entwuerfe.some((b) => b.art === "rechnung"))
+    schritte.push({ text: fertig.some((b) => b.art === "abschlagsrechnung") ? "Schlussrechnung" : "Rechnung", href: `/beleg/neu?art=rechnung&auftrag=${auftragId}`, ton: ton() });
+  if (!entwuerfe.some((b) => b.art === "abschlagsrechnung"))
+    schritte.push({ text: "Abschlagsrechnung", href: `/beleg/neu?art=abschlagsrechnung&auftrag=${auftragId}`, ton: "secondary" });
   return schritte;
+}
+
+/**
+ * Finanzen eines Auftrags (CLAUDE.md „Aufträge“): Auftragswert = Summe der AB; Auftragsbestand (noch nicht
+ * berechnet) = AB − Abschläge − Rechnungen + Gutschriften; offen = noch nicht bezahlte Abschläge und Rechnungen.
+ */
+export function auftragFinanzen<T extends BelegKurz>(belege: T[]) {
+  const fertig = belege.filter((b) => b.status !== "entwurf");
+  const ab = fertig.find((b) => b.art === "auftragsbestaetigung") ?? null;
+  const abschlaege = fertig.filter((b) => b.art === "abschlagsrechnung").sort((a, b) => (a.abschlag_nr ?? 0) - (b.abschlag_nr ?? 0));
+  const rechnungen = fertig.filter((b) => b.art === "rechnung");
+  const gutschriften = fertig.filter((b) => b.art === "gutschrift");
+  const summe = (xs: T[]) => rund(xs.reduce((s, b) => s + b.summe_brutto, 0));
+  const wert = ab?.summe_brutto ?? 0;
+  return {
+    ab,
+    wert,
+    abschlaege,
+    rechnungen,
+    gutschriften,
+    bestand: ab ? rund(wert - summe(abschlaege) - summe(rechnungen) + summe(gutschriften)) : 0,
+    offen: rund([...abschlaege, ...rechnungen].reduce((s, b) => s + (b.status === "bezahlt" ? 0 : (b.offen_betrag ?? b.summe_brutto)), 0)),
+    abschlaegeBezahlt: abschlaege.filter((b) => b.status === "bezahlt").length,
+  };
 }

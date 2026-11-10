@@ -23,7 +23,7 @@ try {
   pruefe("Anmeldung führt zum Dashboard", await b.warte("location.pathname === '/'"), await b.pfad());
   await b.enthaelt("Kunden");
   const nav = await b.js("[...document.querySelectorAll('aside a[href]')].map((a) => a.getAttribute('href'))");
-  pruefe("Navigation zeigt nur fertige Module", nav.includes("/kunden") && nav.includes("/einstellungen") && nav.includes("/belege") && !nav.includes("/belege/rechnungen"), nav.join(" "));
+  pruefe("Navigation zeigt nur fertige Module", nav.includes("/kunden") && nav.includes("/einstellungen") && nav.includes("/belege/rechnungen") && !nav.includes("/artikel"), nav.join(" "));
 
   await b.gehe("/kunden");
 

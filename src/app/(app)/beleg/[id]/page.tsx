@@ -8,13 +8,13 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { getCustomer } from "@/customers";
 import { STEUERART_TEXT } from "@/lib/beleg-typen";
-import { belegZuEingabe, heuteBerlin, ladeBeleg, ladeBelegTags, ladeKundeFuerBeleg, ladeZahlungsbedingungen } from "@/lib/belege";
-import { anzeigeStatus, bearbeitbar, BELEGART_TEXT, belegSchritte } from "@/lib/belege-status";
+import { belegZuEingabe, heuteBerlin, ladeAbrechnung, ladeBeleg, ladeBelegTags, ladeKundeFuerBeleg, ladeZahlungsbedingungen } from "@/lib/belege";
+import { anzeigeStatus, bearbeitbar, BELEGART_TEXT, belegSchritte, LEXWARE_BELEGARTEN } from "@/lib/belege-status";
 import { eur } from "@/lib/format";
 import { tag, zeitpunkt } from "@/lib/zeit";
 import { BelegEditor } from "../editor";
 import { AKTIV, LISTE } from "../navigation";
-import { AngebotZuruecksetzen, KettenLeiste, SchrittKnoepfe, TagsKommentar, UebergebenKnopf } from "../ui";
+import { AngebotZuruecksetzen, KettenLeiste, LexwarePdfKnopf, SchrittKnoepfe, TagsKommentar, UebergebenKnopf } from "../ui";
 
 export const metadata: Metadata = { title: "Beleg" };
 
@@ -29,7 +29,12 @@ export default async function BelegPage({ params }: PageProps<"/beleg/[id]">) {
   const crumbs = [{ label: "Belege" }, { label: liste.text, href: liste.href }, { label: titel }];
 
   if (b.status === "entwurf") {
-    const [zahlungsbedingungen, tags, kunde] = await Promise.all([ladeZahlungsbedingungen(), ladeBelegTags(), b.kunde_id ? ladeKundeFuerBeleg(b.kunde_id) : null]);
+    const [zahlungsbedingungen, tags, kunde, abrechnung] = await Promise.all([
+      ladeZahlungsbedingungen(),
+      ladeBelegTags(),
+      b.kunde_id ? ladeKundeFuerBeleg(b.kunde_id) : null,
+      (b.art === "abschlagsrechnung" || b.art === "rechnung") && b.auftrag ? ladeAbrechnung(b.auftrag.id) : null,
+    ]);
     return (
       <Shell active={AKTIV[b.art]} crumbs={crumbs}>
         <BelegEditor
@@ -40,7 +45,9 @@ export default async function BelegPage({ params }: PageProps<"/beleg/[id]">) {
           kundeStart={kunde}
           tagVorschlaege={tags}
           herkunftListe={getCustomer().herkunft}
-          zurueck={b.auftrag ? { href: `/auftraege/${b.auftrag.id}`, text: "Auftrag" } : b.anfrage ? { href: `/anfragen/${b.anfrage.id}`, text: "Anfrage" } : liste}
+          zurueck={b.auftrag ? { href: `/auftraege/${b.auftrag.id}`, text: "Auftrag" } : b.ticket ? { href: `/service/${b.ticket.id}`, text: "Service-Ticket" } : b.anfrage ? { href: `/anfragen/${b.anfrage.id}`, text: "Anfrage" } : liste}
+          abrechnung={abrechnung}
+          lexware={b.lexware_status ? { status: b.lexware_status, fehler: b.lexware_fehler } : null}
         />
       </Shell>
     );
@@ -54,6 +61,8 @@ export default async function BelegPage({ params }: PageProps<"/beleg/[id]">) {
   const pdf = `/pdf/beleg/${b.id}`;
   const versionierbar = b.art === "angebot" || b.art === "auftragsbestaetigung";
   const abgelaufen = b.art === "angebot" && b.status === "offen" && b.gueltig_bis && b.gueltig_bis < heute;
+  const lexArt = LEXWARE_BELEGARTEN.includes(b.art);
+  const ueberfaellig = lexArt && b.art !== "gutschrift" && b.status === "offen" && (b.offen_betrag ?? 0) > 0 && !!b.faellig_am && b.faellig_am < heute;
 
   return (
     <Shell active={AKTIV[b.art]} crumbs={crumbs}>
@@ -61,7 +70,7 @@ export default async function BelegPage({ params }: PageProps<"/beleg/[id]">) {
         <div className="flex flex-wrap items-center gap-2.5">
           {b.nummer && <span className="rounded-full bg-surface-sunken px-2.5 py-1 font-mono text-[13px]">{b.nummer}</span>}
           <h1 className="text-4xl font-bold tracking-[-0.02em]">{BELEGART_TEXT[b.art]}</h1>
-          <Badge tone={status.ton} data-status={status.key}>{status.text}</Badge>
+          <Badge tone={ueberfaellig ? "red" : status.ton} data-status={ueberfaellig ? "ueberfaellig" : status.key}>{ueberfaellig ? "Überfällig" : status.text}</Badge>
           {b.version > 1 && <Badge tone="gray">Version {b.version}</Badge>}
         </div>
         <p className="flex flex-wrap items-center gap-x-2 text-[14.5px] text-muted">
@@ -74,6 +83,11 @@ export default async function BelegPage({ params }: PageProps<"/beleg/[id]">) {
           {b.anfrage && (
             <>
               ·<Link href={`/anfragen/${b.anfrage.id}`} className="text-accent-text hover:underline" data-sprung="anfrage">Anfrage {b.anfrage.nummer}</Link>
+            </>
+          )}
+          {b.ticket && (
+            <>
+              ·<Link href={`/service/${b.ticket.id}`} className="text-accent-text hover:underline" data-sprung="ticket">Ticket {b.ticket.nummer}</Link>
             </>
           )}
           · <span>{tag(b.datum)}</span>
@@ -106,7 +120,7 @@ export default async function BelegPage({ params }: PageProps<"/beleg/[id]">) {
               )}
               <Button asChild>
                 <a href={pdf} target="_blank" rel="noopener">
-                  <ExternalLink className="size-4" /> Vorschau / Drucken
+                  <ExternalLink className="size-4" /> {lexArt ? "Lexware-PDF öffnen" : "Vorschau / Drucken"}
                 </a>
               </Button>
               <Button asChild>
@@ -114,11 +128,13 @@ export default async function BelegPage({ params }: PageProps<"/beleg/[id]">) {
                   <Download className="size-4" /> PDF herunterladen
                 </a>
               </Button>
-              <Button asChild variant="ghost">
-                <Link href={`/beleg/neu?art=${b.art}&kopie=${b.id}`}>
-                  <Copy className="size-4" /> Duplizieren
-                </Link>
-              </Button>
+              {!lexArt && (
+                <Button asChild variant="ghost">
+                  <Link href={`/beleg/neu?art=${b.art}&kopie=${b.id}`}>
+                    <Copy className="size-4" /> Duplizieren
+                  </Link>
+                </Button>
+              )}
               {b.art === "angebot" && ["angenommen", "abgelehnt"].includes(b.status) && aenderbar && <AngebotZuruecksetzen id={b.id} />}
             </div>
           </Karte>
@@ -133,7 +149,26 @@ export default async function BelegPage({ params }: PageProps<"/beleg/[id]">) {
                   <Angabe name="Brutto"><span className="tabular font-semibold" data-brutto>{eur(b.summe_brutto)}</span></Angabe>
                 </div>
               )}
+              {lexArt && b.steuern.length > 0 && b.steuerart === "standard" && (
+                <Angabe name="Umsatzsteuer">
+                  {b.steuern.map((z) => (
+                    <span key={z.satz} className="block tabular">{z.satz} %: {eur(z.steuer)} auf {eur(z.netto)}</span>
+                  ))}
+                </Angabe>
+              )}
               {b.art !== "lieferschein" && <Angabe name="Steuerart">{STEUERART_TEXT[b.steuerart]}</Angabe>}
+              {lexArt && (b.leistung_von || b.leistung_bis) && (
+                <Angabe name="Leistungsdatum">{[b.leistung_von, b.leistung_bis].filter(Boolean).map((x) => tag(x!)).join(" – ")}</Angabe>
+              )}
+              {lexArt && b.art !== "gutschrift" && b.faellig_am && (
+                <div className="grid grid-cols-2 gap-3">
+                  <Angabe name="Fällig am">
+                    {tag(b.faellig_am)}
+                    {ueberfaellig && <span className="font-medium text-tone-red-fg"> · überfällig</span>}
+                  </Angabe>
+                  <Angabe name="Offen"><span className="tabular" data-offen>{eur(b.offen_betrag ?? 0)}</span></Angabe>
+                </div>
+              )}
               {b.gueltig_bis && (
                 <Angabe name="Gültig bis">
                   {tag(b.gueltig_bis)}
@@ -178,9 +213,19 @@ export default async function BelegPage({ params }: PageProps<"/beleg/[id]">) {
             </Karte>
           )}
 
-          <Karte titel="Ablage" rechts={<Badge tone="gray">nur App</Badge>}>
-            <p className="text-sm text-muted">Das App-PDF ist das Original. Es liegt in der App; die Ablage im OneDrive-Ordner folgt mit dem OneDrive-Modul.</p>
-          </Karte>
+          {lexArt ? (
+            <Karte titel="Lexware" rechts={<Badge tone={b.pdf_pfad ? "green" : "amber"} data-lexware-pdf={b.pdf_pfad ? "da" : "fehlt"}>{b.pdf_pfad ? "Original-PDF" : "PDF folgt"}</Badge>}>
+              <p className="mb-3 text-sm text-muted">
+                In Lexware als <b className="text-ink">{b.nummer}</b> angelegt. Das PDF von Lexware ist das Original; nur dieses PDF wird versendet.
+                {!b.pdf_pfad && " Bis Lexware es liefert, zeigt die App eine Vorschau mit dem Wasserzeichen „Entwurf“."}
+              </p>
+              {!b.pdf_pfad && <LexwarePdfKnopf id={b.id} />}
+            </Karte>
+          ) : (
+            <Karte titel="Ablage" rechts={<Badge tone="gray">nur App</Badge>}>
+              <p className="text-sm text-muted">Das App-PDF ist das Original. Es liegt in der App; die Ablage im OneDrive-Ordner folgt mit dem OneDrive-Modul.</p>
+            </Karte>
+          )}
 
           <Karte titel="Intern">
             <TagsKommentar id={b.id} tags={b.tags ?? []} kommentar={b.kommentar_intern ?? ""} vorschlaege={tags} />

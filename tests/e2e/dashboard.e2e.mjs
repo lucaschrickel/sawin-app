@@ -1,5 +1,6 @@
 // End-to-End-Test Dashboard: Startseite nach der Anmeldung, drei Ansichten (Geschäftsführung, Montage, Einkauf) mit
-// echten Daten aus den Modulen, Belege-Kennzahlen als Platzhalter, Ansicht je Benutzer gemerkt.
+// echten Daten aus den Modulen, Belege-Kennzahlen aus den Belegen (Auftragsbestand, Forderungen, Angebotsquote,
+// Auftragswert je Monat), Ansicht je Benutzer gemerkt.
 // Aufruf: App starten, dann APP_URL=http://localhost:3100 npm run test:dashboard
 import { aufraeumen, bilanz, browser, dbAbfrage, lauf, merken, pruefe, service, sleep, testAdmin } from "./hilfen.mjs";
 
@@ -54,7 +55,7 @@ try {
   pruefe("Ansicht Geschäftsführung gewählt", await b.warte("document.querySelector('[role=tab][aria-selected=true]')?.textContent === 'Geschäftsführung'"));
   const gf = await main();
   pruefe("Begrüßung mit Vorname und Datum", /Guten (Morgen|Tag|Abend), E2E/.test(gf), gf.slice(0, 120));
-  pruefe("Belege-Kennzahlen als Platzhalter", (await b.js("document.querySelectorAll('[data-platzhalter]').length")) >= 4);
+  pruefe("Belege-Kennzahlen aus den Belegen (keine Platzhalter mehr)", await b.warte("!document.querySelector('[data-platzhalter]') && !!document.querySelector('[data-angebotsquote]') && document.body.innerText.includes('Offene Forderungen') && document.body.innerText.includes('Auftragsbestand, noch nicht berechnet')"));
   pruefe("Offene Anfragen mit Wochenbalken", await b.js("(() => { const a = [...document.querySelectorAll('main a[href=\"/anfragen\"]')].find((x) => x.innerText.includes('Offene Anfragen')); return !!a && Number(a.querySelector('.tabular').textContent) >= 1 && a.querySelectorAll('[role=img] i').length === 6; })()"));
   pruefe("Anfragen online: Anteil und Herkunft", await b.js("!!document.querySelector('[data-online-anteil]') && [...document.querySelectorAll('[data-balken] li')].some((x) => x.title.startsWith('Website'))"));
   pruefe("Heute: Einsatz in der Zeitachse (vorgeplant, mit Monteur)", await b.js(`[...document.querySelectorAll('[data-termin=montage]')].some((x) => x.innerText.includes(${JSON.stringify(kunde)}) && x.innerText.includes('vorgeplant') && x.innerText.includes('Dora'))`));

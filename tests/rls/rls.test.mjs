@@ -890,6 +890,80 @@ describe("Belege", () => {
     assert.deepEqual(data, { version: 1, eingefroren_version: null, fertiggestellt_am: null });
   });
 
+  it("Lexware: Server-Funktionen sind für Benutzer gesperrt", async () => {
+    for (const [fn, args] of [
+      ["lexware_start", { p_id: daten.ab.id, p_benutzer: buero.id }],
+      ["lexware_fehler", { p_id: daten.ab.id, p_benutzer: buero.id, p_fehler: "x" }],
+      ["lexware_fertig", { p_id: daten.ab.id, p_benutzer: buero.id, p_daten: {} }],
+      ["lexware_pdf", { p_id: daten.ab.id, p_benutzer: buero.id, p_pfad: "x" }],
+      ["lexware_kunde", { p_kunde: daten.kunde.id, p_benutzer: buero.id, p_kontakt_id: "x", p_hash: "x" }],
+    ]) {
+      const { error } = await buero.client.rpc(fn, args);
+      assert.ok(error, `${fn} für Benutzer ausführbar`);
+    }
+    const { data: k } = await buero.client.from("kunde").update({ lexware_kontakt_id: "gefaelscht", lexware_hash: "x" }).eq("id", daten.kunde.id).select("lexware_kontakt_id, lexware_hash").single();
+    assert.deepEqual(k, { lexware_kontakt_id: null, lexware_hash: null }, "Lexware-Felder am Kunden von Hand gesetzt");
+  });
+
+  it("Lexware-Belege: Bezug Pflicht, Gutschrift nur aus Lexware-Rechnung, Abzug nur echter Abschläge", async () => {
+    const ohne = await buero.client.rpc("beleg_speichern", { p_id: null, p_kopf: { art: "rechnung", kunde_id: daten.kunde.id }, p_positionen: [] });
+    assert.ok(ohne.error, "Rechnung ohne Auftrag oder Ticket gespeichert");
+    const abschlagOhne = await buero.client.rpc("beleg_speichern", { p_id: null, p_kopf: { art: "abschlagsrechnung", kunde_id: daten.kunde.id }, p_positionen: [] });
+    assert.ok(abschlagOhne.error, "Abschlag ohne Auftrag gespeichert");
+    const gs = await buero.client.rpc("beleg_speichern", { p_id: null, p_kopf: { art: "gutschrift", kunde_id: daten.kunde.id, vorgaenger_id: daten.ab.id }, p_positionen: [] });
+    assert.ok(gs.error, "Gutschrift aus einer AB gespeichert");
+    const entwurf = await belegSpeichern(buero, { art: "abschlagsrechnung", kunde_id: daten.kunde.id, auftrag_id: daten.auftrag.id, abschlag_prozent: "30" });
+    assert.equal(Number(entwurf.abschlag_prozent), 30);
+    const re = await belegSpeichern(buero, { art: "rechnung", kunde_id: daten.kunde.id, auftrag_id: daten.auftrag.id }, [
+      { titel: "Leistung", menge: 1, einzelpreis: 1000, steuersatz: 19 },
+      { titel: "abzgl. Abschlag", menge: 1, einzelpreis: -300, steuersatz: 19, abzug_beleg_id: entwurf.id },
+    ]);
+    const { data: pos } = await service.from("beleg_position").select("abzug_beleg_id").eq("beleg_id", re.id);
+    assert.ok(pos.every((p) => p.abzug_beleg_id === null), "Abzug eines nicht fertigen Abschlags gespeichert");
+    const direkt = await buero.client.from("beleg").update({ status: "offen" }).eq("id", re.id);
+    assert.equal(direkt.error?.code, "42501", "Rechnung von Hand auf offen gesetzt");
+    const { data: f } = await buero.client.from("beleg").update({ lexware_id: "x", lexware_status: "fertig", abschlag_nr: 9, steuern: [{ satz: 19 }] }).eq("id", entwurf.id).select("lexware_id, lexware_status, abschlag_nr, steuern").single();
+    assert.deepEqual(f, { lexware_id: null, lexware_status: null, abschlag_nr: null, steuern: [] }, "Lexware-Felder von Hand gesetzt");
+    const fertigApp = await buero.client.rpc("beleg_fertigstellen", { p_id: re.id });
+    assert.ok(fertigApp.error, "Rechnung ohne Lexware fertiggestellt");
+  });
+
+  it("Lexware-Ablauf (Server): Sperre, Abschlagsnummer, Ergebnis mit Benutzer im Audit-Log", async () => {
+    const auftrag = await svcInsert("auftrag", { nummer: `TESTL-${lauf}`, kunde_id: daten.kunde.id, titel: "Lexware" });
+    const ab = await svcInsert("beleg", { art: "auftragsbestaetigung", auftrag_id: auftrag.id, kunde_id: daten.kunde.id, status: "fertiggestellt" });
+    await svcInsert("beleg_position", { beleg_id: ab.id, titel: "Haustür", menge: 1, einzelpreis: 1000 });
+    const a = await belegSpeichern(buero, { art: "abschlagsrechnung", kunde_id: daten.kunde.id, auftrag_id: auftrag.id, vorgaenger_id: ab.id, abschlag_prozent: "50" }, [
+      { titel: "Abschlag 50 %", menge: 1, einzelpreis: 500, steuersatz: 19 },
+    ]);
+    const { data: start, error } = await service.rpc("lexware_start", { p_id: a.id, p_benutzer: buero.id });
+    assert.ifError(error);
+    assert.equal(start.abschlag_nr, 1);
+    const { data: nachStart } = await service.from("beleg").select("titel, lexware_status").eq("id", a.id).single();
+    assert.deepEqual(nachStart, { titel: "1. Abschlagsrechnung", lexware_status: "uebertragung" });
+    const doppelt = await service.rpc("lexware_start", { p_id: a.id, p_benutzer: buero.id });
+    assert.ok(doppelt.error, "zweite Übertragung gleichzeitig gestartet");
+    const aendern = await buero.client.rpc("beleg_speichern", { p_id: a.id, p_kopf: { art: "abschlagsrechnung", kunde_id: daten.kunde.id }, p_positionen: [] });
+    assert.ok(aendern.error, "Beleg während der Übertragung geändert");
+    const verwerfen = await buero.client.rpc("loeschen", { p_tabelle: "beleg", p_id: a.id });
+    assert.ok(verwerfen.error, "Beleg während der Übertragung verworfen");
+    const { error: e2 } = await service.rpc("lexware_fertig", {
+      p_id: a.id,
+      p_benutzer: buero.id,
+      p_daten: { lexware_id: `lex-${lauf}`, nummer: `RE-T-${lauf}`, summe_netto: 500, summe_brutto: 595, steuern: [{ satz: 19, netto: 500, steuer: 95, brutto: 595 }], faellig_am: "2026-11-24", pdf_pfad: "" },
+    });
+    assert.ifError(e2);
+    const { data: fertigB } = await service.from("beleg").select("status, nummer, offen_betrag, lexware_status, fertiggestellt_von").eq("id", a.id).single();
+    assert.deepEqual({ ...fertigB, offen_betrag: Number(fertigB.offen_betrag) }, { status: "offen", nummer: `RE-T-${lauf}`, offen_betrag: 595, lexware_status: "pdf_fehlt", fertiggestellt_von: buero.id });
+    const { data: hist, error: eh } = await buero.client.rpc("historie", { p_tabelle: "beleg", p_id: a.id });
+    assert.ifError(eh);
+    const log = hist.filter((e) => (e.geaendert ?? []).includes("nummer"));
+    assert.ok(log.length && log.every((l) => l.benutzer_id === buero.id && l.db_rolle === "service_role"), `Audit-Log ohne handelnden Benutzer: ${JSON.stringify(log)}`);
+    const nochmal = await service.rpc("lexware_start", { p_id: a.id, p_benutzer: buero.id });
+    assert.ok(nochmal.error, "fertiger Beleg erneut übertragen");
+    const gesperrt = await buero.client.from("beleg").update({ titel: "geändert" }).eq("id", a.id);
+    assert.equal(gesperrt.error?.code, "42501", "fertiger Abschlag geändert");
+  });
+
   it("PDF-Speicher: nur angemeldete Benutzer, Löschen gesperrt", async () => {
     const pfad = `rls-${lauf}/test.pdf`;
     const hoch = await buero.client.storage.from("belege").upload(pfad, new Blob(["%PDF-1.4 test"], { type: "application/pdf" }), { contentType: "application/pdf" });
