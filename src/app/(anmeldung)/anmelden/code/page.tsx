@@ -1,12 +1,23 @@
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
+import { Suspense } from "react";
 import { sicheresZiel } from "@/lib/auth/konstanten";
 import { anmeldeStand } from "@/lib/auth/sitzung";
 import { CodeFormular, Kopf } from "../../formulare";
+import Laden from "../../loading";
 
 export const metadata: Metadata = { title: "Bestätigungscode" };
 
-export default async function CodePage({ searchParams }: PageProps<"/anmelden/code">) {
+/** Sitzung (Cookies) hinter Suspense, damit die Seite nicht blockiert (Cache Components). */
+export default function CodePage({ searchParams }: PageProps<"/anmelden/code">) {
+  return (
+    <Suspense fallback={<Laden />}>
+      <Code searchParams={searchParams} />
+    </Suspense>
+  );
+}
+
+async function Code({ searchParams }: Pick<PageProps<"/anmelden/code">, "searchParams">) {
   const { weiter } = await searchParams;
   const ziel = sicheresZiel(weiter);
   const stand = await anmeldeStand();

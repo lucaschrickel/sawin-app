@@ -17,6 +17,12 @@ const securityHeaders = [
 const nextConfig: NextConfig = {
   cacheComponents: true,
   partialPrefetching: true,
+  experimental: {
+    // Jede App-Seite liest die Sitzung (Cookies) und lädt Daten des Benutzers; sofortige Navigation ohne Server ist
+    // dort nicht möglich (loading.tsx zeigt den Platzhalter). Die Dev-Prüfung „instant navigation“ läuft deshalb nur für
+    // Seiten, die ausdrücklich `export const instant = …` setzen (Guide „Authentication with Cache Components“).
+    instantInsights: { validationLevel: "manual-warning" },
+  },
   poweredByHeader: false,
   turbopack: {
     rules: {

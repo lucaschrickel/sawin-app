@@ -1,11 +1,22 @@
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
+import { Suspense } from "react";
 import { anmeldeStand } from "@/lib/auth/sitzung";
 import { Kopf, PasswortFormular } from "../formulare";
+import Laden from "../loading";
 
 export const metadata: Metadata = { title: "Passwort setzen" };
 
-export default async function PasswortSetzenPage() {
+/** Sitzung (Cookies) hinter Suspense, damit die Seite nicht blockiert (Cache Components). */
+export default function PasswortSetzenPage() {
+  return (
+    <Suspense fallback={<Laden />}>
+      <PasswortSetzen />
+    </Suspense>
+  );
+}
+
+async function PasswortSetzen() {
   const stand = await anmeldeStand();
   if (!stand.angemeldet) redirect("/anmelden?grund=link");
   // Wer schon einen zweiten Faktor hat, bestätigt ihn vor dem Passwortwechsel

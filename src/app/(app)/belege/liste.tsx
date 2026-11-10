@@ -53,9 +53,9 @@ export async function BelegListe({ liste, searchParams }: { liste: string; searc
   const status = eins(sp.status);
   const tagFilter = eins(sp.tag);
   const q = eins(sp.q).trim().toLowerCase();
-  const heute = heuteBerlin();
-
   const [alle, anzahl, tagVorschlaege] = await Promise.all([ladeBelegListe(artFilter ? [artFilter] : def.arten), def.key === "alle" ? zaehleBelegarten() : Promise.resolve({} as Record<string, number>), ladeBelegTags()]);
+  // Datum erst nach dem Laden der Daten (Sitzung): mit Cache Components darf die Zeit nicht vorher gelesen werden
+  const heute = heuteBerlin();
   const ketten = new Map<string, BelegZeile[]>();
   for (const b of alle) ketten.set(b.kette_id, [...(ketten.get(b.kette_id) ?? []), b]);
   const mitStatus = alle.map((b) => ({ b, s: anzeigeStatus(b, ketten.get(b.kette_id) ?? [b], heute) }));
