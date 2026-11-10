@@ -14,7 +14,6 @@ let kunde;
 const kundeName = `Zahlungskunde ${lauf}`;
 const beleg = async (id) => (await dbAbfrage("select * from public.beleg where id = $1", [id]))[0];
 const belegId = () => b.js("location.pathname.split('/')[2]");
-const heute = new Intl.DateTimeFormat("sv-SE", { timeZone: "Europe/Berlin" }).format(new Date());
 
 async function inLexwareAnlegen() {
   await b.klick("[data-aktion=fertigstellen]");

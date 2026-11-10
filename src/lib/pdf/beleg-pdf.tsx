@@ -170,6 +170,7 @@ function BelegDokument({ b, positionen, firma, logo, entwurf }: { b: PdfBeleg; p
   if (b.art === "auftragsbestaetigung" && (b.leistung_von || b.leistung_bis))
     zusatz.push(["Liefer-/Montagezeit", b.leistung_von && b.leistung_bis && b.leistung_von !== b.leistung_bis ? `${tag(b.leistung_von)} – ${tag(b.leistung_bis)}` : tag(b.leistung_von || b.leistung_bis)]);
   if (b.art === "lieferschein" && b.liefertermin) zusatz.push(["Lieferdatum", tag(b.liefertermin)]);
+  if (b.art === "teil_ab" && b.liefertermin) zusatz.push(["Liefertermin", tag(b.liefertermin)]);
   if (["rechnung", "abschlagsrechnung", "gutschrift"].includes(b.art) && (b.leistung_von || b.leistung_bis))
     zusatz.push(["Leistungsdatum", b.leistung_von && b.leistung_bis && b.leistung_von !== b.leistung_bis ? `${tag(b.leistung_von)} – ${tag(b.leistung_bis)}` : tag(b.leistung_von || b.leistung_bis)]);
   const zahlung =
@@ -347,7 +348,7 @@ function BelegDokument({ b, positionen, firma, logo, entwurf }: { b: PdfBeleg; p
         )}
 
         {preise && b.steuerart !== "standard" && <Absatz fett text={b.steuerart === "bauleistung_13b" ? HINWEIS_13B : HINWEIS_STEUERFREI} />}
-        {b.art === "auftragsbestaetigung" && <Absatz text={b.lieferbedingungen} />}
+        {(b.art === "auftragsbestaetigung" || b.art === "teil_ab") && <Absatz text={b.lieferbedingungen} />}
         {!zb && <Absatz text={zahlung} />}
         <Absatz text={b.nachbemerkung} />
         <View wrap={false} style={{ marginTop: 18 }}>

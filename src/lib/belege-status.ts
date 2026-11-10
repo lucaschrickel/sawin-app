@@ -19,10 +19,10 @@ export const BELEGARTEN = [
 export type Belegart = (typeof BELEGARTEN)[number];
 
 /** Belegarten, die die App selbst führt (eigene Nummer, eigenes PDF) */
-export const APP_BELEGARTEN: Belegart[] = ["angebot", "auftragsbestaetigung", "lieferschein"];
+export const APP_BELEGARTEN: Belegart[] = ["angebot", "auftragsbestaetigung", "teil_ab", "lieferschein"];
 
 /** Belegarten, die der Editor anlegt: App-Belege und Lexware-Belege (Rechnung, Abschlag, Gutschrift) */
-export const EDITOR_BELEGARTEN: Belegart[] = ["angebot", "auftragsbestaetigung", "lieferschein", "abschlagsrechnung", "rechnung", "gutschrift"];
+export const EDITOR_BELEGARTEN: Belegart[] = ["angebot", "auftragsbestaetigung", "teil_ab", "lieferschein", "abschlagsrechnung", "rechnung", "gutschrift"];
 
 /** Belegarten, die über Lexware fertiggestellt werden */
 export const LEXWARE_BELEGARTEN: Belegart[] = ["abschlagsrechnung", "rechnung", "gutschrift"];
@@ -196,19 +196,37 @@ function belegSchritteOhneZahlung(b: BelegKurz, kette: BelegKurz[]): Schritt[] {
   }
   const fertig = kette.filter((f) => f.status !== "entwurf");
   const schluss = fertig.find((f) => f.art === "rechnung" && !f.teil);
-  const abschlaege = fertig.filter((f) => f.art === "abschlagsrechnung");
-  const rechnungText = abschlaege.length ? "Schlussrechnung erstellen" : "Rechnung erstellen";
+  const abzuege = fertig.filter((f) => f.art === "abschlagsrechnung" || (f.art === "rechnung" && f.teil));
+  const rechnungText = abzuege.length ? "Schlussrechnung erstellen" : "Rechnung erstellen";
   if (b.art === "auftragsbestaetigung") {
     if (schluss) return [];
     const schritte: Schritt[] = [];
-    if (!fertig.some((f) => f.art === "lieferschein")) schritte.push({ text: "Lieferschein erstellen", href: neu("lieferschein", b.id), ton: "primary" });
+    if (!fertig.some((f) => f.art === "lieferschein" && f.vorgaenger_id === b.id)) schritte.push({ text: "Lieferschein erstellen", href: neu("lieferschein", b.id), ton: "primary" });
     schritte.push({ text: rechnungText, href: neu("rechnung", b.id), ton: schritte.length ? "secondary" : "primary" });
+    schritte.push({ text: "Teil-AB", href: neu("teil_ab", b.id), ton: "secondary" });
     schritte.push({ text: "Abschlagsrechnung", href: neu("abschlagsrechnung", b.id), ton: "secondary" });
     return schritte;
   }
-  if (b.art === "lieferschein" && !schluss) return [{ text: rechnungText, href: neu("rechnung", b.id), ton: "primary" }];
+  if (schluss) return b.art === "rechnung" ? [{ text: "Gutschrift erstellen", href: neu("gutschrift", b.id), ton: "secondary" }] : [];
+  if (b.art === "teil_ab") {
+    // Teil-AB → Lieferschein → Teilrechnung
+    const lsVon = fertig.filter((f) => f.art === "lieferschein" && f.vorgaenger_id === b.id);
+    if (teilrechnungZu([b.id, ...lsVon.map((x) => x.id)], kette)) return [];
+    if (!lsVon.length) return [{ text: "Lieferschein erstellen", href: neu("lieferschein", b.id), ton: "primary" }, { text: "Teilrechnung erstellen", href: neu("rechnung", b.id), ton: "secondary" }];
+    return [{ text: "Teilrechnung erstellen", href: neu("rechnung", lsVon[0].id), ton: "primary" }];
+  }
+  if (b.art === "lieferschein") {
+    const quelle = kette.find((f) => f.id === b.vorgaenger_id);
+    if (quelle?.art === "teil_ab") return teilrechnungZu([b.id, quelle.id], kette) ? [] : [{ text: "Teilrechnung erstellen", href: neu("rechnung", b.id), ton: "primary" }];
+    return [{ text: rechnungText, href: neu("rechnung", b.id), ton: "primary" }];
+  }
   if (b.art === "rechnung") return [{ text: "Gutschrift erstellen", href: neu("gutschrift", b.id), ton: "secondary" }];
   return [];
+}
+
+/** Gibt es schon eine Teilrechnung (auch Entwurf) aus einem dieser Belege (Teil-AB bzw. deren Lieferschein)? */
+function teilrechnungZu(ids: string[], kette: BelegKurz[]): boolean {
+  return kette.some((f) => f.art === "rechnung" && f.teil && !!f.vorgaenger_id && ids.includes(f.vorgaenger_id));
 }
 
 /**
@@ -232,12 +250,16 @@ export function auftragSchritte(auftragId: string, belege: BelegKurz[]): Schritt
     if (!entwuerfe.some((b) => b.art === "gutschrift")) schritte.push({ text: `Gutschrift zu ${schluss.nummer ?? "Rechnung"}`, href: neu("gutschrift", schluss.id), ton: "secondary" });
     return schritte;
   }
-  if (!belege.some((b) => b.art === "lieferschein"))
+  if (!belege.some((b) => b.art === "lieferschein" && b.vorgaenger_id === ab.id))
     schritte.push({ text: "Lieferschein", href: neu("lieferschein", ab.id), ton: ton() });
-  if (!entwuerfe.some((b) => b.art === "rechnung"))
-    schritte.push({ text: fertig.some((b) => b.art === "abschlagsrechnung") ? "Schlussrechnung" : "Rechnung", href: `/beleg/neu?art=rechnung&auftrag=${auftragId}`, ton: ton() });
+  if (!entwuerfe.some((b) => b.art === "rechnung" && !b.teil))
+    schritte.push({ text: fertig.some((b) => b.art === "abschlagsrechnung" || (b.art === "rechnung" && b.teil)) ? "Schlussrechnung" : "Rechnung", href: `/beleg/neu?art=rechnung&auftrag=${auftragId}`, ton: ton() });
+  // Teil-AB und Abschlag (höchstens zwei), dazu „Teilrechnung zu LS…“ für jeden Lieferschein einer Teil-AB ohne Teilrechnung
+  if (!entwuerfe.some((b) => b.art === "teil_ab")) schritte.push({ text: "Teil-AB", href: neu("teil_ab", ab.id), ton: "secondary" });
   if (!entwuerfe.some((b) => b.art === "abschlagsrechnung"))
     schritte.push({ text: "Abschlagsrechnung", href: `/beleg/neu?art=abschlagsrechnung&auftrag=${auftragId}`, ton: "secondary" });
+  for (const ls of fertig.filter((b) => b.art === "lieferschein" && belege.find((x) => x.id === b.vorgaenger_id)?.art === "teil_ab"))
+    if (!teilrechnungZu([ls.id, ls.vorgaenger_id!], belege)) schritte.push({ text: `Teilrechnung zu ${ls.nummer ?? "Lieferschein"}`, href: neu("rechnung", ls.id), ton: "secondary" });
   return schritte;
 }
 

@@ -174,6 +174,29 @@ describe("Schlussrechnung", () => {
   });
 });
 
+describe("Teilrechnungen", () => {
+  it("Abschlag nach einer Teilrechnung gleicht ihre Rundung aus: Schlussrechnung centgenau", () => {
+    let mitDifferenz = 0;
+    for (let i = 0; i < 400; i++) {
+      const a = auftrag([pos(rund(1000 + i * 7.31)), pos(rund(333.33 + i * 1.17), 19, 3)]);
+      // Teilrechnung über die zweite Position (Beträge ergeben sich aus der Position, nicht anpassbar)
+      const teil = belegSummen([pos(rund(333.33 + i * 1.17), 19, 3)], a.kopf).steuern;
+      const e = abschlagBerechnen({ art: "prozent", wert: 30 }, a.wert, [teil]);
+      const abschlag = lexwareAbschlag(e.zeilen, false);
+      const s = schluss(a, [teil, abschlag]);
+      assert.deepEqual(schlussAbweichungen(a.wert.steuern, [teil, abschlag], s.steuern), [], `Lauf ${i}`);
+      // ohne folgenden Abschlag kann eine Teilrechnung einen Rundungscent hinterlassen
+      if (schlussAbweichungen(a.wert.steuern, [teil], schluss(a, [teil]).steuern).length) mitDifferenz++;
+    }
+    assert.ok(mitDifferenz > 0, "Rundungsfälle ohne Ausgleich kommen vor (Editor zeigt sie an)");
+  });
+
+  it("Abzugsposition einer Teilrechnung trägt ihre Bezeichnung", () => {
+    const p = abzugPositionen([{ id: "t", nr: null, nummer: "RE0040", datum: "2026-11-10", steuern: [{ satz: 19, netto: 100, steuer: 19, brutto: 119 }], bezeichnung: "Teilrechnung" }], false);
+    assert.equal(p[0].titel, "abzgl. Teilrechnung RE0040 vom 10.11.2026");
+  });
+});
+
 describe("abzugPositionen", () => {
   it("je Abschlag und Satz eine Minusposition mit Nummer, Datum, Netto und Steuer", () => {
     const steuern = [{ satz: 19, netto: 420.17, steuer: 79.83, brutto: 500 }];

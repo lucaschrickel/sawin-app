@@ -68,6 +68,8 @@ export type KopfEingabe = {
   /** Abschlagsrechnung: Eingabe als Prozent vom Auftragswert (brutto) oder als Bruttobetrag */
   abschlag_art: "prozent" | "betrag";
   abschlag_wert: string;
+  /** Teilrechnung (aus Teil-AB bzw. deren Lieferschein; setzt der Server) */
+  teil: boolean;
   tags: string[];
   kommentar_intern: string;
 };
@@ -152,6 +154,7 @@ export const PLATZHALTER = ["{Zahlungsziel}", "{Fälligkeitsdatum}", "{Skonto}",
 export const STANDARD_TEXTE: Partial<Record<Belegart, { einleitung?: string; nachbemerkung?: string }>> = {
   angebot: { einleitung: "Sehr geehrte Damen und Herren,\nvielen Dank für Ihre Anfrage. Gerne unterbreiten wir Ihnen folgendes Angebot:" },
   auftragsbestaetigung: { einleitung: "Sehr geehrte Damen und Herren,\nvielen Dank für Ihren Auftrag. Hiermit bestätigen wir Ihnen die folgenden Leistungen:" },
+  teil_ab: { einleitung: "Sehr geehrte Damen und Herren,\nhiermit bestätigen wir Ihnen die Lieferung folgender Positionen aus unserer Auftragsbestätigung:" },
   lieferschein: { einleitung: "Wir liefern Ihnen folgende Positionen:", nachbemerkung: "Ware vollständig und unbeschädigt erhalten: ______________________ (Datum, Unterschrift)" },
   rechnung: { einleitung: "Sehr geehrte Damen und Herren,\nfür die erbrachten Leistungen erlauben wir uns, folgende Rechnung zu stellen:", nachbemerkung: "Vielen Dank für Ihren Auftrag." },
   abschlagsrechnung: { einleitung: "Sehr geehrte Damen und Herren,\nwie vereinbart berechnen wir Ihnen folgenden Abschlag:", nachbemerkung: "Vielen Dank für Ihren Auftrag." },

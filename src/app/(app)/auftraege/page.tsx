@@ -54,7 +54,10 @@ export default async function AuftraegePage({ searchParams }: PageProps<"/auftra
   const namen = new Map(benutzer.map((b) => [b.id, b.name]));
   // Aufträge sind die führende Ansicht der Auftragsbestätigungen: Wert = AB, Vorschau rechts = AB
   const abEntwuerfeAnsicht = !board && eins(sp.ab) === "entwuerfe";
-  const abs = await ladeBelegListe(["auftragsbestaetigung"]);
+  const [abs, teilAbs] = await Promise.all([ladeBelegListe(["auftragsbestaetigung"]), ladeBelegListe(["teil_ab"])]);
+  // „+n Teil-AB“ je Auftrag
+  const teilAbZahl = new Map<string, number>();
+  for (const t of teilAbs) if (t.auftrag && t.status !== "entwurf") teilAbZahl.set(t.auftrag.id, (teilAbZahl.get(t.auftrag.id) ?? 0) + 1);
   const abZu = new Map(abs.filter((b) => b.status !== "entwurf" && b.auftrag).map((b) => [b.auftrag!.id, b]));
   const abEntwuerfe = abs.filter((b) => b.status === "entwurf");
   const gewaehlt = abEntwuerfeAnsicht ? "" : liste.some((a) => a.id === eins(sp.id)) ? eins(sp.id) : (liste[0]?.id ?? "");
@@ -202,6 +205,7 @@ export default async function AuftraegePage({ searchParams }: PageProps<"/auftra
                       <AuswahlZeile key={a.id} id={a.id} href={`/auftraege/${a.id}`} gewaehlt={a.id === gewaehlt}>
                         <Td className="pl-4 whitespace-nowrap">
                           <Link href={`/auftraege/${a.id}`} className="font-mono font-medium hover:underline">{a.nummer}</Link>
+                          {teilAbZahl.get(a.id) ? <div className="text-xs text-muted" data-teil-ab>+{teilAbZahl.get(a.id)} Teil-AB</div> : null}
                         </Td>
                         <Td>
                           <b className="font-medium">{a.kunde?.name ?? "–"}</b>

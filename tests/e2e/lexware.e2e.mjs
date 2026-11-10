@@ -1,6 +1,6 @@
 // End-to-End-Test Lexware (Belege Schritt 2) gegen das Lexware-Testkonto (LEXWARE_API_KEY, nie Sawins echtes Konto):
-// Angebot → AB → Auftrag, 1. Abschlag (Prozent) und 2. Abschlag (Betrag) als Lexware-Rechnungen, Schlussrechnung mit
-// Abzug beider Abschläge, Gutschrift aus der Schlussrechnung, Rechnung am Service-Ticket (erst mit Fehler von Lexware,
+// Angebot → AB → Auftrag, 1. Abschlag (Prozent), Teil-AB → Lieferschein → Teilrechnung, 2. Abschlag (Betrag) als
+// Lexware-Rechnungen, Schlussrechnung mit Abzug beider Abschläge und der Teilrechnung, Gutschrift aus der Schlussrechnung, Rechnung am Service-Ticket (erst mit Fehler von Lexware,
 // dann erfolgreich wiederholt). Prüft jeden Betrag zusätzlich direkt über die Lexware-API und gibt die Beträge aus.
 // Jeder Lauf legt im Testkonto endgültige Belege an (dort nicht löschbar).
 // Aufruf: App starten, dann APP_URL=http://localhost:3100 npm run test:lexware   (optional FOTOS=<Ordner>, BEHALTEN=1)
@@ -121,6 +121,38 @@ try {
   zeilen.push(["1. Abschlag (30 %)", a1.nummer, l1.totalPrice.totalNetAmount, l1.totalPrice.totalTaxAmount, l1.totalPrice.totalGrossAmount]);
   await pdfSichern(a1Id, "lex-01-abschlag-1");
 
+  // Teil-AB über ein Fenster (aus der AB), Liefertermin Pflicht → Lieferschein → Teilrechnung in Lexware
+  const datumSetzen = (sel, wert) => b.js(`(() => { const el = document.querySelector(${JSON.stringify(sel)}); Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value").set.call(el, ${JSON.stringify(wert)}); el.dispatchEvent(new Event("input", { bubbles: true })); el.dispatchEvent(new Event("change", { bubbles: true })); })()`);
+  await b.gehe(`/beleg/neu?art=teil_ab&vorgaenger=${abId}`);
+  await b.da("[data-beleg-editor=teil_ab]");
+  pruefe("Teil-AB: Positionen der AB übernommen, Liefertermin leer", (await b.js("document.querySelectorAll('[data-position]').length")) === 3 && (await b.js("document.querySelector('[name=liefertermin]').value")) === "");
+  await b.klick("[data-position='2'] button[aria-label='Position 3 löschen']");
+  await b.klick("[data-position='1'] button[aria-label='Position 2 löschen']");
+  await b.tippe("[data-position='0'] [data-feld=menge]", "1");
+  await datumSetzen("[name=liefertermin]", "2026-12-07");
+  pruefe("Teil-AB: 1 Fenster = 1.487,38 €", await b.warte("document.querySelector('[data-gesamtbetrag]').textContent.includes('1.487,38')"), await b.js("document.querySelector('[data-gesamtbetrag]').textContent"));
+  await b.klick("[data-aktion=fertigstellen]");
+  await b.warte("/^\\/beleg\\/[0-9a-f-]{36}$/.test(location.pathname) && !!document.querySelector('[data-status]')");
+  const tabId = await belegId();
+  const tab = await beleg(tabId);
+  const [auftragNachTab] = await dbAbfrage("select liefertermin from public.auftrag where id = $1", [auftragId]);
+  pruefe("Teil-AB: Nummer AB…-01, Liefertermin am Auftrag", tab?.nummer === `${ab.nummer}-01` && String(auftragNachTab?.liefertermin).length > 0 && new Date(auftragNachTab.liefertermin).toISOString().startsWith("2026-12-0"), `${tab?.nummer} ${auftragNachTab?.liefertermin}`);
+  pruefe("Teil-AB: nächster Schritt Lieferschein", await b.warte("document.querySelector('[data-naechster-schritt]')?.innerText.includes('Lieferschein erstellen')"));
+  await b.gehe(`/beleg/neu?art=lieferschein&vorgaenger=${tabId}`);
+  await b.da("[data-beleg-editor=lieferschein]");
+  await b.klick("[data-aktion=fertigstellen]");
+  await b.warte("/^\\/beleg\\/[0-9a-f-]{36}$/.test(location.pathname) && !!document.querySelector('[data-status]')");
+  const lsId = await belegId();
+  pruefe("Lieferschein der Teil-AB: nächster Schritt Teilrechnung", await b.warte("document.querySelector('[data-naechster-schritt]')?.innerText.includes('Teilrechnung erstellen')"));
+  await b.gehe(`/beleg/neu?art=rechnung&vorgaenger=${lsId}`);
+  await b.da("[data-beleg-editor=rechnung]");
+  pruefe("Teilrechnung: Titel, keine Abzüge", await b.warte("document.querySelector('[name=titel]').value === 'Teilrechnung' && !document.querySelector('[data-abzug]')"));
+  pruefe("Teilrechnung in Lexware angelegt", await inLexwareAnlegen("Teilrechnung"));
+  const teilR = await beleg(await belegId());
+  const lt = await lex(`/v1/invoices/${teilR.lexware_id}`);
+  pruefe("Lexware: Teilrechnung 1.249,90 + 237,48 = 1.487,38, Titel „Teilrechnung“", teilR.teil && lt.title === "Teilrechnung" && rund(lt.totalPrice.totalGrossAmount) === 1487.38, `${lt.title} ${JSON.stringify(lt.totalPrice)}`);
+  zeilen.push(["Teilrechnung (Teil-AB, 1 Fenster)", teilR.nummer, lt.totalPrice.totalNetAmount, lt.totalPrice.totalTaxAmount, lt.totalPrice.totalGrossAmount]);
+
   // Kundenänderung geht nur App → Lexware (beim nächsten Lexware-Beleg bzw. beim Speichern des Kunden)
   await service.from("kunde").update({ telefon: "05371 2222" }).eq("id", k.id);
 
@@ -146,8 +178,8 @@ try {
   // 5. Schlussrechnung: volle Leistung, beide Abschläge als Minusposition
   await b.gehe(`/beleg/neu?art=rechnung&auftrag=${auftragId}`);
   await b.da("[data-beleg-editor=rechnung]");
-  pruefe("Schlussrechnung: Titel und zwei Abzüge (nicht abwählbar)", await b.warte("document.querySelector('[name=titel]').value === 'Schlussrechnung' && document.querySelectorAll('[data-abzug]').length === 2"));
-  const erwartetRest = rund(10014.68 - l1.totalPrice.totalGrossAmount - l2.totalPrice.totalGrossAmount);
+  pruefe("Schlussrechnung: Titel und drei Abzüge (2 Abschläge, Teilrechnung; nicht abwählbar)", await b.warte("document.querySelector('[name=titel]').value === 'Schlussrechnung' && document.querySelectorAll('[data-abzug]').length === 3"));
+  const erwartetRest = rund(10014.68 - l1.totalPrice.totalGrossAmount - l2.totalPrice.totalGrossAmount - lt.totalPrice.totalGrossAmount);
   pruefe(`Schlussrechnung: Rest ${euro(erwartetRest)}`, await b.warte(`document.querySelector('[data-gesamtbetrag]').textContent.includes(${JSON.stringify(euro(erwartetRest).replace(/\s/g, " ").slice(0, -2))})`), await b.js("document.querySelector('[data-gesamtbetrag]').textContent"));
   pruefe("Schlussrechnung: keine Rundungsabweichung", !(await b.js("!!document.querySelector('[data-rundung]')")));
   await foto("lex-02-schlussrechnung-editor");
@@ -156,14 +188,14 @@ try {
   const sr = await beleg(srId);
   const ls = await lex(`/v1/invoices/${sr.lexware_id}`);
   const t19 = (x) => x.taxAmounts.find((t) => t.taxRatePercentage === 19);
-  const netto = rund(8415.7 - l1.totalPrice.totalNetAmount - l2.totalPrice.totalNetAmount);
-  const steuer = rund(1598.98 - l1.totalPrice.totalTaxAmount - l2.totalPrice.totalTaxAmount);
+  const netto = rund(8415.7 - l1.totalPrice.totalNetAmount - l2.totalPrice.totalNetAmount - lt.totalPrice.totalNetAmount);
+  const steuer = rund(1598.98 - l1.totalPrice.totalTaxAmount - l2.totalPrice.totalTaxAmount - lt.totalPrice.totalTaxAmount);
   pruefe(
     "Lexware: Schlussrechnung exakt (Netto, USt und Rest = AB − Abschläge)",
     rund(ls.totalPrice.totalNetAmount) === netto && rund(t19(ls).taxAmount) === steuer && rund(ls.totalPrice.totalGrossAmount) === erwartetRest,
     `${JSON.stringify(ls.totalPrice)} erwartet netto ${netto}, USt ${steuer}, brutto ${erwartetRest}`,
   );
-  pruefe("Lexware: Schlussrechnung hat 3 Leistungen + 2 Minuspositionen", ls.lineItems.filter((x) => x.unitPrice?.netAmount < 0).length === 2 && ls.lineItems.length === 5, String(ls.lineItems.length));
+  pruefe("Lexware: Schlussrechnung hat 3 Leistungen + 3 Minuspositionen", ls.lineItems.filter((x) => x.unitPrice?.netAmount < 0).length === 3 && ls.lineItems.length === 6, String(ls.lineItems.length));
   zeilen.push(["Schlussrechnung (Rest)", sr.nummer, ls.totalPrice.totalNetAmount, ls.totalPrice.totalTaxAmount, ls.totalPrice.totalGrossAmount]);
   await pdfSichern(srId, "lex-03-schlussrechnung");
   await foto("lex-03-schlussrechnung");
@@ -232,7 +264,7 @@ try {
   console.log("\nBeträge (laut Lexware):");
   console.log(["Beleg", "Nummer", "Netto", "USt", "Brutto"].join("\t"));
   for (const [name, nr, nt, st, br] of zeilen) console.log([name, nr, euro(nt), euro(st), euro(br)].join("\t"));
-  console.log(`Kontrolle: Abschläge + Schlussrechnung = ${euro(rund(zeilen[1][4] + zeilen[2][4] + zeilen[3][4]))} (AB ${euro(zeilen[0][4])})`);
+  console.log(`Kontrolle: Abschläge + Teilrechnung + Schlussrechnung = ${euro(rund(zeilen[1][4] + zeilen[2][4] + zeilen[3][4] + zeilen[4][4]))} (AB ${euro(zeilen[0][4])})`);
   if (behalten) console.log(`\nBehalten: Kunde „${kundeName}“, Auftrag ${ab.nummer} (in der App unter /auftraege/${auftragId})`);
 } catch (e) {
   pruefe(`Abbruch: ${e.message}`, false);

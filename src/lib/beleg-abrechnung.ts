@@ -14,6 +14,8 @@ const dez = (n: number) => String(n).replace(".", ",");
 export async function abrechnungAnwenden(z: EditorZustand): Promise<EditorZustand | { fehler: string }> {
   const k = z.kopf;
   if (k.art !== "abschlagsrechnung" && k.art !== "rechnung") return z;
+  // Teilrechnung: nur die Positionen der Teil-AB, kein Abzug (das Kennzeichen „teil“ setzt die Datenbank)
+  if (k.art === "rechnung" && k.teil) return { ...z, positionen: z.positionen.filter((p) => !p.abzug_beleg_id) };
   if (k.bezug.art !== "auftrag" || !k.bezug.id) return k.art === "abschlagsrechnung" ? { fehler: "Eine Abschlagsrechnung gehört zu einem Auftrag." } : z;
   const ab = await ladeAbrechnung(k.bezug.id);
   if (!ab) return { fehler: "Der Auftrag hat noch keine fertiggestellte Auftragsbestätigung." };
@@ -22,7 +24,7 @@ export async function abrechnungAnwenden(z: EditorZustand): Promise<EditorZustan
     if (!(wert > 0)) return { fehler: k.abschlag_art === "prozent" ? "Bitte den Abschlag in Prozent angeben." : "Bitte den Abschlag als Betrag angeben." };
     if (k.abschlag_art === "prozent" && wert > 100) return { fehler: "Der Abschlag liegt zwischen 0 und 100 %." };
     const eingabe = { art: k.abschlag_art, wert };
-    const e = abschlagBerechnen(eingabe, ab.wert, ab.abschlaege.map((a) => a.steuern));
+    const e = abschlagBerechnen(eingabe, ab.wert, ab.abzuege.map((a) => a.steuern));
     const positionen: PositionEingabe[] = abschlagPositionen(e, eingabe, ab.ab).map((p, i) => ({
       key: z.positionen[i]?.key ?? neuerSchluessel(),
       id: z.positionen[i]?.id ?? null,

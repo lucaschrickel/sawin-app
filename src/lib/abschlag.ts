@@ -116,7 +116,8 @@ export function abschlagBerechnen(eingabe: AbschlagEingabe, auftrag: AuftragsWer
   return { ziel, zeilen, netto, steuer, brutto, abweichung: rund(brutto - ziel), bisher_brutto: bisherBrutto, rest, ueberschritten: rest < 0 };
 }
 
-export type AbschlagFuerAbzug = { id: string; nr: number | null; nummer: string | null; datum: string; steuern: SatzBetrag[] };
+/** Bereits berechneter Betrag, den die Schlussrechnung abzieht: Abschlag (mit Nummer „n.“) oder Teilrechnung */
+export type AbschlagFuerAbzug = { id: string; nr: number | null; nummer: string | null; datum: string; steuern: SatzBetrag[]; bezeichnung?: string };
 
 const datumDe = (iso: string) => {
   const [j, m, t] = iso.split("-");
@@ -124,16 +125,19 @@ const datumDe = (iso: string) => {
 };
 const euro = (n: number) => new Intl.NumberFormat("de-DE", { style: "currency", currency: "EUR" }).format(n);
 
-/** Abzugspositionen der Schlussrechnung: je Abschlag und Steuersatz eine Minusposition (Nummer, Datum, Netto, Steuer) */
+/**
+ * Abzugspositionen der Schlussrechnung: je Abschlag bzw. Teilrechnung und Steuersatz eine Minusposition (Nummer,
+ * Datum, Netto, Steuer). Reihenfolge: Abschläge nach Nummer, dann Teilrechnungen nach Datum.
+ */
 export function abzugPositionen(abschlaege: AbschlagFuerAbzug[], bruttoEingabe: boolean) {
   return [...abschlaege]
-    .sort((a, b) => (a.nr ?? 0) - (b.nr ?? 0) || a.datum.localeCompare(b.datum))
+    .sort((a, b) => (a.nr ?? 1e6) - (b.nr ?? 1e6) || a.datum.localeCompare(b.datum))
     .flatMap((a) =>
       a.steuern
         .filter((z) => z.netto !== 0 || z.brutto !== 0)
         .map((z) => ({
           abzug_beleg_id: a.id,
-          titel: `abzgl. ${a.nr ? `${a.nr}. ` : ""}Abschlagsrechnung ${a.nummer ?? ""} vom ${datumDe(a.datum)}`.replace(/\s+/g, " "),
+          titel: `abzgl. ${a.nr ? `${a.nr}. ` : ""}${a.bezeichnung ?? "Abschlagsrechnung"} ${a.nummer ?? ""} vom ${datumDe(a.datum)}`.replace(/\s+/g, " "),
           beschreibung:
             z.satz > 0
               ? `Netto ${euro(z.netto)} zzgl. ${String(z.satz).replace(".", ",")} % USt ${euro(z.steuer)} = ${euro(z.brutto)}`

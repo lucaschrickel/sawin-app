@@ -56,7 +56,7 @@ function abschlagZeilen(kopf: KopfEingabe, abrechnung: AbrechnungKontext | null 
   const wert = zahl(kopf.abschlag_wert);
   if (!(wert > 0)) return [];
   const eingabe = { art: kopf.abschlag_art, wert };
-  const e = abschlagBerechnen(eingabe, abrechnung.wert, abrechnung.abschlaege.map((a) => a.steuern));
+  const e = abschlagBerechnen(eingabe, abrechnung.wert, abrechnung.abzuege.map((a) => a.steuern));
   return abschlagPositionen(e, eingabe, abrechnung.ab).map((p, i) => ({
     key: alt[i]?.key ?? neuerSchluessel(),
     id: alt[i]?.id ?? null,
@@ -147,7 +147,7 @@ export function BelegEditor({ start, hinweis, modus, zahlungsbedingungen, kundeS
     if (!abschlag || !abrechnung) return null;
     const wert = zahl(k.abschlag_wert);
     if (!(wert > 0)) return null;
-    return abschlagBerechnen({ art: k.abschlag_art, wert }, abrechnung.wert, abrechnung.abschlaege.map((a) => a.steuern));
+    return abschlagBerechnen({ art: k.abschlag_art, wert }, abrechnung.wert, abrechnung.abzuege.map((a) => a.steuern));
   }, [abschlag, abrechnung, k.abschlag_art, k.abschlag_wert]);
   const setAbschlag = (aenderung: Partial<KopfEingabe>) => {
     setZ((alt) => {
@@ -164,7 +164,7 @@ export function BelegEditor({ start, hinweis, modus, zahlungsbedingungen, kundeS
       z.positionen.filter((p) => !p.abzug_beleg_id).map((p) => ({ typ: p.typ, menge: zahl(p.menge), einzelpreis: zahl(p.einzelpreis), rabatt_prozent: zahl(p.rabatt_prozent), steuersatz: zahl(p.steuersatz) })),
       { steuerart: k.steuerart, preise_brutto: k.preise_brutto, gesamtrabatt_prozent: zahl(k.gesamtrabatt_prozent) },
     );
-    return { voll, abweichungen: schlussAbweichungen(voll.steuern, abrechnung.abschlaege.map((a) => a.steuern), summen.steuern) };
+    return { voll, abweichungen: schlussAbweichungen(voll.steuern, abrechnung.abzuege.map((a) => a.steuern), summen.steuern) };
   }, [hatAbzug, abrechnung, z.positionen, k.steuerart, k.preise_brutto, k.gesamtrabatt_prozent, summen.steuern]);
 
   // ---------- Verlassen mit ungespeicherten Änderungen: Speichern | Verwerfen | Abbrechen ----------
@@ -482,9 +482,9 @@ export function BelegEditor({ start, hinweis, modus, zahlungsbedingungen, kundeS
                     </Beschriftet>
                   </div>
                 )}
-                {ls && (
-                  <Beschriftet name="Lieferdatum">
-                    <input type="date" className={eingabe} value={k.liefertermin} onChange={(e) => setKopf({ liefertermin: e.target.value })} name="liefertermin" />
+                {(ls || art === "teil_ab") && (
+                  <Beschriftet name={ls ? "Lieferdatum" : "Liefertermin (Pflicht, wird Liefertermin des Auftrags)"}>
+                    <input type="date" className={eingabe} value={k.liefertermin} required={art === "teil_ab"} onChange={(e) => setKopf({ liefertermin: e.target.value })} name="liefertermin" />
                   </Beschriftet>
                 )}
                 {!ls && (
@@ -761,7 +761,7 @@ export function BelegEditor({ start, hinweis, modus, zahlungsbedingungen, kundeS
           {/* Lieferbedingungen, Zahlungsbedingung, Nachbemerkung */}
           <Karte>
             <div className="flex flex-col gap-3">
-              {art === "auftragsbestaetigung" && (
+              {(art === "auftragsbestaetigung" || art === "teil_ab") && (
                 <Beschriftet name="Lieferbedingungen">
                   <textarea rows={3} className={flaeche} value={k.lieferbedingungen} onChange={(e) => setKopf({ lieferbedingungen: e.target.value })} name="lieferbedingungen" />
                 </Beschriftet>
@@ -1241,7 +1241,7 @@ function AbschlagKarte({
       </div>
       <dl className="mt-4 flex max-w-md flex-col gap-1.5 text-sm" data-abschlag-uebersicht>
         {zeile(`Auftragswert (AB ${abrechnung.ab.nummer})`, eur(abrechnung.ab.brutto))}
-        {abrechnung.abschlaege.map((a) => zeile(`${a.nr ?? ""}. Abschlag ${a.nummer ?? ""} vom ${datumDe(a.datum)}`, eur(-a.brutto)))}
+        {abrechnung.abzuege.map((a) => zeile(a.bezeichnung ? `${a.bezeichnung} ${a.nummer ?? ""} vom ${datumDe(a.datum)}` : `${a.nr ?? ""}. Abschlag ${a.nummer ?? ""} vom ${datumDe(a.datum)}`, eur(-a.brutto)))}
         {ergebnis && (
           <>
             {ergebnis.zeilen.length > 1 &&

@@ -1031,6 +1031,50 @@ describe("Belege", () => {
     assert.equal(a.phase, "abgeschlossen", "Auftrag in Abnahme mit bezahlter Schlussrechnung wird abgeschlossen");
   });
 
+  it("Teil-AB und Teilrechnung: nur aus fertiger AB, Liefertermin Pflicht, Nummer AB-01, Schlussrechnung zieht ab", async () => {
+    const auftrag = await svcInsert("auftrag", { nummer: `TESTT-${lauf}`, kunde_id: daten.kunde.id, titel: "Teil-AB" });
+    const ab = await svcInsert("beleg", { art: "auftragsbestaetigung", auftrag_id: auftrag.id, kunde_id: daten.kunde.id, status: "fertiggestellt" });
+    await svcInsert("beleg_position", { beleg_id: ab.id, titel: "Fenster", menge: 3, einzelpreis: 500 });
+    const ohneAb = await buero.client.rpc("beleg_speichern", { p_id: null, p_kopf: { art: "teil_ab", kunde_id: daten.kunde.id, auftrag_id: auftrag.id }, p_positionen: [] });
+    assert.ok(ohneAb.error, "Teil-AB ohne AB als Vorgänger");
+    const tab = await belegSpeichern(buero, { art: "teil_ab", kunde_id: daten.kunde.id, vorgaenger_id: ab.id }, [{ titel: "Fenster", menge: 1, einzelpreis: 500, steuersatz: 19 }]);
+    assert.equal(tab.auftrag_id, auftrag.id, "Teil-AB übernimmt den Auftrag der AB");
+    const ohneTermin = await buero.client.rpc("beleg_fertigstellen", { p_id: tab.id });
+    assert.ok(ohneTermin.error, "Teil-AB ohne Liefertermin fertiggestellt");
+    assert.ifError((await buero.client.rpc("beleg_speichern", { p_id: tab.id, p_kopf: { art: "teil_ab", kunde_id: daten.kunde.id, liefertermin: "2026-12-07" }, p_positionen: [{ titel: "Fenster", menge: 1, einzelpreis: 500, steuersatz: 19 }] })).error);
+    const { nummer } = await fertig(buero, tab.id);
+    assert.equal(nummer, `${auftrag.nummer}-01`, "Nummer = AB-Nummer mit -01");
+    const { data: a } = await service.from("auftrag").select("liefertermin").eq("id", auftrag.id).single();
+    assert.equal(a.liefertermin, "2026-12-07", "Teil-AB setzt den Liefertermin des Auftrags");
+    // Teilrechnung aus der Teil-AB: Kennzeichen „teil“ setzt die Datenbank, nicht der Benutzer
+    const tr = await belegSpeichern(buero, { art: "rechnung", kunde_id: daten.kunde.id, vorgaenger_id: tab.id, leistung_von: "2026-12-07" }, [{ titel: "Fenster", menge: 1, einzelpreis: 500, steuersatz: 19 }]);
+    assert.equal(tr.teil, true, "Rechnung aus Teil-AB ist Teilrechnung");
+    const re = await belegSpeichern(buero, { art: "rechnung", kunde_id: daten.kunde.id, vorgaenger_id: ab.id, leistung_von: "2026-12-07" });
+    assert.equal(re.teil, false);
+    const direkt = await buero.client.from("beleg").update({ teil: true }).eq("id", re.id).select("teil").single();
+    assert.equal(direkt.data?.teil ?? false, false, "Kennzeichen „teil“ von Hand gesetzt");
+    // Teilrechnung fertig (Server), dann muss die Schlussrechnung sie abziehen
+    assert.ifError((await service.rpc("lexware_start", { p_id: tr.id, p_benutzer: buero.id })).error);
+    const { data: trNach } = await service.from("beleg").select("titel").eq("id", tr.id).single();
+    assert.equal(trNach.titel, "Teilrechnung");
+    assert.ifError((await service.rpc("lexware_fertig", { p_id: tr.id, p_benutzer: buero.id, p_daten: { lexware_id: `lext-${lauf}`, nummer: `RE-T2-${lauf}`, summe_netto: 500, summe_brutto: 595, steuern: [{ satz: 19, netto: 500, steuer: 95, brutto: 595 }], pdf_pfad: "" } })).error);
+    const ohneAbzug = await service.rpc("lexware_start", { p_id: re.id, p_benutzer: buero.id });
+    assert.match(ohneAbzug.error?.message ?? "", /Teilrechnungen abziehen/, "Schlussrechnung ohne Abzug der Teilrechnung");
+    const mitAbzug = await buero.client.rpc("beleg_speichern", {
+      p_id: re.id,
+      p_kopf: { art: "rechnung", kunde_id: daten.kunde.id, leistung_von: "2026-12-07" },
+      p_positionen: [
+        { titel: "Fenster", menge: 3, einzelpreis: 500, steuersatz: 19 },
+        { titel: "abzgl. Teilrechnung", menge: 1, einzelpreis: -500, steuersatz: 19, abzug_beleg_id: tr.id },
+      ],
+    });
+    assert.ifError(mitAbzug.error);
+    const { data: pos } = await service.from("beleg_position").select("id, abzug_beleg_id").eq("beleg_id", re.id);
+    for (const p of pos) if (!angelegt.some(([, x]) => x === p.id)) angelegt.push(["beleg_position", p.id]);
+    assert.ok(pos.some((p) => p.abzug_beleg_id === tr.id), "Abzug der Teilrechnung gespeichert");
+    assert.ifError((await service.rpc("lexware_start", { p_id: re.id, p_benutzer: buero.id })).error);
+  });
+
   it("PDF-Speicher: nur angemeldete Benutzer, Löschen gesperrt", async () => {
     const pfad = `rls-${lauf}/test.pdf`;
     const hoch = await buero.client.storage.from("belege").upload(pfad, new Blob(["%PDF-1.4 test"], { type: "application/pdf" }), { contentType: "application/pdf" });

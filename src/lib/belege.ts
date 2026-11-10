@@ -361,6 +361,7 @@ export function belegZuEingabe(d: BelegDetail): EditorZustand {
       liefertermin: s(b.liefertermin),
       leistung_von: s(b.leistung_von),
       leistung_bis: s(b.leistung_bis),
+      teil: !!b.teil,
       abschlag_art: b.abschlag_betrag != null ? "betrag" : "prozent",
       abschlag_wert: b.abschlag_betrag != null ? dez(b.abschlag_betrag) : b.abschlag_prozent != null ? dez(b.abschlag_prozent) : "",
       tags: b.tags ?? [],
@@ -386,6 +387,9 @@ export type AbrechnungKontext = {
   ab: { id: string; nummer: string; datum: string; netto: number; brutto: number; steuerart: Steuerart; preise_brutto: boolean };
   wert: AuftragsWert;
   abschlaege: (AbschlagFuerAbzug & { brutto: number; netto: number; status: string })[];
+  teilrechnungen: (AbschlagFuerAbzug & { brutto: number; netto: number; status: string })[];
+  /** alles, was die Schlussrechnung abzieht (Abschläge und Teilrechnungen), Beträge laut Lexware */
+  abzuege: (AbschlagFuerAbzug & { brutto: number; netto: number; status: string })[];
   schluss: { id: string; nummer: string | null } | null;
 };
 
@@ -402,21 +406,33 @@ export async function ladeAbrechnung(auftragId: string): Promise<AbrechnungKonte
   const s = belegSummen(((pos ?? []) as Position[]).map(positionZahlen), { steuerart, preise_brutto: ab.preise_brutto, gesamtrabatt_prozent: Number(ab.gesamtrabatt_prozent) });
   const satz = (z: { satz: unknown; netto: unknown; steuer: unknown; brutto: unknown }): SatzBetrag => ({ satz: Number(z.satz), netto: Number(z.netto), steuer: Number(z.steuer), brutto: Number(z.brutto) });
   const schluss = (rest ?? []).find((b) => b.art === "rechnung" && !b.teil);
+  const zeile = (b: NonNullable<typeof rest>[number]) => ({
+    id: b.id,
+    nr: b.abschlag_nr as number | null,
+    nummer: b.nummer as string | null,
+    datum: b.datum as string,
+    status: b.status as string,
+    netto: Number(b.summe_netto),
+    brutto: Number(b.summe_brutto),
+    steuern: ((b.steuern ?? []) as SatzBetrag[]).map(satz),
+    bezeichnung: b.art === "rechnung" ? "Teilrechnung" : undefined,
+  });
+  const abschlaege = (rest ?? []).filter((b) => b.art === "abschlagsrechnung").map(zeile).sort((a, b) => (a.nr ?? 0) - (b.nr ?? 0));
+  const teilrechnungen = (rest ?? []).filter((b) => b.art === "rechnung" && b.teil).map(zeile).sort((a, b) => a.datum.localeCompare(b.datum));
   return {
     auftrag_id: auftragId,
     ab: { id: ab.id, nummer: ab.nummer, datum: ab.datum, netto: s.netto, brutto: s.brutto, steuerart, preise_brutto: ab.preise_brutto },
     wert: { steuern: s.steuern, brutto: s.brutto, brutto_eingabe: s.brutto_eingabe },
-    abschlaege: (rest ?? [])
-      .filter((b) => b.art === "abschlagsrechnung")
-      .map((b) => ({ id: b.id, nr: b.abschlag_nr, nummer: b.nummer, datum: b.datum, status: b.status, netto: Number(b.summe_netto), brutto: Number(b.summe_brutto), steuern: ((b.steuern ?? []) as SatzBetrag[]).map(satz) }))
-      .sort((a, b) => (a.nr ?? 0) - (b.nr ?? 0)),
+    abschlaege,
+    teilrechnungen,
+    abzuege: [...abschlaege, ...teilrechnungen],
     schluss: schluss ? { id: schluss.id, nummer: schluss.nummer } : null,
   };
 }
 
-/** Abzugspositionen der Schlussrechnung als Editor-Zeilen (aus den angelegten Abschlägen des Auftrags) */
+/** Abzugspositionen der Schlussrechnung als Editor-Zeilen (angelegte Abschläge und Teilrechnungen des Auftrags) */
 export function abzugZeilen(k: AbrechnungKontext): PositionEingabe[] {
-  return abzugPositionen(k.abschlaege, k.wert.brutto_eingabe).map((p) => ({
+  return abzugPositionen(k.abzuege, k.wert.brutto_eingabe).map((p) => ({
     key: neuerSchluessel(),
     id: null,
     typ: "artikel",
@@ -489,6 +505,7 @@ export async function neuerBelegZustand(p: NeuParameter): Promise<{ zustand: Edi
     leistung_bis: "",
     abschlag_art: "prozent",
     abschlag_wert: "",
+    teil: false,
     tags: [],
     kommentar_intern: "",
   };
@@ -536,9 +553,10 @@ export async function neuerBelegZustand(p: NeuParameter): Promise<{ zustand: Edi
     const vb = v.beleg;
     const erlaubt =
       (p.art === "auftragsbestaetigung" && vb.art === "angebot" && ["offen", "angenommen"].includes(vb.status)) ||
-      (p.art === "lieferschein" && vb.art === "auftragsbestaetigung") ||
+      (p.art === "lieferschein" && (vb.art === "auftragsbestaetigung" || vb.art === "teil_ab")) ||
+      (p.art === "teil_ab" && vb.art === "auftragsbestaetigung") ||
       (p.art === "abschlagsrechnung" && vb.art === "auftragsbestaetigung") ||
-      (p.art === "rechnung" && (vb.art === "auftragsbestaetigung" || vb.art === "lieferschein")) ||
+      (p.art === "rechnung" && (vb.art === "auftragsbestaetigung" || vb.art === "lieferschein" || vb.art === "teil_ab")) ||
       (p.art === "gutschrift" && (vb.art === "rechnung" || vb.art === "abschlagsrechnung") && !!vb.lexware_id);
     if (!erlaubt) return { fehler: `Aus ${BELEGART_TEXT[vb.art]} ${vb.nummer ?? ""} entsteht keine ${BELEGART_TEXT[p.art]}.` };
     if (p.art === "auftragsbestaetigung" && v.kette.some((x) => x.art === "auftragsbestaetigung"))
@@ -563,8 +581,13 @@ export async function neuerBelegZustand(p: NeuParameter): Promise<{ zustand: Edi
       preise_brutto: vb.preise_brutto,
       gesamtrabatt_prozent: vb.gesamtrabatt_prozent ? dez(vb.gesamtrabatt_prozent) : "",
       titel: vb.titel && vb.titel !== BELEGART_TEXT[vb.art] ? vb.titel : BELEGART_TEXT[p.art],
-      lieferbedingungen: p.art === "lieferschein" ? "" : kopf.lieferbedingungen,
+      lieferbedingungen: p.art === "teil_ab" ? s(vb.lieferbedingungen) : p.art === "lieferschein" ? "" : kopf.lieferbedingungen,
     });
+    if (p.art === "teil_ab") {
+      Object.assign(kopf, { titel: "Teil-Auftragsbestätigung", liefertermin: "" });
+      hinweis = "Nicht gelieferte Positionen entfernen, Mengen anpassen. Der Liefertermin ist Pflicht und wird der Liefertermin des Auftrags.";
+    }
+    if (p.art === "lieferschein" && vb.art === "teil_ab" && vb.liefertermin) kopf.liefertermin = vb.liefertermin;
     if (p.art === "auftragsbestaetigung" && vb.zahlungsbedingung_text) {
       Object.assign(kopf, {
         zahlungsbedingung_id: s(vb.zahlungsbedingung_id),
@@ -600,13 +623,20 @@ export async function neuerBelegZustand(p: NeuParameter): Promise<{ zustand: Edi
     } else if (p.art === "rechnung" && abrechnung) {
       const ls = vb.art === "lieferschein" ? vb : null;
       const abBeleg = vb.art === "auftragsbestaetigung" ? vb : null;
-      Object.assign(kopf, {
-        titel: abrechnung.abschlaege.length ? "Schlussrechnung" : "Rechnung",
-        leistung_von: ls?.liefertermin ?? abBeleg?.leistung_bis ?? heute,
-      });
-      positionen = [...positionen, ...abzugZeilen(abrechnung)];
-      if (abrechnung.abschlaege.length)
-        hinweis = `Die Schlussrechnung zieht ${abrechnung.abschlaege.length === 1 ? "den Abschlag" : `alle ${abrechnung.abschlaege.length} Abschläge`} ab. Der Abzug lässt sich nicht abwählen.`;
+      // Teilrechnung: aus einer Teil-AB oder dem Lieferschein einer Teil-AB, nur deren Positionen, ohne Abzug
+      const teil = vb.art === "teil_ab" || (!!ls && v.kette.find((x) => x.id === ls.vorgaenger_id)?.art === "teil_ab");
+      if (teil) {
+        Object.assign(kopf, { teil: true, titel: "Teilrechnung", leistung_von: vb.liefertermin ?? heute });
+        hinweis = "Teilrechnung über die Positionen der Teil-AB, ohne Abzug. Die Schlussrechnung zieht sie später ab.";
+      } else {
+        const n = abrechnung.abzuege.length;
+        Object.assign(kopf, {
+          titel: n ? "Schlussrechnung" : "Rechnung",
+          leistung_von: ls?.liefertermin ?? abBeleg?.leistung_bis ?? heute,
+        });
+        positionen = [...positionen, ...abzugZeilen(abrechnung)];
+        if (n) hinweis = `Die Schlussrechnung zieht ${n === 1 ? "den bereits berechneten Betrag" : `alle ${n} bereits berechneten Beträge (Abschläge und Teilrechnungen)`} ab. Der Abzug lässt sich nicht abwählen.`;
+      }
     } else if (p.art === "gutschrift") {
       Object.assign(kopf, {
         titel: "Gutschrift",

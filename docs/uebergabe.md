@@ -105,7 +105,7 @@ APP_URL=http://localhost:3100 npm run test:einkauf       # Lieferanten, Bestellu
 APP_URL=http://localhost:3100 npm run test:dashboard     # Dashboard: drei Ansichten mit echten Daten, Ansicht je Benutzer gemerkt
 APP_URL=http://localhost:3100 npm run test:oberflaeche   # Passwortfeld mit Augen-Symbol, Logo hell und dunkel
 APP_URL=http://localhost:3100 npm run test:belege        # Belege: Angebot → AB → Auftrag → Lieferschein, PDF, Versionen, Listen
-APP_URL=http://localhost:3100 npm run test:lexware      # Lexware-Testkonto: Angebot → AB → 2 Abschläge → Schlussrechnung → Gutschrift, Ticket-Rechnung
+APP_URL=http://localhost:3100 npm run test:lexware      # Lexware-Testkonto: Angebot → AB → Abschlag → Teil-AB → Teilrechnung → Abschlag → Schlussrechnung → Gutschrift, Ticket-Rechnung
 APP_URL=http://localhost:3100 npm run test:zahlungen    # Lexware-Testkonto: Zahlungsstand abrufen, Als bezahlt markieren, Zahlungsbestätigung
 npm run test:unit                                       # Belegsummen und Abschläge (Rundung auf Cent, Schlussrechnung centgenau), ohne App
 ```

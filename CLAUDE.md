@@ -45,6 +45,8 @@ Eine Codebasis, je Kunde eine eigene Instanz. Diese Datei gilt für jede Arbeit 
     wiederverwendet (für App-Belege zulässig, die GoBD-relevanten Rechnungsnummern vergibt Lexware).
   - **Teil-AB:** Nummer = AB-Nummer mit Zusatz `-01`, `-02` … (z. B. `AB2260227-01`). Enthält ausgewählte Positionen
     der AB und einen Liefertermin (Pflicht). Die zuletzt fertiggestellte Teil-AB setzt den Liefertermin des Auftrags.
+    Umsetzung (10.11.2026): Der Editor übernimmt alle Positionen der AB; nicht gelieferte entfernt man, Mengen sind
+    änderbar. Die Teil-AB ist nach dem Fertigstellen gesperrt (keine Versionen).
   - **Angebot und AB bearbeiten, Versionen:** Ein fertiggestelltes Angebot bleibt änderbar, bis die AB dazu existiert;
     eine fertiggestellte AB bleibt änderbar, bis ein Folgebeleg existiert (Teil-AB, Lieferschein, Abschlags- oder
     Schlussrechnung). Beim Bearbeiten wird das Belegdatum auf heute gesetzt (beim Angebot verschiebt sich „Gültig bis“
@@ -468,7 +470,10 @@ Die Monteur-App kommt in Version 2.
   `beleg_anhang` (Gruppe, Quelle, Reihenfolge); Uploads landen im Auftrags- bzw. Ticketordner.
 - **Rechnungen am Auftrag:**
   - **Teilrechnung:** Rechnung aus dem Lieferschein einer Teil-AB (oder aus der Teil-AB), nur über deren Positionen,
-    ohne Abzug. Kennzeichen `teil` am Beleg. Der Auftrag bleibt offen.
+    ohne Abzug. Kennzeichen `teil` am Beleg (setzt nur die Datenbank aus dem Vorgänger). Der Auftrag bleibt offen.
+    Titel in Lexware „Teilrechnung“. Ihre Beträge ergeben sich aus den Positionen; ein folgender Abschlag gleicht ihre
+    Rundung für die centgenaue Schlussrechnung mit aus. Ist sie der letzte Abzug, kann ein Rundungscent bleiben (der
+    Editor der Schlussrechnung zeigt ihn an).
   - **Schlussrechnung bzw. Rechnung:** genau **eine** je Auftrag, aus der AB oder dem Lieferschein der AB, über alle
     Positionen. Sie zieht alle bereits berechneten Abschläge **und** Teilrechnungen desselben Auftrags ab („abzgl.
     bereits berechnet“); der Abzug lässt sich nicht abwählen. Gibt es weder Abschläge noch Teilrechnungen, heißt sie
@@ -830,7 +835,8 @@ Maßstab ist OWASP ASVS Level 1. Vor dem Start mit Echtdaten müssen alle Mindes
 - [ ] Belegerstellung vollständig gegen das Lexware-Testkonto durchgespielt: Angebot → AB → Auftrag, zwei Abschläge,
       Schlussrechnung mit Abzug, Gutschrift und Ticket-Rechnung mit Austausch der Vorschau durch das Lexware-PDF
       erledigt (`npm run test:lexware`, 10.11.2026); Zahlungsstand aus Lexware und „Als bezahlt markieren“ erledigt
-      (`npm run test:zahlungen`, 10.11.2026); offen: Teil-AB, Lieferschein → Teilrechnung, eine echte Bankzahlung in
+      (`npm run test:zahlungen`, 10.11.2026); Teil-AB → Lieferschein → Teilrechnung und Schlussrechnung mit Abzug der Teilrechnung erledigt
+      (`npm run test:lexware`, 10.11.2026); offen: eine echte Bankzahlung in
       Lexware gebucht und abgeglichen
 - [ ] Nummernkreise der App-Belege mit Sawin abgestimmt (Startwerte je Belegart nach der Airtable-Übernahme)
 - [ ] E-Mail-Versand über Microsoft Graph mit Sawins Postfach getestet (PDF-Gruppen, BCC an angebot@/auftrag@, Protokoll)
