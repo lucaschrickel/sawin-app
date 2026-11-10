@@ -1,105 +1,35 @@
 "use client";
 
 import Link from "next/link";
-import { Menu, Plus, Search, Bell, LogOut } from "lucide-react";
+import { Bell, Menu, Plus, Search } from "lucide-react";
 import { useState, type ReactNode } from "react";
-import { Avatar } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
-import { cn } from "@/lib/cn";
 import { Inaktivitaet } from "./inaktivitaet";
-import { NAVIGATION } from "./navigation";
+import type { Zaehler } from "./navigation";
+import { Seitenleiste } from "./seitenleiste";
 
 type AppShellProps = {
   active: string;
   crumbs: { label: string; href?: string }[];
   brand: { wordmark: string; tagline?: string; logo: ReactNode };
   user: { initials: string; name: string; role: string };
+  /** Zahlen an den Menüpunkten */
+  zaehler: Zaehler;
+  /** Seitenleiste eingeklappt (je Benutzer gemerkt) */
+  eingeklappt: boolean;
   /** automatische Abmeldung nach so vielen Minuten ohne Eingabe */
   inaktivMinuten: number;
   children: ReactNode;
 };
 
 /** App-Rahmen: dunkle Seitenleiste, helles Inhaltsfeld, Kopfzeile mit Suche. */
-export function AppShell({ active, crumbs, brand, user, inaktivMinuten, children }: AppShellProps) {
+export function AppShell({ active, crumbs, brand, user, zaehler, eingeklappt, inaktivMinuten, children }: AppShellProps) {
   const [open, setOpen] = useState(false);
 
   return (
     <div className="flex min-h-screen py-3 pr-3 max-[960px]:p-0">
       <Inaktivitaet minuten={inaktivMinuten} />
-      <aside
-        aria-label="Hauptnavigation"
-        className={cn(
-          "sticky top-3 flex h-[calc(100vh-24px)] w-[252px] shrink-0 flex-col gap-0.5 overflow-y-auto py-2.5 pr-3.5 pl-[18px] text-frame-ink [--focus-ring:var(--frame-focus-ring)] [scrollbar-width:none]",
-          "max-[960px]:fixed max-[960px]:top-0 max-[960px]:left-0 max-[960px]:z-[60] max-[960px]:h-screen max-[960px]:bg-frame max-[960px]:pl-3.5 max-[960px]:transition-transform",
-          open ? "max-[960px]:translate-x-0 max-[960px]:shadow-[0_0_40px_rgb(0_0_0/0.3)]" : "max-[960px]:-translate-x-[105%]",
-        )}
-      >
-        <Link href="/" className="mb-2 flex items-center gap-3 border-b border-frame-line px-1 pt-1.5 pb-3.5">
-          <span className="w-[46px] shrink-0">{brand.logo}</span>
-          <span>
-            <b className="block text-[17px] leading-tight font-bold tracking-[0.16em] text-accent">{brand.wordmark}</b>
-            {brand.tagline && <small className="mt-0.5 block text-[11.5px] tracking-[0.04em] text-frame-muted">{brand.tagline}</small>}
-          </span>
-        </Link>
-
-        {NAVIGATION.map((group) => (
-          <div key={group.label}>
-            <div className="px-2 pt-[11px] pb-1 text-[10.5px] font-medium tracking-[0.1em] text-frame-muted uppercase">
-              {group.label}
-            </div>
-            {group.items.map((item) => {
-              const on = item.key === active;
-              const Icon = item.icon;
-              return (
-                <Link
-                  key={item.key}
-                  href={item.href}
-                  aria-current={on ? "page" : undefined}
-                  className={cn(
-                    "flex items-center gap-[11px] rounded-full py-[3px] pr-2.5 pl-[5px] text-[13.5px]",
-                    on ? "bg-accent/15 font-medium text-white" : "text-[#c9c6c1] hover:bg-white/5 hover:text-white",
-                  )}
-                >
-                  <span
-                    className={cn(
-                      "inline-flex size-7 shrink-0 items-center justify-center rounded-full",
-                      on ? "bg-accent text-accent-ink" : "bg-white/[0.07] text-[#cfcac4]",
-                    )}
-                  >
-                    <Icon className="size-[15px]" strokeWidth={1.8} aria-hidden="true" />
-                  </span>
-                  {item.label}
-                </Link>
-              );
-            })}
-          </div>
-        ))}
-
-        <div className="mt-auto flex flex-col gap-2.5 border-t border-frame-line px-1 pt-3.5">
-          <div className="flex items-center gap-2 text-xs text-[#bdb9b3]">
-            <span className="size-2 rounded-full bg-[#6fbf8e]" aria-hidden="true" />
-            Buchhaltung: Lexware
-          </div>
-          <div className="flex items-center gap-2.5">
-            <Avatar initials={user.initials} size="lg" className="bg-accent text-accent-ink" />
-            <span className="min-w-0 flex-1">
-              <b className="block truncate text-base font-semibold text-white">{user.name}</b>
-              <small className="block text-xs text-frame-muted">{user.role}</small>
-            </span>
-            {/* Abmelden per POST an den Route-Handler (kein Link, damit nichts vorab geladen wird) */}
-            <form action="/abmelden" method="post">
-              <button
-                type="submit"
-                aria-label="Abmelden"
-                title="Abmelden"
-                className="inline-flex size-9 cursor-pointer items-center justify-center rounded-full text-frame-muted hover:bg-white/5 hover:text-white"
-              >
-                <LogOut className="size-[17px]" aria-hidden="true" />
-              </button>
-            </form>
-          </div>
-        </div>
-      </aside>
+      <Seitenleiste active={active} brand={brand} user={user} zaehler={zaehler} eingeklappt={eingeklappt} offen={open} />
 
       {open && (
         <div className="fixed inset-0 z-[55] bg-black/40 min-[961px]:hidden" onClick={() => setOpen(false)} aria-hidden="true" />

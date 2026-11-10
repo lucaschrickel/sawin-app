@@ -117,7 +117,7 @@ function AnfrageFormular({ anfrage: a, kunde, objekte = [], benutzer, ichId, her
       <div className="grid grid-cols-2 gap-3 max-md:grid-cols-1">
         <Field label="Herkunft" error={f.herkunft}>
           {(p) => (
-            <Select name="herkunft" value={herkunft} onValueChange={(v) => { setHerkunft(v); s.aenderung(); }}>
+            <Select name="herkunft" value={herkunft ?? ""} onValueChange={(v) => { setHerkunft(v); s.aenderung(); }}>
               <SelectTrigger id={p.id}><SelectValue placeholder="Bitte wählen …" /></SelectTrigger>
               <SelectContent>{herkunftListe.map((h) => <SelectItem key={h} value={h}>{h}</SelectItem>)}</SelectContent>
             </Select>

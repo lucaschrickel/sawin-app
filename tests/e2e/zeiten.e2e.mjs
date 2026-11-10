@@ -80,7 +80,10 @@ try {
   await b.warte("!document.querySelector('[role=dialog]')");
   await buchungenMerken();
   pruefe("Fahrt ohne Auftrag gespeichert", await warteDb("select art, auftrag_id from public.zeitbuchung where mitarbeiter_id = $1", [ben.id], (r) => r[0]?.art === "fahrt" && r[0]?.auftrag_id === null));
-  pruefe("Liste: beide Buchungen, 9,5 h, Summe je Mitarbeiter", await b.warte(`(() => { const t = document.querySelector('main').innerText; return t.includes("2 Buchungen") && t.includes("9,5 h") && t.includes("Summe im Zeitraum"); })()`));
+  // Nur die eigenen Buchungen prüfen: auf Staging können weitere Buchungen dieser Woche liegen
+  const eigene = (await dbAbfrage("select id from public.zeitbuchung where mitarbeiter_id = any($1)", [[anna.id, ben.id]])).map((x) => x.id);
+  const zeilenDa = eigene.map((id) => `!!document.querySelector("tr[data-buchung='${id}']")`).join(" && ");
+  pruefe("Liste: beide Buchungen, Summe je Mitarbeiter (8,5 h und 1 h)", await b.warte(`${zeilenDa} && (() => { const f = document.querySelector('main tfoot')?.innerText ?? ""; return f.includes("Anna Zeit ${lauf} 8,5 h") && f.includes("Ben Zeit ${lauf} 1 h"); })()`));
 
   // 3. Bearbeiten: Ende 15 Uhr → 7,5 h
   await b.klick(`tr[data-buchung='${z1.id}'] td`);

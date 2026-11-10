@@ -1,60 +1,60 @@
 import {
-  BookUser,
-  CalendarDays,
-  CalendarRange,
+  Briefcase,
+  Calendar,
   CheckSquare,
   Clock,
-  ClipboardList,
-  Factory,
-  FileCheck2,
+  Download,
   FileText,
-  Files,
+  Grid3x3,
   Inbox,
   LayoutDashboard,
-  Palette,
   Receipt,
-  ReceiptText,
   Settings2,
   ShoppingCart,
+  Store,
+  Sun,
   Truck,
   Undo2,
-  UserX,
+  User,
   Users,
-  Van,
   Wrench,
   type LucideIcon,
 } from "lucide-react";
 
-export type NavItem = { key: string; href: string; label: string; icon: LucideIcon; bereit?: boolean };
+/** Schlüssel der Zähler an den Menüpunkten (berechnet in der Server-Hülle) */
+export type ZaehlerSchluessel = "aufgaben" | "anfragen" | "auftraege" | "service" | "fahrzeuge" | "abwesenheiten";
+export type Zaehler = Partial<Record<ZaehlerSchluessel, { n: number; dringend?: boolean }>>;
+
+export type NavItem = { key: string; href: string; label: string; icon: LucideIcon; bereit?: boolean; zaehler?: ZaehlerSchluessel };
 export type NavGroup = { label: string; items: NavItem[] };
 
 /**
- * Navigation für Version 1, Gruppen und Reihenfolge wie in CLAUDE.md („Rahmen und Navigation“).
- * Sichtbar sind nur Module mit `bereit: true`; weitere werden beim Bau ihres Moduls freigeschaltet.
+ * Navigation für Version 1: Gruppen, Reihenfolge und Symbole wie in der Demo (CLAUDE.md „Rahmen und Navigation“).
+ * Module ohne `bereit: true` erscheinen ausgegraut als „folgt“ (Entscheidung 10.11.2026) und sind nicht anklickbar.
  */
-const ALLE: NavGroup[] = [
+export const NAVIGATION: NavGroup[] = [
   {
     label: "Übersicht",
     items: [
       { key: "dashboard", href: "/", label: "Dashboard", icon: LayoutDashboard },
-      { key: "aufgaben", href: "/aufgaben", label: "Aufgaben", icon: CheckSquare, bereit: true },
+      { key: "aufgaben", href: "/aufgaben", label: "Aufgaben", icon: CheckSquare, bereit: true, zaehler: "aufgaben" },
     ],
   },
   {
     label: "Kunden & Anfragen",
     items: [
       { key: "kunden", href: "/kunden", label: "Kunden", icon: Users, bereit: true },
-      { key: "anfragen", href: "/anfragen", label: "Anfragen", icon: Inbox, bereit: true },
+      { key: "anfragen", href: "/anfragen", label: "Anfragen", icon: Inbox, bereit: true, zaehler: "anfragen" },
     ],
   },
   {
     label: "Belege",
     items: [
-      { key: "belege", href: "/belege", label: "Alle Belege", icon: Files },
+      { key: "belege", href: "/belege", label: "Alle Belege", icon: Download },
       { key: "angebote", href: "/belege/angebote", label: "Angebote", icon: FileText },
-      { key: "auftraege", href: "/auftraege", label: "Aufträge", icon: FileCheck2, bereit: true },
+      { key: "auftraege", href: "/auftraege", label: "Aufträge", icon: Briefcase, bereit: true, zaehler: "auftraege" },
       { key: "lieferscheine", href: "/belege/lieferscheine", label: "Lieferscheine", icon: Truck },
-      { key: "abschlaege", href: "/belege/abschlaege", label: "Abschlagsrechnungen", icon: ReceiptText },
+      { key: "abschlaege", href: "/belege/abschlaege", label: "Abschlagsrechnungen", icon: Receipt },
       { key: "rechnungen", href: "/belege/rechnungen", label: "Rechnungen", icon: Receipt },
       { key: "gutschriften", href: "/belege/gutschriften", label: "Gutschriften", icon: Undo2 },
     ],
@@ -62,38 +62,30 @@ const ALLE: NavGroup[] = [
   {
     label: "Montage & Service",
     items: [
-      { key: "montageplan", href: "/montageplan", label: "Montageplan", icon: CalendarRange, bereit: true },
-      { key: "service", href: "/service", label: "Service-Tickets", icon: Wrench },
-      { key: "serviceplan", href: "/serviceplan", label: "Service-Plan", icon: ClipboardList },
+      { key: "montageplan", href: "/montageplan", label: "Montageplan", icon: Calendar, bereit: true },
+      { key: "service", href: "/service", label: "Service-Tickets", icon: Wrench, zaehler: "service" },
+      { key: "serviceplan", href: "/serviceplan", label: "Service-Plan", icon: Calendar },
     ],
   },
   {
     label: "Einkauf",
     items: [
-      { key: "lieferanten", href: "/lieferanten", label: "Lieferanten", icon: Factory },
+      { key: "lieferanten", href: "/lieferanten", label: "Lieferanten", icon: Store },
       { key: "bestellungen", href: "/bestellungen", label: "Bestellungen", icon: ShoppingCart },
     ],
   },
   {
     label: "Team und Ressourcen",
     items: [
-      { key: "kalender", href: "/kalender", label: "Kalender", icon: CalendarDays },
-      { key: "mitarbeiter", href: "/mitarbeiter", label: "Mitarbeiter", icon: BookUser, bereit: true },
-      { key: "fahrzeuge", href: "/fahrzeuge", label: "Fahrzeuge", icon: Van },
+      { key: "kalender", href: "/kalender", label: "Kalender", icon: Grid3x3 },
+      { key: "mitarbeiter", href: "/mitarbeiter", label: "Mitarbeiter", icon: User, bereit: true },
+      { key: "fahrzeuge", href: "/fahrzeuge", label: "Fahrzeuge", icon: Truck, zaehler: "fahrzeuge" },
       { key: "zeiten", href: "/zeiten", label: "Zeiterfassung", icon: Clock, bereit: true },
-      { key: "abwesenheiten", href: "/abwesenheiten", label: "Abwesenheiten", icon: UserX, bereit: true },
+      { key: "abwesenheiten", href: "/abwesenheiten", label: "Abwesenheiten", icon: Sun, bereit: true, zaehler: "abwesenheiten" },
     ],
   },
   {
     label: "System",
-    items: [
-      { key: "einstellungen", href: "/einstellungen", label: "Einstellungen", icon: Settings2, bereit: true },
-      { key: "styleguide", href: "/styleguide", label: "Designsystem", icon: Palette, bereit: true },
-    ],
+    items: [{ key: "einstellungen", href: "/einstellungen", label: "Einstellungen", icon: Settings2, bereit: true }],
   },
 ];
-
-export const NAVIGATION: NavGroup[] = ALLE.map((g) => ({ ...g, items: g.items.filter((i) => i.bereit) })).filter(
-  (g) => g.items.length > 0,
-);
-

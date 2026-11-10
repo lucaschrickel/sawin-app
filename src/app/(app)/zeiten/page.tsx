@@ -8,7 +8,7 @@ import { Table, Td, Th } from "@/components/ui/table";
 import { pruefeSitzung } from "@/lib/auth/sitzung";
 import { cn } from "@/lib/cn";
 import { stundenText, ZEIT_ART_TEXT, ZEIT_ARTEN } from "@/lib/team";
-import { heuteBerlin } from "@/lib/zeit";
+import { heute as ladeHeute } from "@/lib/heute";
 import { ladeBuchungen, ladeZeitDialogDaten, summeJeAuftrag, summeJeMitarbeiter, zeitraumAus } from "@/lib/zeiten";
 import { BuchungenTabelle } from "./ui";
 import { ZeitDialog } from "./zeit-dialog";
@@ -20,7 +20,7 @@ const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 export default async function ZeitenPage({ searchParams }: PageProps<"/zeiten">) {
   const sp = await searchParams;
-  const heute = heuteBerlin();
+  const heute = await ladeHeute();
   const ansicht = ["mitarbeiter", "auftraege"].includes(eins(sp.ansicht)) ? eins(sp.ansicht) : "buchungen";
   const zr = zeitraumAus(eins(sp.zeitraum), eins(sp.ab), heute);
   const mitarbeiter = UUID.test(eins(sp.mitarbeiter)) ? eins(sp.mitarbeiter) : "";

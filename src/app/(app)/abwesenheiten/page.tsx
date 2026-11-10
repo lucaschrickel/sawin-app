@@ -10,7 +10,8 @@ import { Table, Td, Th } from "@/components/ui/table";
 import { ladeAbwesenheiten } from "@/lib/abwesenheiten";
 import { pruefeSitzung } from "@/lib/auth/sitzung";
 import { ABWESENHEIT_STATUS_TEXT, ABWESENHEIT_STATUS_TON, ABWESENHEIT_TEXT, ABWESENHEIT_TON, arbeitstageText, arbeitstageZwischen } from "@/lib/team";
-import { heuteBerlin, tag } from "@/lib/zeit";
+import { tag } from "@/lib/zeit";
+import { heute as ladeHeute } from "@/lib/heute";
 import { AbwesenheitDialog, AbwesenheitLoeschen, Entscheiden } from "./ui";
 
 export const metadata: Metadata = { title: "Abwesenheiten" };
@@ -21,7 +22,7 @@ const zeitraum = (von: string, bis: string) => (von === bis ? tag(von) : `${tag(
 
 export default async function AbwesenheitenPage({ searchParams }: PageProps<"/abwesenheiten">) {
   const sp = await searchParams;
-  const heute = heuteBerlin();
+  const heute = await ladeHeute();
   const jahr = /^\d{4}$/.test(eins(sp.jahr)) ? Number(eins(sp.jahr)) : Number(heute.slice(0, 4));
   const mitarbeiter = UUID.test(eins(sp.mitarbeiter)) ? eins(sp.mitarbeiter) : "";
   const [{ benutzer: ich }, d] = await Promise.all([pruefeSitzung(), ladeAbwesenheiten(jahr, mitarbeiter)]);

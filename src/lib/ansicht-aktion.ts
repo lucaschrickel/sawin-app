@@ -13,3 +13,11 @@ export async function ansichtSetzen(seite: string, ansicht: "liste" | "board") {
   else await supabase.from("benutzer_einstellung").insert({ benutzer_id: benutzer.id, ansichten });
   refresh();
 }
+
+/** Merkt, ob die Seitenleiste eingeklappt ist (je Benutzer). Kein refresh: der Zustand lebt im Browser weiter. */
+export async function seitenleisteSetzen(eingeklappt: boolean) {
+  const { supabase, benutzer } = await pruefeSitzung();
+  const { data } = await supabase.from("benutzer_einstellung").select("id").eq("benutzer_id", benutzer.id).maybeSingle();
+  if (data) await supabase.from("benutzer_einstellung").update({ seitenleiste_eingeklappt: !!eingeklappt }).eq("id", data.id);
+  else await supabase.from("benutzer_einstellung").insert({ benutzer_id: benutzer.id, seitenleiste_eingeklappt: !!eingeklappt });
+}

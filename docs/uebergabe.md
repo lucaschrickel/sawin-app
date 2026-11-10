@@ -98,6 +98,7 @@ APP_URL=http://localhost:3100 npm run test:montageplan # Modul Montageplan (Plan
 APP_URL=http://localhost:3100 npm run test:mitarbeiter # Modul Mitarbeiter
 APP_URL=http://localhost:3100 npm run test:zeiten      # Modul Zeiterfassung
 APP_URL=http://localhost:3100 npm run test:abwesenheiten # Modul Abwesenheiten (Büro-Benutzer und Admin)
+APP_URL=http://localhost:3100 npm run test:seitenleiste  # Seitenleiste wie in der Demo (folgt, Zähler, Einklappen)
 ```
 
 **Vor der Einladung von Mitarbeitern:** Der eingebaute E-Mail-Versand von Supabase schickt nur an Mitglieder der

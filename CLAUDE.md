@@ -138,6 +138,8 @@ Die Monteur-App kommt in Version 2.
 
 - Seitenleiste einklappbar auf eine Symbolleiste, über den Knopf oben in der Seitenleiste neben dem Logo.
   Der Zustand wird je Benutzer gemerkt.
+- Noch nicht gebaute Module stehen ausgegraut mit „folgt“ in der Seitenleiste und sind nicht anklickbar
+  (Entscheidung 10.11.2026). Das Designsystem (`/styleguide`) steht nicht in der Seitenleiste.
 - **Zurück oben links:** Oben links steht als Knopf „← <vorherige Maske>“ immer die Maske, aus der man gekommen ist,
   nicht die fachliche Elternseite (Beispiel: Angebot aus der Liste „Angebote“ geöffnet → „← Angebote“, nicht die
   Anfrage). Ein Klick führt genau dorthin zurück, mit Filter und Ansicht von vorher. Technisch ein Verlauf je

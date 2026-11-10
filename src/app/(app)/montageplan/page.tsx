@@ -6,7 +6,8 @@ import { Shell } from "@/components/app/shell";
 import { pruefeSitzung } from "@/lib/auth/sitzung";
 import { ladeTafel } from "@/lib/montageplan";
 import { kalenderwoche, plusTage, wocheAus } from "@/lib/woche";
-import { heuteBerlin, tag } from "@/lib/zeit";
+import { tag } from "@/lib/zeit";
+import { heute as ladeHeute } from "@/lib/heute";
 import type { AuftragWahl } from "./einsatz-dialog";
 import { Plantafel } from "./plantafel";
 
@@ -17,7 +18,7 @@ const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 export default async function MontageplanPage({ searchParams }: PageProps<"/montageplan">) {
   const sp = await searchParams;
-  const heute = heuteBerlin();
+  const heute = await ladeHeute();
   const montag = wocheAus(eins(sp.woche), heute);
   const auftragId = eins(sp.auftrag);
   const { supabase } = await pruefeSitzung();
