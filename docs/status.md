@@ -39,7 +39,7 @@ Stand: 11.11.2026, nach Versand (vorläufig), Kopfzeile und OneDrive-Ablage. Ver
 | Montageplan | Plantafel komplett, Wochenplan-PDF | fertig | |
 | Team | Kalender, Mitarbeiter, Fahrzeuge, Zeiterfassung, Abwesenheiten | fertig | |
 | Einkauf | Lieferanten (Konditionen), Bestellungen | fertig | |
-| Ablage | OneDrive über Microsoft Graph: Ordner ab Angebot, Umbenennen mit der AB, Beleg-PDFs, Upload, Zwischenspeicher, Nachladen | teilweise | gebaut und gegen einen nachgebauten Graph-Server getestet; die echte Verbindung zu Sawins Bibliothek (App-Registrierung, Test in `_App-Test`) steht aus |
+| Ablage | OneDrive über Microsoft Graph: Ordner ab Angebot, Umbenennen mit der AB, Beleg-PDFs, Upload, Zwischenspeicher, Nachladen | fertig | mit Sawins Bibliothek „Kundenprojekte“ im Ordner `_App-Test` getestet (11.11.2026, localhost); auf Vercel mit dem Deployment |
 | Kommunikation | Chat je Auftrag und Ticket | fehlt | Tabellen vorhanden |
 | Formulare | Aufmaßblatt digital, Protokolle (PDF, Scan) | fehlt | Ablage für Scans steht bereit (Upload in den Unterordner) |
 | Einstellungen | Firma, Benutzer, Montageplan, Belege & Artikel | fertig | |
@@ -62,7 +62,7 @@ Stand: 11.11.2026, nach Versand (vorläufig), Kopfzeile und OneDrive-Ablage. Ver
 | Lexware-Testpunkte | erledigt bis auf `vatfree` und das Zahlungs-Event (Webhook gebaut) |
 | Belegerstellung gegen das Testkonto | erledigt bis auf eine echte Bankzahlung |
 | Nummernkreise mit Sawin | offen |
-| OneDrive mit Sawins Bibliothek | offen: App-Registrierung (docs/uebergabe.md „OneDrive“), Test in `_App-Test` |
+| OneDrive mit Sawins Bibliothek | erledigt in `_App-Test` (App-Registrierung „Sawin App Ablage“, Freigabe nur „Kundenprojekte“); offen: Variablen in Vercel, Basisordner `2026` in Produktion |
 | Vorläufiger Versand mit Sawins Outlook | offen (mailto mit BCC prüfen) |
 | Steuerberater | offen |
 | Airtable-Übernahme | offen |

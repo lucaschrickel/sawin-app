@@ -184,35 +184,49 @@ Verknüpfung (Drive-ID, Item-ID). Ist Microsoft nicht erreichbar oder noch nicht
 privaten Speicher `ablage-puffer` und wird nachgeladen (Cron alle 30 Minuten, beim Öffnen eines Auftrags,
 „Jetzt übertragen“ in den Einstellungen).
 
-**App-Registrierung (als globaler Administrator, je Umgebung eine eigene Registrierung empfohlen):**
+**Stand bei Sawin (eingerichtet 11.11.2026):** eine Registrierung „Sawin App Ablage“ für beide Umgebungen mit zwei
+geheimen Schlüsseln („Staging“ für Preview und `.env.local`, „Produktion“ für Production; beide gültig bis 10.11.2028),
+Berechtigung nur `Lists.SelectedOperations.Selected`, Schreibrecht nur auf die Bibliothek „Kundenprojekte“ der Website
+`https://sawinbe.sharepoint.com/sites/Sawin-Bauelemente`. Basisordner: Staging `_App-Test`, Produktion `2026`
+(zum Jahreswechsel in den Einstellungen umstellen). Website-ID und Bibliotheks-ID stehen in Einstellungen ›
+Verbindungen. **Vor dem 10.11.2028 neue Schlüssel anlegen** und in Vercel tauschen.
+
+**App-Registrierung (als globaler Administrator; eine Registrierung mit je einem Schlüssel pro Umgebung genügt):**
 
 1. https://entra.microsoft.com › Anwendungen › App-Registrierungen › **Neue Registrierung**: Name z. B.
-   „Sawin App Ablage (Staging)“, Kontotyp „Nur Konten in diesem Organisationsverzeichnis“, **Umleitungs-URI leer
+   „Sawin App Ablage“, Kontotyp „Nur Konten in diesem Organisationsverzeichnis“, **Umleitungs-URI leer
    lassen**. Nach dem Registrieren notieren: **Anwendungs-ID (Client-ID)** → `MS_GRAPH_CLIENT_ID`,
    **Verzeichnis-ID (Mandant)** → `MS_GRAPH_TENANT_ID`.
-2. **Zertifikate & Geheimnisse** › Neuer geheimer Clientschlüssel (Ablauf 12 oder 24 Monate, Termin vormerken). Den
-   **Wert** sofort kopieren (nur einmal sichtbar) → `MS_GRAPH_CLIENT_SECRET`.
+2. **Zertifikate & Geheimnisse** › je Umgebung ein geheimer Clientschlüssel („Staging“, „Produktion“; Ablauf 24 Monate,
+   Termin vormerken). Den **Wert** sofort kopieren (nur einmal sichtbar, in den Passwort-Manager) →
+   `MS_GRAPH_CLIENT_SECRET` der jeweiligen Umgebung.
 3. **API-Berechtigungen**: die vorhandene delegierte Berechtigung „User.Read“ entfernen. Berechtigung hinzufügen ›
    Microsoft Graph › **Anwendungsberechtigungen** › **Lists.SelectedOperations.Selected**. Danach **„Administrator­
    zustimmung für <Mandant> erteilen“**. Nicht hinzufügen: Mail.*, Files.ReadWrite.All, Sites.ReadWrite.All.
    Die Zustimmung allein gibt noch keinen Zugriff; erst die Freigabe in Schritt 4.
 4. **Freigabe der einen Bibliothek** im Graph Explorer (https://developer.microsoft.com/graph/graph-explorer, als
    globaler Administrator angemeldet; für diese Aufrufe einmalig die delegierte Berechtigung `Sites.FullControl.All`
-   für den Graph Explorer zustimmen):
+   für den Graph Explorer zustimmen). **Das Konto muss zusätzlich Websiteadministrator der Website sein**, globaler
+   Administrator allein reicht nicht (sonst „403 accessDenied“ beim POST): SharePoint Admin Center › Websites ›
+   Aktive Websites › Website › Berechtigungen › Websiteadministratoren › Weitere Administratoren. Danach im Graph
+   Explorer ab- und wieder anmelden. Nach der Freigabe kann man sich dort wieder austragen und die Zustimmung des
+   Graph Explorers über https://myapps.microsoft.com › Graph Explorer › „Berechtigungen widerrufen“ entfernen
+   (nie „Administratorzustimmung erteilen“ für den Graph Explorer):
    - Website-ID: `GET https://graph.microsoft.com/v1.0/sites/<firma>.sharepoint.com:/sites/<website>` → `id`
      (Form `<host>,<guid>,<guid>`).
-   - Bibliotheks-ID: `GET https://graph.microsoft.com/v1.0/sites/<website-id>/lists?$select=id,displayName` → `id`
-     der Dokumentbibliothek (meist „Dokumente“).
+   - Bibliotheks-ID: `GET https://graph.microsoft.com/v1.0/sites/<website-id>/lists?$select=id,displayName,webUrl` →
+     `id` der Dokumentbibliothek, deren `webUrl` auf den Bibliotheksnamen endet (bei Sawin „/Kundenprojekte“).
    - Freigeben: `POST https://graph.microsoft.com/v1.0/sites/<website-id>/lists/<bibliotheks-id>/permissions` mit
      `{"roles": ["write"], "grantedTo": {"application": {"id": "<client-id>", "displayName": "Sawin App Ablage"}}}`
-     (lehnt v1.0 den Aufruf ab, dieselbe Adresse mit `/beta/`).
+     (bei Sawin über v1.0 mit „201 Created“; lehnt v1.0 den Aufruf ab, dieselbe Adresse mit `/beta/`).
    - Prüfen: `GET …/lists/<bibliotheks-id>/permissions` zeigt die App mit „write“.
    - Falls Microsoft die Freigabe auf Listenebene für diese Bibliothek nicht zulässt: statt Schritt 3/4
      `Sites.Selected` (Anwendungsberechtigung) und `POST /v1.0/sites/<website-id>/permissions` mit demselben Inhalt
      (dann gilt der Zugriff für die eine Website).
 5. **Umgebungsvariablen** in Vercel (Production und Preview getrennt, als „Sensitive“) und lokal in `.env.local`:
    `MS_GRAPH_TENANT_ID`, `MS_GRAPH_CLIENT_ID`, `MS_GRAPH_CLIENT_SECRET`, `MS_TOKEN_SCHLUESSEL`
-   (`openssl rand -base64 32`, je Umgebung eigener Wert). Danach neu deployen.
+   (`openssl rand -base64 32` oder `node -e "console.log(require('crypto').randomBytes(32).toString('base64'))"`, je
+   Umgebung eigener Wert). Danach neu deployen bzw. den Dev-Server neu starten.
 6. **In der App** (Admin): Einstellungen › Verbindungen › Website-ID, Bibliotheks-ID, Basisordner **`_App-Test`** ›
    „Prüfen und speichern“. Ein Angebot anlegen: der Ordner `<AG-Nummer>_<Kunde>` mit Unterordnern erscheint in
    `_App-Test`. Erst nach der Abnahme den echten Basisordner eintragen.
