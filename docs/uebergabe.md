@@ -28,6 +28,7 @@ Vorlage: `.env.example`. Lokal in `.env.local` (nie einchecken), auf Vercel in d
 | `SUPABASE_ACCESS_TOKEN` | nur lokal | Persönliches Token (Supabase › Account › Access Tokens) zum Einspielen der Auth-Einstellungen. Nicht auf Vercel setzen. |
 | `SUPABASE_AUTH_SITE_URL` | nur lokal (beim Einspielen) | Adresse der App für Links in Auth-E-Mails, z. B. `http://localhost:3000` (Staging lokal) oder die Vercel-Adresse |
 | `LEXWARE_API_KEY` | nur Server | Lexware Office › Erweiterungen › Public API: Schlüssel erzeugen. Staging: eigenes Testkonto, Produktion: Schlüssel des Kunden (erst beim Go-live). Ohne Schlüssel zeigt die Seitenleiste „Lexware nicht verbunden“ und Rechnungen lassen sich nicht fertigstellen. |
+| `CRON_SECRET` | nur Server (Vercel: Production und Preview) | Zufällige Zeichenkette, mindestens 16 Zeichen (z. B. `openssl rand -hex 32`). Vercel schickt sie beim Cron als `Authorization: Bearer …`; ohne sie antwortet `/api/cron/zahlungsabgleich` immer 401. Je Umgebung ein eigener Wert. |
 | `MS_GRAPH_TENANT_ID`, `MS_GRAPH_CLIENT_ID`, `MS_GRAPH_CLIENT_SECRET` | nur Server | App-Registrierung in Microsoft Entra für OneDrive und E-Mail |
 
 ## Datenbank
@@ -108,7 +109,7 @@ APP_URL=http://localhost:3100 npm run test:belege        # Belege: Angebot → A
 APP_URL=http://localhost:3100 npm run test:lexware      # Lexware-Testkonto: Angebot → AB → Abschlag → Teil-AB → Teilrechnung → Abschlag → Schlussrechnung → Gutschrift, Ticket-Rechnung
 APP_URL=http://localhost:3100 npm run test:zahlungen    # Lexware-Testkonto: Zahlungsstand abrufen, Als bezahlt markieren, Zahlungsbestätigung
 APP_URL=http://localhost:3100 npm run test:katalog      # Artikelkatalog, Textvorlagen, formatierte Beschreibungen (ohne Lexware)
-npm run test:unit                                       # Belegsummen und Abschläge (Rundung auf Cent, Schlussrechnung centgenau), ohne App
+npm run test:unit                                       # Belegsummen, Abschläge (centgenau), Zahlungsposten, HTML, Webhook-Signatur und Cron-Zugang, ohne App
 ```
 
 **Belege einrichten (je Instanz, einmalig in der App):** Unter Einstellungen › Firma die Firmendaten eintragen (stehen
@@ -132,6 +133,42 @@ einen eigenen SMTP-Zugang eintragen (z. B. Microsoft 365 des Betriebs oder ein V
 - Interne Kopie (BCC) je Belegart in `belegart_einstellung` eintragen (bei Sawin: Angebot an `angebot@…`, AB und
   Teil-AB an `auftrag@…`).
 
+## Vercel
+
+- **Region:** `vercel.json` setzt `"regions": ["fra1"]` für alle Serverfunktionen. In Vercel unter Settings › Functions
+  prüfen, dass dort „Frankfurt (fra1)“ steht und keine andere Region eingetragen ist.
+- **Umgebungsvariablen** (Settings › Environment Variables) für **Production** und **Preview** getrennt setzen; Preview
+  zeigt auf Staging-Supabase und das Lexware-Testkonto, Production auf die Produktivprojekte:
+  `NEXT_PUBLIC_CUSTOMER_ID`, `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`,
+  `SUPABASE_SERVICE_ROLE_KEY`, `LEXWARE_API_KEY`, `CRON_SECRET` (später `MS_GRAPH_*`). Nicht auf Vercel:
+  `SUPABASE_DB_URL`, `SUPABASE_ACCESS_TOKEN`, `SUPABASE_AUTH_SITE_URL`.
+- **Cron:** `vercel.json` ruft alle 30 Minuten `/api/cron/zahlungsabgleich` auf (Zahlungsstand aller offenen
+  Lexware-Belege). Vercel führt Crons **nur für Production-Deployments** aus und erst ab dem **Pro-Tarif** öfter als
+  einmal am Tag (im Hobby-Tarif schlägt das Deployment mit diesem Zeitplan fehl). Läuft Staging als Preview, gibt es
+  dort keinen Cron; der Abgleich beim Öffnen und der Webhook reichen dann. Prüfen: Settings › Cron Jobs › „Run“,
+  Ergebnis in den Logs (`{"status":"ok","geprueft":…}`).
+- **Schutz der Deployments:** Ist „Vercel Authentication“ (Deployment Protection) aktiv, erreicht Lexware den Webhook
+  nicht. Für die Adresse, die Lexware aufruft, entweder den Schutz abschalten (für Production Standard) oder unter
+  Settings › Deployment Protection ein „Protection Bypass for Automation“-Geheimnis anlegen und an die Webhook-Adresse
+  hängen: `…/api/lexware/webhook?x-vercel-protection-bypass=<Geheimnis>`.
+- **Lexware-Webhook registrieren** (einmal je Umgebung und je Lexware-Konto; der API-Schlüssel kommt aus `.env.local`,
+  also zuerst prüfen, dass er zum richtigen Konto gehört):
+
+  ```bash
+  npm run lexware:webhook -- konto     # mit welchem Lexware-Konto ist der Schlüssel verbunden?
+  npm run lexware:webhook -- anlegen https://<app-adresse>/api/lexware/webhook
+  npm run lexware:webhook -- liste     # payment.changed, invoice.status.changed, credit-note.status.changed
+  npm run lexware:webhook -- loeschen <subscriptionId>
+  ```
+
+  Lexware prüft die Adresse beim Anlegen (HEAD, muss 200 liefern; HTTPS Pflicht). Der Endpunkt prüft jede Zustellung
+  über die RSA-Signatur von Lexware (Header `X-Lxo-Signature`, öffentlicher Schlüssel in
+  `src/lib/lexware/webhook-pruefung.ts`), erkennt Doppelzustellungen und protokolliert Fehler in der Tabelle
+  `lexware_ereignis` (Admins lesen sie z. B. im Supabase-Dashboard). Bei Fehlern antwortet er 500, Lexware stellt
+  dann erneut zu. Wird der Lexware-API-Schlüssel ungültig gemacht, löscht Lexware alle Abos: nach einem neuen
+  Schlüssel erneut anlegen. Beim Go-live: Abos im Testkonto löschen und mit Sawins Schlüssel für die
+  Produktionsadresse anlegen.
+
 ## Lexware
 
 - **Konto:** Lexware Office des Kunden (Tarif mit Public API). Bis zum Go-live arbeitet Staging nur gegen ein eigenes
@@ -147,8 +184,8 @@ einen eigenen SMTP-Zugang eintragen (z. B. Microsoft 365 des Betriebs oder ein V
 - **Zahlungen:** Lexware nimmt Zahlungen über die API nicht an. Bar- und Kartenzahlungen, die das Büro in der App
   „als bezahlt markiert“, müssen zusätzlich in Lexware gebucht werden; die App gleicht sie dann ab (gleicher Beleg,
   gleicher Betrag). Den Zahlungsstand holt die App beim Öffnen von Belegen, Aufträgen und Dashboard (höchstens alle
-  5 Minuten) und über „Zahlungsstand abrufen“. **Sobald die App auf Vercel läuft:** Cron alle 15 Minuten einrichten
-  (neue Variable `CRON_SECRET`, wird mit dem Cron ergänzt).
+  5 Minuten), über „Zahlungsstand abrufen“, alle 30 Minuten per Vercel-Cron und sofort über den Lexware-Webhook
+  (siehe „Vercel“).
 - **Fehler:** Lehnt Lexware einen Beleg ab, bleibt er Entwurf, die Meldung steht auf der Belegseite, und
   „Fertigstellen“ versucht es erneut. Ein schon angelegter Beleg wird dabei gefunden (Kontakt, Datum, Betrag) und
   nicht doppelt angelegt. Fehlt das Original-PDF, holt die App es beim Öffnen nach („PDF von Lexware holen“).

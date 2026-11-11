@@ -1,6 +1,6 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
-import { AKTIV_COOKIE, INAKTIV_MINUTEN, istOeffentlich } from "@/lib/auth/konstanten";
+import { AKTIV_COOKIE, INAKTIV_MINUTEN, istMaschinenPfad, istOeffentlich } from "@/lib/auth/konstanten";
 
 /**
  * Läuft vor jeder Anfrage:
@@ -10,6 +10,8 @@ import { AKTIV_COOKIE, INAKTIV_MINUTEN, istOeffentlich } from "@/lib/auth/konsta
  * 3. meldet nach INAKTIV_MINUTEN ohne Anfrage ab, auch wenn der Browser zwischendurch geschlossen war.
  */
 export async function proxy(request: NextRequest) {
+  // Cron und Webhook: kein Cookie, keine Sitzung; der Endpunkt prüft selbst
+  if (istMaschinenPfad(request.nextUrl.pathname)) return NextResponse.next();
   let response = NextResponse.next({ request });
   const supabase = createServerClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY!, {
     cookies: {

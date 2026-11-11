@@ -7,6 +7,13 @@ export const AKTIV_COOKIE = "app_letzte_aktivitaet";
 /** Seiten ohne Anmeldung. Alles andere verlangt eine Sitzung. */
 export const OEFFENTLICHE_PFADE = ["/anmelden", "/passwort-vergessen", "/auth/", "/abmelden"];
 
+/**
+ * Endpunkte für Maschinen (Vercel-Cron, Lexware-Webhook): ohne Sitzung, ohne Umleitung. Sie prüfen ihren Zugang selbst
+ * (CRON_SECRET bzw. Signatur von Lexware).
+ */
+export const MASCHINEN_PFADE = ["/api/cron/", "/api/lexware/"];
+export const istMaschinenPfad = (pfad: string) => MASCHINEN_PFADE.some((p) => pfad.startsWith(p));
+
 export const istOeffentlich = (pfad: string) =>
   OEFFENTLICHE_PFADE.some((p) => (p.endsWith("/") ? pfad.startsWith(p) : pfad === p || pfad.startsWith(p + "/")));
 

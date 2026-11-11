@@ -16,6 +16,7 @@
     "auth:push": "node scripts/supabase-config.mjs push",
     "admin:einladen": "node scripts/admin-einladen.mjs",
     "admin:passwort": "node scripts/passwort-setzen.mjs",
+    "lexware:webhook": "node scripts/lexware-webhook.mjs",
     "test:anmeldung": "node tests/e2e/anmeldung.e2e.mjs",
     "test:kunden": "node tests/e2e/kunden.e2e.mjs",
     "test:anfragen": "node tests/e2e/anfragen.e2e.mjs",

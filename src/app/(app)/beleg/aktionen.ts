@@ -211,7 +211,7 @@ export async function zahlungsstandAbrufen(id: string): Promise<Ergebnis> {
   const d = await ladeBeleg(id);
   if (!d?.beleg.lexware_id) return { fehler: "Der Beleg liegt nicht in Lexware." };
   try {
-    await zahlstandHolen({ id, lexware_id: d.beleg.lexware_id }, benutzer.id);
+    await zahlstandHolen({ id, lexware_id: d.beleg.lexware_id, art: d.beleg.art }, benutzer.id);
   } catch (e) {
     return { fehler: `Lexware: ${e instanceof Error ? e.message : "unbekannter Fehler"}` };
   }

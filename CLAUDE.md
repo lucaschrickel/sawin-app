@@ -101,8 +101,11 @@ Eine Codebasis, je Kunde eine eigene Instanz. Diese Datei gilt für jede Arbeit 
     Lexware noch nicht kennt; 0 → „Bezahlt“. Abgleich: Die App liest die Lexware-Belegliste (offener Betrag, Status) ab
     der ältesten offenen Forderung und holt nur für geänderte Belege die Zahlungsposten (`/v1/payments/{id}`).
     Ausgelöst beim Öffnen von Belegseite, Belegliste, Auftrag und Dashboard (im Hintergrund nach der Antwort, höchstens
-    alle 5 Minuten) und über „Zahlungsstand abrufen“; ein Vercel-Cron folgt, sobald Staging auf Vercel läuft, der
-    Lexware-Webhook danach. Nur Geldeingänge werden Zahlungen; Gutschriften, Skonto und Ausbuchungen verringern nur den
+    alle 5 Minuten), über „Zahlungsstand abrufen“, alle 30 Minuten per Vercel-Cron (`/api/cron/zahlungsabgleich`, nur
+    mit `CRON_SECRET`) und sofort über den Lexware-Webhook (`/api/lexware/webhook`: `payment.changed`,
+    `invoice.status.changed`, `credit-note.status.changed`; RSA-Signatur geprüft, Doppelzustellungen erkannt, Eingang
+    und Fehler in `lexware_ereignis`, 11.11.2026). Gutschriften haben bei Lexware keine Zahlungsposten; ihren Stand liest
+    die App aus der Belegliste bzw. der Gutschrift. Nur Geldeingänge werden Zahlungen; Gutschriften, Skonto und Ausbuchungen verringern nur den
     offenen Betrag. **Abgleich App-Buchung ↔ Lexware-Zahlung:** gleicher Beleg und gleicher Betrag, bei mehreren das
     nächstliegende Datum; ohne genaue Übereinstimmung (z. B. Skonto) bleibt „in Lexware noch buchen“ stehen. Eine eigene,
     noch nicht abgeglichene Zahlung ohne Bestätigung lässt sich entfernen (Markierung). Steht der Auftrag in „Abnahme“

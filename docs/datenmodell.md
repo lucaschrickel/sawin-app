@@ -106,7 +106,8 @@ Bestellstatus, Liefer-KW, AB-Status und Pipeline-Stufe werden **abgeleitet**, ni
 | `zahlung_erfassen()` | Funktion „Als bezahlt markieren“: App-Buchung (Quelle app, „in Lexware noch buchen“), Teilzahlung möglich, Betrag höchstens offen, Datum bis heute; optional mit Zahlungsbestätigung |
 | `zahlungsbestaetigung_erstellen()` | Funktion: Zahlungsbestätigung (App-Beleg, Nummer ZB…, fertiggestellt, Vorgänger = Rechnung bzw. Abschlag, Betrag = Zahlung, `offen_betrag` = Restbetrag zum Zeitpunkt der Bestätigung); höchstens eine je Zahlung |
 | Zahlungsstand | `beleg.lexware_offen` = offener Betrag laut Lexware; `offen_betrag` = `lexware_offen` − nicht abgeglichene App-Buchungen; 0 → Status „bezahlt“ (Trigger auf `zahlung`). Offener Betrag und Status ändern nur die Zahlungsfunktionen bzw. der Server. Zahlungen ändert kein Benutzer; eigene, nicht abgeglichene ohne Bestätigung lassen sich als gelöscht markieren. Bezahlt und alles erledigt → Auftrag in Abnahme/Baustelle fertig wird „abgeschlossen“. |
-| `lexware_zahlungen()`, `lexware_abgleich_beginnen()` | Server (Service-Rolle): Zahlungsstand eines Belegs aus Lexware übernehmen (Geldeingänge als Zahlung, passende App-Buchung wird abgeglichen statt doppelt gezählt); Abgleich höchstens alle 5 Minuten (`einstellung.lexware_zahlung_abgleich_am`) |
+| `lexware_zahlungen()`, `lexware_abgleich_beginnen()` | Server (Service-Rolle): Zahlungsstand eines Belegs aus Lexware übernehmen (Geldeingänge als Zahlung, passende App-Buchung wird abgeglichen statt doppelt gezählt; Gutschriften nur offener Betrag und Status); Abgleich beim Öffnen höchstens alle 5 Minuten (`einstellung.lexware_zahlung_abgleich_am`), der Cron erzwingt ihn |
+| `lexware_ereignis` | Eingangsprotokoll des Lexware-Webhooks: Schlüssel (SHA-256 aus Organisation, Ereignis, Ressource, Zeitpunkt; Lexware liefert keine Ereignis-ID), Ereignis, Ressource, Status (neu, verarbeitet, ignoriert, fehler), Fehlertext, Versuche, Zeitpunkte. Technisches Protokoll ohne Audit-Trigger; schreiben nur `lexware_ereignis_eingang()` (idempotent: Doppelzustellung wird nur gezählt, nach Fehler erneut verarbeitet) und `lexware_ereignis_ende()` (Service-Rolle), lesen nur Admins. |
 | Formatierte Texte | `beleg_position.beschreibung_html` und `artikel.beschreibung_html`: bereinigtes HTML (Whitelist b, strong, i, em, u, ul, ol, li, p, br, span mit color bzw. font-weight), bereinigt vom Server vor dem Speichern (`src/lib/html.ts`) |
 | `beleg_position.abzug_beleg_id` | Schlussrechnung: Minusposition für den Abzug dieses Abschlags bzw. dieser Teilrechnung (vom Server gesetzt, nur fertige Abschläge und Teilrechnungen desselben Auftrags) |
 | Teil-AB und Teilrechnung | Teil-AB nur aus einer fertigen AB, Liefertermin Pflicht, Nummer `<AB>-01`; `beleg_fertigstellen` setzt den Liefertermin des Auftrags. Eine Rechnung aus einer Teil-AB bzw. deren Lieferschein ist Teilrechnung (`teil`, setzt nur `beleg_speichern`), ohne Abzug; `lexware_start` verlangt in der Schlussrechnung den Abzug aller Abschläge und Teilrechnungen. |
@@ -151,7 +152,7 @@ Wahl der Rechnung). Höchstens eine Zahlungsbestätigung je Zahlung. Höchstens 
 2. `…_team.sql`: Benutzer, Mitarbeiter, Kolonnen, Ressourcen, Fahrzeuge, Abwesenheiten
 3. `…_stammdaten.sql`: Einstellungen, Artikel, Vorlagen, Zahlungsbedingungen, Kunden, Lieferanten, Konditionen
 4. `…_anfragen_auftraege.sql`: Anfragen, Aufträge, Service-Tickets
-5. `…_belege.sql`: Belege, Positionen, Versionen, Versand, Zahlungen (Modul Belege Schritt 1: `20261111090000_belege_modul.sql` mit Speichern, Fertigstellen, Übergeben, Status-Regeln, Speicher `belege`; Korrekturen `…090100` und `…090200`; Schritt 2 Lexware: `20261112090000_lexware.sql`, Korrektur `…090100`; Zahlungen `20261113090000_zahlungen.sql` und `…090100`; Teil-AB `…090200_teil_ab.sql`)
+5. `…_belege.sql`: Belege, Positionen, Versionen, Versand, Zahlungen (Modul Belege Schritt 1: `20261111090000_belege_modul.sql` mit Speichern, Fertigstellen, Übergeben, Status-Regeln, Speicher `belege`; Korrekturen `…090100` und `…090200`; Schritt 2 Lexware: `20261112090000_lexware.sql`, Korrektur `…090100`; Zahlungen `20261113090000_zahlungen.sql` und `…090100`; Teil-AB `…090200_teil_ab.sql`; Webhook-Protokoll `20261114090000_lexware_ereignis.sql`, Korrektur Abgleichsbeginn `…090100`)
 6. `…_planung_arbeit.sql`: Einsätze, Zeiten, Aufgaben, Termine, Formulare, Chat, Notizen, Benachrichtigungen, Einkauf
 7. `…_rls.sql`: RLS und Policies für alle Tabellen, Rechte für `anon` entzogen, Prüfung am Ende: bricht ab, wenn
    eine Tabelle in `public` ohne RLS ist
@@ -190,6 +191,8 @@ und danach wieder entfernt:
 14. **Einkauf:** Lieferant samt Ansprechpartnern (entfernter nur markiert), Lieferanten-Konditionen nur mit Recht,
     Bestellung `BE-JJ-NNN` nur mit Zeilen und Auftrag, gelieferte Bestellung und Lieferant mit offener Bestellung nicht
     löschbar, Löschen nur als Markierung.
+15. **Lexware-Webhook:** Server-Funktionen für Benutzer und Admins gesperrt, Doppelzustellung erkannt, nach Fehler
+    erneut verarbeitet, Protokoll nur für Admins lesbar.
 11. **Abwesenheiten löschen:** eine entschiedene Abwesenheit löscht nur ein Admin (nur als Markierung), einen Antrag
     und eine Krankmeldung jeder Benutzer.
 

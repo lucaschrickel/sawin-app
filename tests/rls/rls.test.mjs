@@ -1102,6 +1102,45 @@ describe("Belege", () => {
   });
 });
 
+describe("Lexware-Webhook (Eingangsprotokoll)", () => {
+  const eingang = (schluessel) =>
+    service.rpc("lexware_ereignis_eingang", { p_schluessel: schluessel, p_ereignis: "payment.changed", p_ressource: randomUUID(), p_am: new Date().toISOString(), p_organisation: randomUUID() });
+  it("Benutzer können die Server-Funktionen nicht aufrufen und nichts eintragen", async () => {
+    const a = await buero.client.rpc("lexware_ereignis_eingang", { p_schluessel: `x-${lauf}`, p_ereignis: "payment.changed", p_ressource: "x", p_am: null, p_organisation: null });
+    assert.ok(a.error, "lexware_ereignis_eingang für Benutzer aufrufbar");
+    const e = await admin.client.rpc("lexware_ereignis_ende", { p_id: randomUUID(), p_status: "verarbeitet", p_fehler: null });
+    assert.ok(e.error, "lexware_ereignis_ende für Admins aufrufbar");
+    const i = await admin.client.from("lexware_ereignis").insert({ schluessel: `x-${lauf}`, ereignis: "payment.changed", ressource_id: "x" });
+    assert.ok(i.error, "Admin kann Ereignisse eintragen");
+  });
+  it("Doppelzustellung wird erkannt; nach einem Fehler wird erneut verarbeitet; lesen nur Admins", async () => {
+    const schluessel = `rls-${lauf}-${randomUUID()}`;
+    const r1 = await eingang(schluessel);
+    assert.ifError(r1.error);
+    angelegt.push(["lexware_ereignis", r1.data.id]);
+    assert.equal(r1.data.verarbeiten, true, "neues Ereignis");
+    const r2 = await eingang(schluessel);
+    assert.equal(r2.data.verarbeiten, false, "Doppelzustellung während der Verarbeitung");
+    assert.ifError((await service.rpc("lexware_ereignis_ende", { p_id: r1.data.id, p_status: "fehler", p_fehler: "Lexware nicht erreichbar" })).error);
+    const r3 = await eingang(schluessel);
+    assert.equal(r3.data.verarbeiten, true, "nach Fehler erneut verarbeiten");
+    assert.equal(r3.data.id, r1.data.id);
+    await service.rpc("lexware_ereignis_ende", { p_id: r1.data.id, p_status: "verarbeitet", p_fehler: null });
+    const r4 = await eingang(schluessel);
+    assert.equal(r4.data.verarbeiten, false, "verarbeitetes Ereignis nicht noch einmal");
+    const ungueltig = await service.rpc("lexware_ereignis_ende", { p_id: r1.data.id, p_status: "kaputt", p_fehler: null });
+    assert.ok(ungueltig.error, "ungültiger Status angenommen");
+
+    const { data: b } = await buero.client.from("lexware_ereignis").select("id").eq("id", r1.data.id);
+    assert.deepEqual(b, [], "Büro sieht das Protokoll");
+    const { data: a } = await admin.client.from("lexware_ereignis").select("status, versuche, verarbeitet_am, fehler").eq("id", r1.data.id).single();
+    assert.equal(a.status, "verarbeitet");
+    assert.equal(a.versuche, 4);
+    assert.ok(a.verarbeitet_am);
+    assert.equal(a.fehler, null);
+  });
+});
+
 describe("Soft Delete und Audit-Log", () => {
   let aufgabe;
   it("echtes Löschen ist gesperrt", async () => {
