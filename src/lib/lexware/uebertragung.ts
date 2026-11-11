@@ -1,4 +1,5 @@
 import "server-only";
+import { belegPdfAblegen, imHintergrund } from "@/lib/onedrive/ablage";
 import { createHash } from "node:crypto";
 import { pruefeSitzung } from "@/lib/auth/sitzung";
 import { BUCKET } from "@/lib/beleg-ablage";
@@ -282,11 +283,13 @@ async function vorhandenSuchen(d: BelegDetail, kontaktId: string, seit: string):
 
 /** Original-PDF von Lexware holen und im Speicher „belege“ ablegen; gibt den Pfad zurück */
 async function pdfHolen(b: { id: string; art: BelegDetail["beleg"]["art"]; lexware_id: string; nummer: string }): Promise<string> {
-  const { supabase } = await pruefeSitzung();
+  const { supabase, benutzer } = await pruefeSitzung();
   const pdf = await lexware<Buffer>("GET", `/v1/${pfadArt(b.art)}/${b.lexware_id}/file`, { accept: "application/pdf" });
   const pfad = `${b.id}/${pdfDateiname({ art: b.art, nummer: b.nummer, version: 1 })}`;
   const { error } = await supabase.storage.from(BUCKET).upload(pfad, pdf, { contentType: "application/pdf", upsert: true });
   if (error) throw new Error("Das PDF konnte nicht abgelegt werden.");
+  // Lexware-Original zusätzlich in den OneDrive-Ordner (im Hintergrund)
+  imHintergrund(() => belegPdfAblegen(b.id, pdf, benutzer.id), "Lexware-PDF");
   return pfad;
 }
 

@@ -1,4 +1,6 @@
 import type { Metadata } from "next";
+import { AblageKarte } from "@/components/app/ablage-karte";
+import { nachladenImHintergrund } from "@/lib/onedrive/ablage";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { PackageCheck, Plus, TriangleAlert } from "lucide-react";
@@ -70,6 +72,8 @@ export default async function AuftragPage({ params, searchParams }: PageProps<"/
   const ab = belege.find((b) => b.art === "auftragsbestaetigung" && b.status !== "entwurf");
   const belegSchritte = auftragSchritte(id, belege);
   const fin = auftragFinanzen(belege);
+  // OneDrive: zwischengespeicherte Dateien im Hintergrund übertragen (höchstens alle 2 Minuten)
+  nachladenImHintergrund();
   const schluss = fin.rechnungen.find((b) => !b.teil);
   const gutschriftAus = [...fin.abschlaege, ...fin.rechnungen].map((b) => ({ text: `Gutschrift zu ${b.nummer ?? ""}`, sub: `aus ${b.art === "rechnung" ? "der Rechnung" : "dem Abschlag"}, wird in Lexware angelegt`, href: `/beleg/neu?art=gutschrift&vorgaenger=${b.id}` }));
   const erstellen = ab
@@ -347,6 +351,7 @@ export default async function AuftragPage({ params, searchParams }: PageProps<"/
                   {a.abgeschlossen_am && <Angabe name="Abgeschlossen am">{tag(a.abgeschlossen_am)}</Angabe>}
                 </dl>
               </Karte>
+              <AblageKarte bezug={{ auftrag_id: a.id }} />
               <Karte titel="Service-Tickets" rechts={<TicketDialog benutzer={benutzer} ichId={ich.id} herkunftListe={c.herkunft} vorlage={{ kunde: k ? { id: k.id, name: k.name } : undefined, auftrag: { id: a.id, nummer: a.nummer, titel: a.titel, kunde: k?.name ?? "", phase: a.phase } }} ausloeser={<button type="button" className="rounded-full border border-line px-3 py-1 text-sm font-medium hover:border-line-strong">Ticket</button>} />}>
                 {tickets.length ? (
                   <ul className="flex flex-col">

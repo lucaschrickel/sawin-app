@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { AblageKarte } from "@/components/app/ablage-karte";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Angabe, Karte } from "@/components/app/info-karte";
@@ -130,6 +131,7 @@ export default async function TicketSeite({ params, searchParams }: PageProps<"/
                   <Link href={`/auftraege/${a.id}`} className="text-sm hover:underline"><span className="font-mono">{a.nummer}</span> · {a.titel}</Link>
                 </Karte>
               )}
+              <AblageKarte bezug={{ ticket_id: t.id }} />
               <Karte titel="Belege" rechts={<span className="text-sm text-muted-2 tabular">{belege.length}</span>}>
                 {belege.length ? (
                   <BelegeKompakt belege={belege} heute={heute} />

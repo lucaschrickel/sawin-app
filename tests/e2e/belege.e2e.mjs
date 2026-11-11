@@ -5,7 +5,7 @@
 // Aufruf: App starten, dann APP_URL=http://localhost:3100 npm run test:belege   (optional FOTOS=<Ordner>)
 import { writeFileSync } from "node:fs";
 import path from "node:path";
-import { aufraeumen, bilanz, browser, dbAbfrage, lauf, merken, pruefe, service, sleep, testAdmin } from "./hilfen.mjs";
+import { aufraeumen, bilanz, browser, dbAbfrage, lauf, merken, pruefe, service, sleep, testAdmin, belegeAufraeumen } from "./hilfen.mjs";
 
 const fotos = process.env.FOTOS;
 const foto = async (name) => fotos && (await b.foto(path.join(fotos, `${name}.png`)));
@@ -239,16 +239,8 @@ try {
   b?.ende();
   // Aufräumen: Belege des Testkunden mit Positionen, Versionen, Versand und PDFs; Firmendaten zurücksetzen
   try {
-    if (kunde) {
-      const belege = await dbAbfrage("select id, pdf_pfad from public.beleg where kunde_id = $1 order by created_at desc", [kunde.id]);
-      const pfade = (await dbAbfrage("select name from storage.objects where bucket_id = 'belege' and split_part(name, '/', 1) = any($1)", [belege.map((x) => x.id)])).map((x) => x.name);
-      if (pfade.length) await service.storage.from("belege").remove(pfade);
-      for (const t of ["beleg_position", "beleg_version", "beleg_versand"]) await dbAbfrage(`delete from public.${t} where beleg_id = any($1)`, [belege.map((x) => x.id)]);
-      await dbAbfrage("update public.beleg set vorgaenger_id = null where kunde_id = $1", [kunde.id]);
-      await dbAbfrage("delete from public.beleg where kunde_id = $1", [kunde.id]);
-      await dbAbfrage("delete from public.auftrag where kunde_id = $1", [kunde.id]);
-      await dbAbfrage("delete from public.anfrage where kunde_id = $1", [kunde.id]);
-    }
+    // gemeinsame Hilfe: Belege, PDFs, OneDrive-Ablage bzw. Zwischenspeicher, Aufträge, Anfragen des Testkunden
+    if (kunde) await belegeAufraeumen(kunde.id).catch((e) => console.error("Aufräumen Belege:", e.message));
     if (firmaVorher) await service.from("einstellung").update(firmaVorher).eq("einzig", true);
   } catch (e) {
     console.error("Aufräumen Belege:", e.message);

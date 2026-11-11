@@ -75,6 +75,9 @@ export default async function BelegPage({ params }: PageProps<"/beleg/[id]">) {
     supabase.from("belegart_einstellung").select("bcc_email").eq("belegart", b.art).maybeSingle<{ bcc_email: string | null }>(),
   ]);
   const pdf = `/pdf/beleg/${b.id}`;
+  // OneDrive-Ablage des PDFs (neueste Version)
+  const { data: ablage } = await supabase.from("ablage_datei").select("status, web_url, unterordner, version, fehler").eq("beleg_id", b.id).order("version", { ascending: false }).limit(1).maybeSingle<{ status: string; web_url: string | null; unterordner: string | null; version: number; fehler: string | null }>();
+  const ablageText = ablage ? (ablage.status === "abgelegt" ? `Im OneDrive-Ordner${ablage.unterordner ? ` unter „${ablage.unterordner}“` : ""} abgelegt (Version ${ablage.version}).` : `Wartet auf die Übertragung nach OneDrive${ablage.fehler ? `: ${ablage.fehler}` : "."}`) : "Noch nicht im OneDrive-Ordner.";
   const versionierbar = b.art === "angebot" || b.art === "auftragsbestaetigung";
   const abgelaufen = b.art === "angebot" && b.status === "offen" && b.gueltig_bis && b.gueltig_bis < heute;
   const lexArt = LEXWARE_BELEGARTEN.includes(b.art);
@@ -283,10 +286,16 @@ export default async function BelegPage({ params }: PageProps<"/beleg/[id]">) {
                 {!b.pdf_pfad && " Bis Lexware es liefert, zeigt die App eine Vorschau mit dem Wasserzeichen „Entwurf“."}
               </p>
               {!b.pdf_pfad && <LexwarePdfKnopf id={b.id} />}
+              <p className="mt-3 text-xs text-muted-2" data-beleg-ablage={ablage?.status ?? "keine"}>
+                {ablage?.web_url ? <a href={ablage.web_url} target="_blank" rel="noopener" className="text-accent-text hover:underline">{ablageText}</a> : ablageText}
+              </p>
             </Karte>
           ) : (
-            <Karte titel="Ablage" rechts={<Badge tone="gray">nur App</Badge>}>
-              <p className="text-sm text-muted">Das App-PDF ist das Original. Es liegt in der App; die Ablage im OneDrive-Ordner folgt mit dem OneDrive-Modul.</p>
+            <Karte titel="Ablage" rechts={<Badge tone={ablage?.status === "abgelegt" ? "green" : ablage ? "amber" : "gray"}>{ablage?.status === "abgelegt" ? "OneDrive" : ablage ? "wartet" : "nur App"}</Badge>}>
+              <p className="text-sm text-muted" data-beleg-ablage={ablage?.status ?? "keine"}>
+                Das App-PDF ist das Original.{" "}
+                {ablage?.web_url ? <a href={ablage.web_url} target="_blank" rel="noopener" className="text-accent-text hover:underline">{ablageText}</a> : ablageText}
+              </p>
             </Karte>
           )}
 

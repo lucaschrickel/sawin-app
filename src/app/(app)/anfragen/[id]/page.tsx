@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { AblageKarte } from "@/components/app/ablage-karte";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import type { ReactNode } from "react";
@@ -152,6 +153,7 @@ export default async function AnfragePage({ params }: PageProps<"/anfragen/[id]"
               <Angabe name="Objekt">{a.objekt ?? "–"}</Angabe>
             </dl>
           </Karte>
+          <AblageKarte bezug={{ anfrage_id: a.id }} hinweisOhneOrdner="Der Ordner entsteht mit dem ersten Angebot." />
           <Karte titel="Details">
             <dl className="flex flex-col gap-3 text-[14.5px]">
               <Angabe name="Produkte">

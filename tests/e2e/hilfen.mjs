@@ -81,7 +81,21 @@ export async function weitererBenutzer(name) {
 }
 
 /** Entfernt alle gemerkten Zeilen und Testbenutzer (über die Datenbankverbindung, die API löscht nie echt). */
+/** OneDrive-Ablage von Testdaten entfernen: Dateien (samt Zwischenspeicher) und Ordner zu Anfragen, Aufträgen, Tickets, Belegen */
+export async function ablageAufraeumen({ anfrage = [], auftrag = [], ticket = [], beleg = [] }) {
+  if (!anfrage.length && !auftrag.length && !ticket.length && !beleg.length) return;
+  const ordner = (await dbAbfrage("select id from public.ablage_ordner where anfrage_id = any($1) or auftrag_id = any($2) or ticket_id = any($3)", [anfrage, auftrag, ticket])).map((x) => x.id);
+  const dateien = await dbAbfrage("select id, puffer_pfad from public.ablage_datei where ordner_id = any($1) or beleg_id = any($2)", [ordner, beleg]);
+  const pfade = dateien.map((x) => x.puffer_pfad).filter(Boolean);
+  if (pfade.length) await service.storage.from("ablage-puffer").remove(pfade);
+  if (dateien.length) await dbAbfrage("delete from public.ablage_datei where id = any($1)", [dateien.map((x) => x.id)]);
+  if (ordner.length) await dbAbfrage("delete from public.ablage_datei where ordner_id = any($1)", [ordner]);
+  if (ordner.length) await dbAbfrage("delete from public.ablage_ordner where id = any($1)", [ordner]);
+}
+
 export async function aufraeumen() {
+  const nach = (t) => zeilen.filter(([x]) => x === t).map(([, id]) => id);
+  await ablageAufraeumen({ anfrage: nach("anfrage"), auftrag: nach("auftrag"), ticket: nach("service_ticket"), beleg: nach("beleg") }).catch((e) => console.error("Aufräumen Ablage:", e.message));
   const db = new pg.Client({ connectionString: DB_URL, ssl: { rejectUnauthorized: false } });
   await db.connect();
   try {
@@ -222,8 +236,26 @@ export async function browser() {
  */
 export async function belegeAufraeumen(kundeId) {
   if (!kundeId) return;
+  // Die App legt PDFs im Hintergrund (nach der Antwort) in der OneDrive-Ablage bzw. im Zwischenspeicher ab: kurz warten
+  // und bei einem Fremdschlüssel-Konflikt (gerade neu entstandene Ablage-Zeile) erneut versuchen
+  await sleep(2000);
+  for (let versuch = 1; ; versuch++) {
+    try {
+      return await belegeAufraeumenEinmal(kundeId);
+    } catch (e) {
+      if (versuch >= 4 || !/foreign key/i.test(e.message)) throw e;
+      await sleep(1500);
+    }
+  }
+}
+
+async function belegeAufraeumenEinmal(kundeId) {
   const belege = await dbAbfrage("select id from public.beleg where kunde_id = $1", [kundeId]);
   const ids = belege.map((x) => x.id);
+  const anfragen = (await dbAbfrage("select id from public.anfrage where kunde_id = $1", [kundeId])).map((x) => x.id);
+  const auftraege = (await dbAbfrage("select id from public.auftrag where kunde_id = $1", [kundeId])).map((x) => x.id);
+  const tickets = (await dbAbfrage("select id from public.service_ticket where kunde_id = $1", [kundeId])).map((x) => x.id);
+  await ablageAufraeumen({ anfrage: anfragen, auftrag: auftraege, ticket: tickets, beleg: ids });
   if (ids.length) {
     const pfade = (await dbAbfrage("select name from storage.objects where bucket_id = 'belege' and split_part(name, '/', 1) = any($1)", [ids])).map((x) => x.name);
     if (pfade.length) await service.storage.from("belege").remove(pfade);

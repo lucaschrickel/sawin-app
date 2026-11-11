@@ -1,6 +1,7 @@
 import "server-only";
 import { getCustomer } from "@/customers";
 import { pruefeSitzung } from "@/lib/auth/sitzung";
+import { belegPdfAblegen, imHintergrund } from "@/lib/onedrive/ablage";
 import { ladeFirma, ZAHLUNGSART_TEXT, type BelegDetail } from "@/lib/belege";
 import { belegPdf, pdfDateiname, type PdfBeleg, type PdfPosition } from "@/lib/pdf/beleg-pdf";
 
@@ -61,13 +62,15 @@ export async function erzeugePdf(daten: { b: PdfBeleg; positionen: PdfPosition[]
 
 /** Original-PDF eines fertiggestellten App-Belegs erzeugen und ablegen; setzt beleg.pdf_pfad */
 export async function pdfAblegen(d: BelegDetail): Promise<string> {
-  const { supabase } = await pruefeSitzung();
+  const { supabase, benutzer } = await pruefeSitzung();
   const pdf = await erzeugePdf(druckDaten(d), false);
   const pfad = `${d.beleg.id}/${pdfDateiname(d.beleg)}`;
   const { error } = await supabase.storage.from(BUCKET).upload(pfad, pdf, { contentType: "application/pdf", upsert: true });
   if (error) throw new Error(`PDF konnte nicht abgelegt werden: ${error.message}`);
   const { error: e2 } = await supabase.from("beleg").update({ pdf_pfad: pfad }).eq("id", d.beleg.id);
   if (e2) throw new Error("PDF-Pfad konnte nicht gespeichert werden.");
+  // zusätzlich in den OneDrive-Ordner (im Hintergrund; ohne Verbindung in den Zwischenspeicher)
+  imHintergrund(() => belegPdfAblegen(d.beleg.id, pdf, benutzer.id), "Beleg-PDF");
   return pfad;
 }
 

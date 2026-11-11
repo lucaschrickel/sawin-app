@@ -272,15 +272,9 @@ try {
   b?.ende();
   if (!behalten) {
     try {
-      if (ticket) {
-        await dbAbfrage("delete from public.beleg_position where beleg_id in (select id from public.beleg where ticket_id = $1)", [ticket.id]);
-        const tb = await dbAbfrage("select id from public.beleg where ticket_id = $1", [ticket.id]);
-        const pfade = (await dbAbfrage("select name from storage.objects where bucket_id = 'belege' and split_part(name, '/', 1) = any($1)", [tb.map((x) => x.id)])).map((x) => x.name);
-        if (pfade.length) await service.storage.from("belege").remove(pfade);
-        await dbAbfrage("delete from public.beleg where ticket_id = $1", [ticket.id]);
-        await dbAbfrage("delete from public.service_ticket where id = $1", [ticket.id]);
-      }
+      // gemeinsame Hilfe (auch Ticket-Belege des Kunden und die OneDrive-Ablage), danach das Ticket
       await belegeAufraeumen(kunde?.id);
+      if (ticket) await dbAbfrage("delete from public.service_ticket where id = $1", [ticket.id]);
     } catch (e) {
       console.error("Aufräumen Lexware:", e.message);
     }

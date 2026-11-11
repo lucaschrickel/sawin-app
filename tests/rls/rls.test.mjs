@@ -1102,6 +1102,37 @@ describe("Belege", () => {
   });
 });
 
+describe("OneDrive-Ablage", () => {
+  it("Benutzer lesen Ordner und Dateien, schreiben nur über den Server; Token nie lesbar", async () => {
+    const { data: oid, error } = await service.rpc("ablage_ordner_setzen", { p_benutzer: buero.id, p_id: null, p_daten: { anfrage_id: daten.anfrage.id, name: `AG_${lauf}`, status: "wartet" } });
+    assert.ifError(error);
+    angelegt.push(["ablage_ordner", oid]);
+    const { data: did } = await service.rpc("ablage_datei_setzen", { p_benutzer: buero.id, p_id: null, p_daten: { ordner_id: oid, name: "Scan.pdf", quelle: "upload", status: "wartet" } });
+    angelegt.push(["ablage_datei", did]);
+    const { data: o } = await buero.client.from("ablage_ordner").select("id, name").eq("id", oid).single();
+    assert.equal(o?.name, `AG_${lauf}`, "Ordner nicht lesbar");
+    const { data: d } = await buero.client.from("ablage_datei").select("id").eq("id", did);
+    assert.equal(d?.length, 1, "Datei nicht lesbar");
+    const ins = await buero.client.from("ablage_ordner").insert({ anfrage_id: daten.anfrage.id, name: "x" });
+    assert.ok(ins.error, "Benutzer legt Ordner direkt an");
+    const { data: upd } = await buero.client.from("ablage_datei").update({ status: "abgelegt", item_id: "gefaelscht" }).eq("id", did).select("id");
+    assert.deepEqual(upd ?? [], [], "Benutzer ändert die Verknüpfung");
+    for (const [fn, args] of [
+      ["ablage_ordner_setzen", { p_benutzer: buero.id, p_id: oid, p_daten: { item_id: "x" } }],
+      ["ablage_datei_setzen", { p_benutzer: buero.id, p_id: did, p_daten: { item_id: "x" } }],
+    ]) {
+      const r = await admin.client.rpc(fn, args);
+      assert.ok(r.error, `${fn} für Benutzer aufrufbar`);
+    }
+    const t = await admin.client.from("ms_token").select("*");
+    assert.ok(t.error || !t.data?.length, "Token für Benutzer lesbar");
+    // Verwerfen eines Uploads markiert nur als gelöscht und nennt den handelnden Benutzer
+    assert.ifError((await service.rpc("ablage_datei_setzen", { p_benutzer: buero.id, p_id: did, p_daten: { geloescht: true } })).error);
+    const { data: weg } = await service.from("ablage_datei").select("deleted_at").eq("id", did).single();
+    assert.ok(weg.deleted_at, "nicht als gelöscht markiert");
+  });
+});
+
 describe("Vorläufiger Versand und globale Suche", () => {
   it("beleg_versenden: kein Entwurf, nur gültige Adressen, friert Angebot ein und protokolliert", async () => {
     const ag = await belegSpeichern(buero, { art: "angebot", kunde_id: daten.kunde.id, anfrage_id: daten.anfrage.id, titel: `Versand ${lauf}` });

@@ -29,7 +29,9 @@ Vorlage: `.env.example`. Lokal in `.env.local` (nie einchecken), auf Vercel in d
 | `SUPABASE_AUTH_SITE_URL` | nur lokal (beim Einspielen) | Adresse der App für Links in Auth-E-Mails, z. B. `http://localhost:3000` (Staging lokal) oder die Vercel-Adresse |
 | `LEXWARE_API_KEY` | nur Server | Lexware Office › Erweiterungen › Public API: Schlüssel erzeugen. Staging: eigenes Testkonto, Produktion: Schlüssel des Kunden (erst beim Go-live). Ohne Schlüssel zeigt die Seitenleiste „Lexware nicht verbunden“ und Rechnungen lassen sich nicht fertigstellen. |
 | `CRON_SECRET` | nur Server (Vercel: Production und Preview) | Zufällige Zeichenkette, mindestens 16 Zeichen (z. B. `openssl rand -hex 32`). Vercel schickt sie beim Cron als `Authorization: Bearer …`; ohne sie antwortet `/api/cron/zahlungsabgleich` immer 401. Je Umgebung ein eigener Wert. |
-| `MS_GRAPH_TENANT_ID`, `MS_GRAPH_CLIENT_ID`, `MS_GRAPH_CLIENT_SECRET` | nur Server | App-Registrierung in Microsoft Entra für OneDrive und E-Mail |
+| `MS_GRAPH_TENANT_ID`, `MS_GRAPH_CLIENT_ID`, `MS_GRAPH_CLIENT_SECRET` | nur Server (Vercel: Production und Preview, „Sensitive“) | App-Registrierung in Microsoft Entra für die OneDrive-Ablage (siehe „OneDrive“): Verzeichnis-ID, Anwendungs-ID, geheimer Clientschlüssel. Keine Mailrechte. |
+| `MS_TOKEN_SCHLUESSEL` | nur Server (je Umgebung eigener Wert) | 32 Byte base64 (`openssl rand -base64 32`); verschlüsselt das Graph-Zugriffstoken in `public.ms_token`. Wechsel unkritisch: das Token wird dann neu geholt. |
+| `MS_GRAPH_BASIS`, `MS_LOGIN_BASIS` | nur Tests | Lenken Graph und Anmeldung auf den nachgebauten Test-Server (`npm run test:onedrive`). **Nie** auf Vercel setzen. |
 
 ## Datenbank
 
@@ -98,6 +100,7 @@ APP_URL=http://localhost:3100 npm run test:auftraege  # Modul Aufträge
 APP_URL=http://localhost:3100 npm run test:montageplan # Modul Montageplan (Plantafel, echte Mausbewegungen)
 APP_URL=http://localhost:3100 npm run test:plantafel  # Kolonnen, Ressourcen, Pipeline, Duplizieren, Farbe, Sammelfreigabe, 4 Wochen, Wochenplan-PDF
 APP_URL=http://localhost:3100 npm run test:kopfzeile  # Globale Suche, Neu-Menü, Glocke, vorläufiger Versand (Download, mailto)
+APP_URL=http://localhost:3100 npm run test:onedrive   # OneDrive-Ablage gegen den nachgebauten Graph-Server (siehe „OneDrive“)
 APP_URL=http://localhost:3100 npm run test:mitarbeiter # Modul Mitarbeiter
 APP_URL=http://localhost:3100 npm run test:zeiten      # Modul Zeiterfassung
 APP_URL=http://localhost:3100 npm run test:abwesenheiten # Modul Abwesenheiten (Büro-Benutzer und Admin)
@@ -144,7 +147,7 @@ einen eigenen SMTP-Zugang eintragen (z. B. Microsoft 365 des Betriebs oder ein V
   `NEXT_PUBLIC_CUSTOMER_ID`, `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`,
   `SUPABASE_SERVICE_ROLE_KEY`, `LEXWARE_API_KEY`, `CRON_SECRET` (später `MS_GRAPH_*`). Nicht auf Vercel:
   `SUPABASE_DB_URL`, `SUPABASE_ACCESS_TOKEN`, `SUPABASE_AUTH_SITE_URL`.
-- **Cron:** `vercel.json` ruft alle 30 Minuten `/api/cron/zahlungsabgleich` auf (Zahlungsstand aller offenen
+- **Cron:** `vercel.json` ruft alle 30 Minuten `/api/cron/zahlungsabgleich` und versetzt dazu `/api/cron/ablage` (OneDrive nachladen) auf (Zahlungsstand aller offenen
   Lexware-Belege). Vercel führt Crons **nur für Production-Deployments** aus und erst ab dem **Pro-Tarif** öfter als
   einmal am Tag (im Hobby-Tarif schlägt das Deployment mit diesem Zeitplan fehl). Läuft Staging als Preview, gibt es
   dort keinen Cron; der Abgleich beim Öffnen und der Webhook reichen dann. Prüfen: Settings › Cron Jobs › „Run“,
@@ -170,6 +173,57 @@ einen eigenen SMTP-Zugang eintragen (z. B. Microsoft 365 des Betriebs oder ein V
   dann erneut zu. Wird der Lexware-API-Schlüssel ungültig gemacht, löscht Lexware alle Abos: nach einem neuen
   Schlüssel erneut anlegen. Beim Go-live: Abos im Testkonto löschen und mit Sawins Schlüssel für die
   Produktionsadresse anlegen.
+
+## OneDrive (Ablage über Microsoft Graph)
+
+Die App legt je Vorgang einen Ordner an (ab dem ersten Angebot `<AG-Nummer>_<Kunde>`, mit der AB umbenannt in
+`<AB-Nummer>_<Kunde>`, Unterordner wie im bisherigen Make-Szenario) und speichert dort Beleg-PDFs, Scans und Dateien.
+Sie meldet sich als **Anwendung** an (keine Benutzeranmeldung, deshalb **keine Redirect-URLs**, weder für localhost noch
+für vercel.app) und darf nur in **eine** SharePoint-Bibliothek schreiben. Keine Mailrechte. Die App speichert nur die
+Verknüpfung (Drive-ID, Item-ID). Ist Microsoft nicht erreichbar oder noch nichts eingerichtet, liegt die Datei im
+privaten Speicher `ablage-puffer` und wird nachgeladen (Cron alle 30 Minuten, beim Öffnen eines Auftrags,
+„Jetzt übertragen“ in den Einstellungen).
+
+**App-Registrierung (als globaler Administrator, je Umgebung eine eigene Registrierung empfohlen):**
+
+1. https://entra.microsoft.com › Anwendungen › App-Registrierungen › **Neue Registrierung**: Name z. B.
+   „Sawin App Ablage (Staging)“, Kontotyp „Nur Konten in diesem Organisationsverzeichnis“, **Umleitungs-URI leer
+   lassen**. Nach dem Registrieren notieren: **Anwendungs-ID (Client-ID)** → `MS_GRAPH_CLIENT_ID`,
+   **Verzeichnis-ID (Mandant)** → `MS_GRAPH_TENANT_ID`.
+2. **Zertifikate & Geheimnisse** › Neuer geheimer Clientschlüssel (Ablauf 12 oder 24 Monate, Termin vormerken). Den
+   **Wert** sofort kopieren (nur einmal sichtbar) → `MS_GRAPH_CLIENT_SECRET`.
+3. **API-Berechtigungen**: die vorhandene delegierte Berechtigung „User.Read“ entfernen. Berechtigung hinzufügen ›
+   Microsoft Graph › **Anwendungsberechtigungen** › **Lists.SelectedOperations.Selected**. Danach **„Administrator­
+   zustimmung für <Mandant> erteilen“**. Nicht hinzufügen: Mail.*, Files.ReadWrite.All, Sites.ReadWrite.All.
+   Die Zustimmung allein gibt noch keinen Zugriff; erst die Freigabe in Schritt 4.
+4. **Freigabe der einen Bibliothek** im Graph Explorer (https://developer.microsoft.com/graph/graph-explorer, als
+   globaler Administrator angemeldet; für diese Aufrufe einmalig die delegierte Berechtigung `Sites.FullControl.All`
+   für den Graph Explorer zustimmen):
+   - Website-ID: `GET https://graph.microsoft.com/v1.0/sites/<firma>.sharepoint.com:/sites/<website>` → `id`
+     (Form `<host>,<guid>,<guid>`).
+   - Bibliotheks-ID: `GET https://graph.microsoft.com/v1.0/sites/<website-id>/lists?$select=id,displayName` → `id`
+     der Dokumentbibliothek (meist „Dokumente“).
+   - Freigeben: `POST https://graph.microsoft.com/v1.0/sites/<website-id>/lists/<bibliotheks-id>/permissions` mit
+     `{"roles": ["write"], "grantedTo": {"application": {"id": "<client-id>", "displayName": "Sawin App Ablage"}}}`
+     (lehnt v1.0 den Aufruf ab, dieselbe Adresse mit `/beta/`).
+   - Prüfen: `GET …/lists/<bibliotheks-id>/permissions` zeigt die App mit „write“.
+   - Falls Microsoft die Freigabe auf Listenebene für diese Bibliothek nicht zulässt: statt Schritt 3/4
+     `Sites.Selected` (Anwendungsberechtigung) und `POST /v1.0/sites/<website-id>/permissions` mit demselben Inhalt
+     (dann gilt der Zugriff für die eine Website).
+5. **Umgebungsvariablen** in Vercel (Production und Preview getrennt, als „Sensitive“) und lokal in `.env.local`:
+   `MS_GRAPH_TENANT_ID`, `MS_GRAPH_CLIENT_ID`, `MS_GRAPH_CLIENT_SECRET`, `MS_TOKEN_SCHLUESSEL`
+   (`openssl rand -base64 32`, je Umgebung eigener Wert). Danach neu deployen.
+6. **In der App** (Admin): Einstellungen › Verbindungen › Website-ID, Bibliotheks-ID, Basisordner **`_App-Test`** ›
+   „Prüfen und speichern“. Ein Angebot anlegen: der Ordner `<AG-Nummer>_<Kunde>` mit Unterordnern erscheint in
+   `_App-Test`. Erst nach der Abnahme den echten Basisordner eintragen.
+
+Prüfung ohne Microsoft (nachgebauter Graph-Server; nur mit leerem Zwischenspeicher auf Staging):
+
+```bash
+MS_GRAPH_BASIS=http://127.0.0.1:3990/v1.0 MS_LOGIN_BASIS=http://127.0.0.1:3990/login MS_GRAPH_TENANT_ID=test \
+MS_GRAPH_CLIENT_ID=test MS_GRAPH_CLIENT_SECRET=test MS_TOKEN_SCHLUESSEL=<base64> CRON_SECRET=<geheim> npx next start -p 3100
+APP_URL=http://localhost:3100 CRON_SECRET=<geheim> npm run test:onedrive
+```
 
 ## Lexware
 

@@ -127,6 +127,8 @@ Wahl der Rechnung). Höchstens eine Zahlungsbestätigung je Zahlung. Höchstens 
 |---|---|
 | `einsatz` | Auftrag **oder** Ticket, Beginn, Ende (`ende > beginn`), Fahrzeug, Ressource, `fest` (freigegeben), Farbe (Paletten-Token `plan-1` … `plan-10` oder `#RRGGBB`, geprüft) |
 | `einsatz_monteur` | Einsatz, Mitarbeiter (mehrere Monteure je Einsatz) |
+| `ablage_ordner`, `ablage_datei` | OneDrive-Ablage: Ordner je Anfrage (ab dem ersten Angebot), derselbe Ordner für den Auftrag (`auftrag_id` kommt mit der AB dazu), Tickets eigene Ordner; Drive-ID, Item-ID, Web-Adresse, Unterordner (Name → Item-ID), Status (wartet, angelegt, fehler). Dateien mit Unterordner, Quelle (beleg, upload, formular), Beleg und Version, Status (upload, wartet, abgelegt, fehler), Pfad im Zwischenspeicher `ablage-puffer`, Versuche, Fehler. Lesen alle Benutzer, schreiben nur der Server über `ablage_ordner_setzen()` / `ablage_datei_setzen()` (Service-Rolle, handelnder Benutzer im Audit-Log). |
+| `ms_token` | Verschlüsseltes Zugriffstoken für Microsoft Graph (AES-256-GCM, Schlüssel nur in `MS_TOKEN_SCHLUESSEL`); RLS ohne Policy, nur Service-Rolle. |
 | `beleg_versenden()` | Vorläufiger Versand (Version 1): prüft Empfänger und interne Kopie, verlangt bei Rechnung, Abschlag und Gutschrift das Lexware-PDF, friert bei Angebot und AB die Version ein und protokolliert in `beleg_versand` (Kanal `email`, Empfänger, BCC, Betreff, Text, Dateiname). |
 | `suche()` | Globale Suche (SECURITY INVOKER, RLS gilt): Kunden (auch Lieferadressen), Anfragen, Aufträge, Belege (auch Positionen, Tags, Kommentar), Service-Tickets; je Bereich höchstens n Treffer, mit Fundstelle. Konditionen werden nie durchsucht. |
 | `einsatz_freigeben()`, `kolonne_speichern()`, `kolonne_monteur()`, `kolonne_loeschen()`, `ressource_loeschen()` | Funktionen (SECURITY INVOKER) der Plantafel: vorgeplante Einsätze gesammelt freigeben (gibt die Anzahl zurück); Kolonne mit Stammfahrzeug und Mitgliedern in Reihenfolge speichern (nur Monteure, entfernte nur markiert); Monteur in eine andere Kolonne verschieben, in eine weitere duplizieren, entfernen oder sortieren; Kolonne samt Mitgliedschaften als gelöscht markieren (Einsätze behalten ihr Team); weitere Ressource nur ohne künftige Einsätze als gelöscht markieren. Reihenfolge der Gruppen in `einstellung.plantafel_gruppen` (`kolonne:<id>`, `solo`, `res`). |
@@ -158,7 +160,8 @@ Wahl der Rechnung). Höchstens eine Zahlungsbestätigung je Zahlung. Höchstens 
 5. `…_belege.sql`: Belege, Positionen, Versionen, Versand, Zahlungen (Modul Belege Schritt 1: `20261111090000_belege_modul.sql` mit Speichern, Fertigstellen, Übergeben, Status-Regeln, Speicher `belege`; Korrekturen `…090100` und `…090200`; Schritt 2 Lexware: `20261112090000_lexware.sql`, Korrektur `…090100`; Zahlungen `20261113090000_zahlungen.sql` und `…090100`; Teil-AB `…090200_teil_ab.sql`; Webhook-Protokoll `20261114090000_lexware_ereignis.sql`, Korrektur Abgleichsbeginn `…090100`)
 6. `…_planung_arbeit.sql`: Einsätze, Zeiten, Aufgaben, Termine, Formulare, Chat, Notizen, Benachrichtigungen, Einkauf
    (Plantafel fertig: `20261114090200_plantafel.sql` mit Ressource und Farbe am Einsatz, Sammelfreigabe, Kolonnen,
-   Reihenfolge der Gruppen)
+   Reihenfolge der Gruppen; OneDrive-Ablage `20261116090000_onedrive.sql`, `…090100` Upload-Status, `…090200` Verwerfen;
+   Versand `20261115090000_versand_vorlaeufig.sql`, Suche `20261115090100_suche.sql`)
 7. `…_rls.sql`: RLS und Policies für alle Tabellen, Rechte für `anon` entzogen, Prüfung am Ende: bricht ab, wenn
    eine Tabelle in `public` ohne RLS ist
 
