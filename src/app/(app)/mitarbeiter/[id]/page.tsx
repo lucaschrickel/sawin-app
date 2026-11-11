@@ -57,7 +57,24 @@ export default async function MitarbeiterSeite({ params }: PageProps<"/mitarbeit
 
       <div className="grid items-start gap-4 lg:grid-cols-[minmax(0,1fr)_360px]">
         <div className="flex min-w-0 flex-col gap-4">
-          <Karte titel="Einsätze" rechts={<span className="text-xs text-muted-2">diese und nächste Woche</span>}>
+          <Karte
+            titel="Einsätze"
+            rechts={
+              m.ist_monteur ? (
+                <a
+                  href={`/pdf/wochenplan?woche=${montag}&monteur=${m.id}`}
+                  target="_blank"
+                  rel="noopener"
+                  data-wochenplan-monteur
+                  className="rounded-full border border-line px-3 py-1 text-sm font-medium hover:border-line-strong"
+                >
+                  Wochenplan drucken
+                </a>
+              ) : (
+                <span className="text-xs text-muted-2">diese und nächste Woche</span>
+              )
+            }
+          >
             {einsaetze.length ? (
               <ul className="flex flex-col">
                 {einsaetze.map((e) => (

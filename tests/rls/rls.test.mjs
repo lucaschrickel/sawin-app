@@ -1102,6 +1102,101 @@ describe("Belege", () => {
   });
 });
 
+describe("Plantafel: Kolonnen, Ressourcen, Farbe, Sammelfreigabe", () => {
+  const kuerzel = (p) => p + Array.from(randomBytes(3), (x) => "ABCDEFGHIJKLMNOPQRSTUVWXYZ"[x % 26]).join("");
+  const mitglieder = async (kolonne) => (await service.from("kolonne_mitglied").select("id, mitarbeiter_id, reihenfolge, deleted_at").eq("kolonne_id", kolonne).order("created_at")).data ?? [];
+  const merkeMitglieder = async (kolonne) => {
+    for (const m of await mitglieder(kolonne)) if (!angelegt.some(([t, x]) => t === "kolonne_mitglied" && x === m.id)) angelegt.push(["kolonne_mitglied", m.id]);
+  };
+  let zweiter, kol1, kol2, ressource;
+  const einsatzNeu = async (wer, extra) => {
+    const beginn = new Date(Date.now() + 9 * 864e5);
+    const { data: id, error } = await wer.client.rpc("einsatz_speichern", {
+      p_id: null, p_auftrag_id: daten.auftrag.id, p_ticket_id: null, p_beginn: beginn.toISOString(), p_ende: new Date(beginn.getTime() + 4 * 36e5).toISOString(),
+      p_monteure: [], p_fahrzeug_id: null, p_fest: false, p_hinweis: null, ...extra,
+    });
+    if (id) {
+      angelegt.push(["einsatz", id]);
+      for (const m of (await service.from("einsatz_monteur").select("id").eq("einsatz_id", id)).data ?? []) angelegt.push(["einsatz_monteur", m.id]);
+    }
+    return { id, error };
+  };
+
+  it("Kolonne speichern: Mitglieder in Reihenfolge, nur Monteure, entfernte nur markiert", async () => {
+    zweiter = await svcInsert("mitarbeiter", { kuerzel: kuerzel("K"), name: `Zweiter Monteur ${lauf}`, ist_monteur: true });
+    const buerokraft = await svcInsert("mitarbeiter", { kuerzel: kuerzel("B"), name: `Bürokraft ${lauf}`, ist_monteur: false });
+    const { data: id, error } = await buero.client.rpc("kolonne_speichern", { p_id: null, p_name: `Kolonne ${lauf}`, p_stammfahrzeug_id: null, p_mitglieder: [zweiter.id, daten.monteur.id] });
+    assert.ifError(error);
+    kol1 = id;
+    angelegt.push(["kolonne", id]);
+    await merkeMitglieder(id);
+    assert.deepEqual((await mitglieder(id)).map((m) => [m.mitarbeiter_id, m.reihenfolge]), [[zweiter.id, 1], [daten.monteur.id, 2]]);
+    const nicht = await buero.client.rpc("kolonne_speichern", { p_id: id, p_name: `Kolonne ${lauf}`, p_stammfahrzeug_id: null, p_mitglieder: [buerokraft.id] });
+    assert.ok(nicht.error, "Nicht-Monteur als Mitglied angenommen");
+    assert.ifError((await buero.client.rpc("kolonne_speichern", { p_id: id, p_name: `Kolonne ${lauf}`, p_stammfahrzeug_id: null, p_mitglieder: [daten.monteur.id] })).error);
+    const nachher = await mitglieder(id);
+    assert.ok(nachher.find((m) => m.mitarbeiter_id === zweiter.id)?.deleted_at, "entferntes Mitglied nicht als gelöscht markiert");
+    assert.equal(nachher.filter((m) => !m.deleted_at).length, 1);
+    const anon2 = await anon.rpc("kolonne_speichern", { p_id: null, p_name: "x", p_stammfahrzeug_id: null, p_mitglieder: [] });
+    assert.ok(anon2.error, "nicht angemeldet: Kolonne angelegt");
+  });
+
+  it("Monteur in weitere Kolonne duplizieren, nicht doppelt, wieder entfernen", async () => {
+    const { data: id } = await buero.client.rpc("kolonne_speichern", { p_id: null, p_name: `Kolonne B ${lauf}`, p_stammfahrzeug_id: null, p_mitglieder: [] });
+    kol2 = id;
+    angelegt.push(["kolonne", id]);
+    assert.ifError((await buero.client.rpc("kolonne_monteur", { p_mitarbeiter: daten.monteur.id, p_von: kol1, p_nach: kol2, p_kopieren: true, p_vor: null })).error);
+    await merkeMitglieder(kol2);
+    assert.equal((await mitglieder(kol1)).filter((m) => !m.deleted_at && m.mitarbeiter_id === daten.monteur.id).length, 1, "beim Duplizieren aus der alten Kolonne entfernt");
+    assert.equal((await mitglieder(kol2)).filter((m) => !m.deleted_at).length, 1);
+    const doppelt = await buero.client.rpc("kolonne_monteur", { p_mitarbeiter: daten.monteur.id, p_von: kol1, p_nach: kol2, p_kopieren: false, p_vor: null });
+    assert.equal(doppelt.error?.code, "23505", "schon Mitglied: doppelt angelegt");
+    assert.ifError((await buero.client.rpc("kolonne_monteur", { p_mitarbeiter: daten.monteur.id, p_von: kol2, p_nach: null, p_kopieren: false, p_vor: null })).error);
+    assert.ok((await mitglieder(kol2)).every((m) => m.deleted_at), "aus der Kolonne entfernt (nur markiert)");
+    assert.ifError((await buero.client.rpc("kolonne_loeschen", { p_id: kol2 })).error);
+    const { data: k } = await service.from("kolonne").select("deleted_at").eq("id", kol2).single();
+    assert.ok(k.deleted_at, "Kolonne nur als gelöscht markiert");
+  });
+
+  it("Einsatz mit weiterer Ressource ohne Monteur; Farbe nur aus Palette oder #RRGGBB", async () => {
+    ressource = await svcInsert("ressource", { name: `Selbstabholer ${lauf}` });
+    const ok = await einsatzNeu(buero, { p_ressource_id: ressource.id, p_farbe: "plan-3" });
+    assert.ifError(ok.error);
+    const { data: e } = await service.from("einsatz").select("ressource_id, farbe").eq("id", ok.id).single();
+    assert.deepEqual(e, { ressource_id: ressource.id, farbe: "plan-3" });
+    const frei = await einsatzNeu(buero, { p_monteure: [daten.monteur.id], p_farbe: "#1A237E" });
+    assert.ifError(frei.error);
+    const falsch = await einsatzNeu(buero, { p_monteure: [daten.monteur.id], p_farbe: "red; background:url(x)" });
+    assert.equal(falsch.error?.code, "23514", "ungültige Farbe angenommen");
+    const leer = await einsatzNeu(buero, {});
+    assert.ok(leer.error, "ohne Monteur und ohne Ressource angenommen");
+  });
+
+  it("Ressource mit künftigem Einsatz nicht löschbar; danach nur als Markierung", async () => {
+    const r = await buero.client.rpc("ressource_loeschen", { p_id: ressource.id });
+    assert.equal(r.error?.code, "23514");
+    const { data: es } = await service.from("einsatz").select("id").eq("ressource_id", ressource.id).is("deleted_at", null);
+    for (const e of es ?? []) assert.ifError((await buero.client.rpc("einsatz_loeschen", { p_id: e.id })).error);
+    assert.ifError((await buero.client.rpc("ressource_loeschen", { p_id: ressource.id })).error);
+    const { data } = await service.from("ressource").select("deleted_at").eq("id", ressource.id).single();
+    assert.ok(data.deleted_at);
+  });
+
+  it("Sammelfreigabe: nur vorgeplante, Anzahl zurück; nicht angemeldet nichts", async () => {
+    const a = await einsatzNeu(buero, { p_monteure: [daten.monteur.id] });
+    const b2 = await einsatzNeu(buero, { p_monteure: [daten.monteur.id] });
+    const nichtAngemeldet = await anon.rpc("einsatz_freigeben", { p_ids: [a.id, b2.id] });
+    assert.ok(nichtAngemeldet.error || nichtAngemeldet.data === 0, "nicht angemeldet freigegeben");
+    const { data: n, error } = await buero.client.rpc("einsatz_freigeben", { p_ids: [a.id, b2.id] });
+    assert.ifError(error);
+    assert.equal(n, 2);
+    const { data: n2 } = await buero.client.rpc("einsatz_freigeben", { p_ids: [a.id, b2.id] });
+    assert.equal(n2, 0, "schon freigegebene noch einmal gezählt");
+    const { data: fest } = await service.from("einsatz").select("fest").in("id", [a.id, b2.id]);
+    assert.ok(fest.every((x) => x.fest));
+  });
+});
+
 describe("Lexware-Webhook (Eingangsprotokoll)", () => {
   const eingang = (schluessel) =>
     service.rpc("lexware_ereignis_eingang", { p_schluessel: schluessel, p_ereignis: "payment.changed", p_ressource: randomUUID(), p_am: new Date().toISOString(), p_organisation: randomUUID() });

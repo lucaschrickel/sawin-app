@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { Search, Trash2, X } from "lucide-react";
+import { Copy, Search, Trash2, X } from "lucide-react";
 import { useActionState, useEffect, useRef, useState, useTransition, type ReactNode } from "react";
 import { Bestaetigen } from "@/components/ui/bestaetigen";
 import { Button } from "@/components/ui/button";
@@ -9,18 +9,22 @@ import { Field, Input, Textarea } from "@/components/ui/field";
 import { FormularDialog, type FormularSteuerung } from "@/components/ui/formular-dialog";
 import { Formular } from "@/components/ui/formular";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import type { Monteur, Plan, TafelEinsatz, TafelFahrzeug } from "@/lib/montageplan";
+import type { Monteur, Plan, TafelEinsatz, TafelFahrzeug, TafelRessource } from "@/lib/montageplan";
 import { bezugHref } from "@/lib/montageplan-text";
-import { auftraegeSuchen, einsatzLoeschen, einsatzSpeichern, monteurSpeichern, ticketsSuchen, type AuftragTreffer, type Ergebnis } from "./aktionen";
+import { naechsterWerktag, type TafelKolonne } from "@/lib/plantafel-logik";
+import { plusTage } from "@/lib/woche";
+import { auftraegeSuchen, einsatzLoeschen, einsatzSpeichern, monteurSpeichern, ticketsSuchen, type AuftragTreffer, type EinsatzDaten, type Ergebnis } from "./aktionen";
+import { FarbWahl } from "./tafel-dialoge";
 
 export type AuftragWahl = { id: string; nummer: string; titel: string; kunde: string; phase?: string };
 /** Gewählter Bezug eines Einsatzes: Auftrag (Montageplan) oder Service-Ticket (Service-Plan) */
 export type BezugWahl = AuftragWahl & { art: "auftrag" | "ticket" };
-export type DialogVorlage = { einsatz: TafelEinsatz } | { beginn: string; ende: string; monteure: string[]; bezug?: BezugWahl };
+export type DialogVorlage =
+  | { einsatz: TafelEinsatz }
+  | { beginn: string; ende: string; monteure: string[]; bezug?: BezugWahl; ressource_id?: string | null; fahrzeug_id?: string | null };
 
-
-/** Prüftermine, die heute oder früher fällig waren (Hinweis im Termin-Dialog) */
-function ueberfaellig(f: TafelFahrzeug, heute: string) {
+/** Prüftermine, die heute oder früher fällig waren (Hinweis im Termin-Dialog und an der Kolonne) */
+export function ueberfaellig(f: TafelFahrzeug, heute: string) {
   const termine: [string, string | null][] = [
     ["TÜV/HU", f.tuev_am],
     ["Service", f.service_am],
@@ -29,9 +33,21 @@ function ueberfaellig(f: TafelFahrzeug, heute: string) {
   return termine.filter(([, d]) => d && d < heute).map(([l]) => l);
 }
 
-type DialogProps = { plan: Plan; vorlage: DialogVorlage; monteure: Monteur[]; fahrzeuge: TafelFahrzeug[]; heute: string; beiSchliessen: () => void; beiErgebnis: (r: Ergebnis) => void };
+type DialogProps = {
+  plan: Plan;
+  vorlage: DialogVorlage;
+  monteure: Monteur[];
+  fahrzeuge: TafelFahrzeug[];
+  kolonnen?: TafelKolonne[];
+  ressourcen?: TafelRessource[];
+  /** Feiertage (Datum) für „Duplizieren“ am nächsten Werktag */
+  feiertage?: string[];
+  heute: string;
+  beiSchliessen: () => void;
+  beiErgebnis: (r: Ergebnis) => void;
+};
 
-/** Termin-Dialog: Einsatz anlegen oder ändern (Auftrag bzw. Ticket, Zeitraum, Monteure, Fahrzeug, Freigabe, Hinweis), löschen */
+/** Termin-Dialog: Einsatz anlegen oder ändern (Bezug, Zeitraum, Team, Fahrzeug, Ressource, Farbe, Freigabe, Hinweis), duplizieren, löschen */
 export function EinsatzDialog(p: DialogProps) {
   const e = "einsatz" in p.vorlage ? p.vorlage.einsatz : null;
   return (
@@ -43,39 +59,54 @@ export function EinsatzDialog(p: DialogProps) {
 
 const OHNE = "ohne";
 
-function EinsatzFormular({ plan, vorlage, monteure, fahrzeuge, heute, s, beiErgebnis }: DialogProps & { s: FormularSteuerung }) {
+function EinsatzFormular({ plan, vorlage, monteure, fahrzeuge, kolonnen = [], ressourcen = [], feiertage = [], heute, s, beiErgebnis }: DialogProps & { s: FormularSteuerung }) {
   const e = "einsatz" in vorlage ? vorlage.einsatz : null;
+  const neu = "einsatz" in vorlage ? null : vorlage;
   const art = plan === "montage" ? "auftrag" : "ticket";
-  const [auftrag, setAuftrag] = useState<BezugWahl | null>(e?.bezug ?? ("bezug" in vorlage ? (vorlage.bezug ?? null) : null));
-  const [fahrzeugId, setFahrzeugId] = useState(e?.fahrzeug_id ?? OHNE);
+  const [auftrag, setAuftrag] = useState<BezugWahl | null>(e?.bezug ?? neu?.bezug ?? null);
+  const [fahrzeugId, setFahrzeugId] = useState(e?.fahrzeug_id ?? neu?.fahrzeug_id ?? OHNE);
   const fz = fahrzeuge.find((f) => f.id === fahrzeugId);
-  const [beginn, setBeginn] = useState(e?.beginn ?? ("beginn" in vorlage ? vorlage.beginn : ""));
-  const [ende, setEnde] = useState(e?.ende ?? ("ende" in vorlage ? vorlage.ende : ""));
-  const [team, setTeam] = useState<string[]>(e?.monteure ?? ("monteure" in vorlage ? vorlage.monteure : []));
+  const [beginn, setBeginn] = useState(e?.beginn ?? neu?.beginn ?? "");
+  const [ende, setEnde] = useState(e?.ende ?? neu?.ende ?? "");
+  const [team, setTeam] = useState<string[]>(e?.monteure ?? neu?.monteure ?? []);
   const [fest, setFest] = useState(e?.fest ?? false);
   const [hinweis, setHinweis] = useState(e?.hinweis ?? "");
+  const [ressource, setRessource] = useState(e?.ressource_id ?? neu?.ressource_id ?? OHNE);
+  const [farbe, setFarbe] = useState<string | null>(e?.farbe ?? null);
+  const [kolonne, setKolonne] = useState(OHNE);
   const [fehler, setFehler] = useState<Ergebnis>({});
   const [laeuft, starten] = useTransition();
   const aendern = <T,>(setze: (v: T) => void) => (v: T) => { setze(v); s.aenderung(); };
   // Monteure, die im Einsatz stehen, aber inzwischen deaktiviert sind, bleiben wählbar
   const auswahl = [...monteure, ...(e?.monteure ?? []).filter((id) => !monteure.some((m) => m.id === id)).map((id) => ({ id, name: "Deaktivierter Monteur", kuerzel: "–" }))];
 
-  const speichern = () =>
+  const daten = (kopie: boolean): EinsatzDaten => {
+    const bezugArt = auftrag?.art ?? art;
+    // Kopie am nächsten Werktag (ohne Wochenende und Feiertag); Uhrzeiten und Länge bleiben, die Kopie ist vorgeplant
+    const tag = beginn.slice(0, 10);
+    const versatz = kopie && tag ? Math.round((Date.parse(naechsterWerktag(tag, feiertage)) - Date.parse(tag)) / 864e5) : 0;
+    const schieben = (x: string) => (versatz && x ? plusTage(x.slice(0, 10), versatz) + x.slice(10) : x);
+    return {
+      id: kopie ? null : (e?.id ?? null),
+      auftrag_id: bezugArt === "auftrag" ? (auftrag?.id ?? "") : null,
+      ticket_id: bezugArt === "ticket" ? (auftrag?.id ?? "") : null,
+      fahrzeug_id: fahrzeugId === OHNE ? null : fahrzeugId,
+      beginn: schieben(beginn),
+      ende: schieben(ende),
+      monteure: team,
+      fest: kopie ? false : fest,
+      hinweis,
+      ressource_id: ressource === OHNE ? null : ressource,
+      farbe,
+    };
+  };
+
+  const speichern = (kopie = false) =>
     starten(async () => {
-      const bezugArt = auftrag?.art ?? art;
-      const r = await einsatzSpeichern({
-        id: e?.id ?? null,
-        auftrag_id: bezugArt === "auftrag" ? (auftrag?.id ?? "") : null,
-        ticket_id: bezugArt === "ticket" ? (auftrag?.id ?? "") : null,
-        fahrzeug_id: fahrzeugId === OHNE ? null : fahrzeugId,
-        beginn,
-        ende,
-        monteure: team,
-        fest,
-        hinweis,
-      });
+      const d = daten(kopie);
+      const r = await einsatzSpeichern(d);
       if (r.ok) {
-        beiErgebnis(r);
+        beiErgebnis(kopie ? { ...r, warnung: r.warnung ?? `Weiterer Einsatz am ${d.beginn.slice(8, 10)}.${d.beginn.slice(5, 7)}. angelegt (vorgeplant).` } : r);
         s.fertig();
       } else setFehler(r);
     });
@@ -113,8 +144,36 @@ function EinsatzFormular({ plan, vorlage, monteure, fahrzeuge, heute, s, beiErge
         </Field>
       </div>
 
+      {kolonnen.length > 0 && (
+        <Field label="Kolonne übernehmen" hint="Setzt Team und Stammfahrzeug der Kolonne">
+          {(p) => (
+            <Select
+              value={kolonne}
+              onValueChange={(v) => {
+                setKolonne(v);
+                const k = kolonnen.find((x) => x.id === v);
+                if (!k) return;
+                aendern(setTeam)([...k.mitglieder]);
+                if (k.stammfahrzeug_id) setFahrzeugId(k.stammfahrzeug_id);
+              }}
+            >
+              <SelectTrigger id={p.id} aria-label="Kolonne übernehmen"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value={OHNE}>– Team einzeln wählen –</SelectItem>
+                {kolonnen.map((k) => (
+                  <SelectItem key={k.id} value={k.id}>
+                    {k.name}
+                    {k.mitglieder.length ? ` · ${k.mitglieder.map((m) => monteure.find((x) => x.id === m)?.name.split(" ")[0] ?? "").join(", ")}` : ""}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          )}
+        </Field>
+      )}
+
       <fieldset className="flex flex-col gap-1.5">
-        <legend className="mb-1.5 text-sm font-medium text-ink-3">Monteure *</legend>
+        <legend className="mb-1.5 text-sm font-medium text-ink-3">Monteure{ressource === OHNE ? " *" : ""}</legend>
         <div className="flex flex-wrap gap-2">
           {auswahl.map((m) => (
             <label key={m.id} className="flex cursor-pointer items-center gap-2 rounded-full border border-line px-3 py-1.5 text-sm has-[:checked]:border-ink has-[:checked]:bg-surface-sunken">
@@ -133,17 +192,30 @@ function EinsatzFormular({ plan, vorlage, monteure, fahrzeuge, heute, s, beiErge
         {fehler.felder?.monteure && <small className="text-xs text-tone-red-fg">{fehler.felder.monteure}</small>}
       </fieldset>
 
-      <Field label="Fahrzeug" error={fehler.felder?.fahrzeug} hint="Höchstens ein Fahrzeug je Einsatz">
-        {(p) => (
-          <Select value={fahrzeugId} onValueChange={(v) => aendern(setFahrzeugId)(v)}>
-            <SelectTrigger id={p.id} aria-label="Fahrzeug"><SelectValue /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value={OHNE}>– ohne Fahrzeug –</SelectItem>
-              {fahrzeuge.map((f) => <SelectItem key={f.id} value={f.id}>{f.kennzeichen}{f.typ ? " · " + f.typ : ""}</SelectItem>)}
-            </SelectContent>
-          </Select>
-        )}
-      </Field>
+      <div className="grid grid-cols-2 gap-3 max-md:grid-cols-1">
+        <Field label="Fahrzeug" error={fehler.felder?.fahrzeug} hint="Höchstens ein Fahrzeug je Einsatz">
+          {(p) => (
+            <Select value={fahrzeugId} onValueChange={(v) => aendern(setFahrzeugId)(v)}>
+              <SelectTrigger id={p.id} aria-label="Fahrzeug"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value={OHNE}>– ohne Fahrzeug –</SelectItem>
+                {fahrzeuge.map((f) => <SelectItem key={f.id} value={f.id}>{f.kennzeichen}{f.typ ? " · " + f.typ : ""}</SelectItem>)}
+              </SelectContent>
+            </Select>
+          )}
+        </Field>
+        <Field label="Weitere Ressource" hint="z. B. Selbstabholer, Subunternehmer">
+          {(p) => (
+            <Select value={ressource} onValueChange={(v) => aendern(setRessource)(v)}>
+              <SelectTrigger id={p.id} aria-label="Weitere Ressource"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value={OHNE}>– keine –</SelectItem>
+                {ressourcen.map((r) => <SelectItem key={r.id} value={r.id}>{r.name}</SelectItem>)}
+              </SelectContent>
+            </Select>
+          )}
+        </Field>
+      </div>
       {fz && ueberfaellig(fz, heute).length > 0 && (
         <p role="alert" data-pruefung className="-mt-2 rounded-md bg-tone-amber-bg px-3.5 py-2 text-sm text-tone-amber-fg">
           {fz.kennzeichen}: {ueberfaellig(fz, heute).join(", ")} überfällig.
@@ -152,13 +224,25 @@ function EinsatzFormular({ plan, vorlage, monteure, fahrzeuge, heute, s, beiErge
 
       <Field label="Hinweis für die Monteure">{(p) => <Textarea {...p} value={hinweis} onChange={(x) => aendern(setHinweis)(x.target.value)} placeholder="z. B. Schlüssel beim Nachbarn" />}</Field>
 
+      <div className="flex flex-col gap-1.5">
+        <span className="text-sm font-medium text-ink-3">Farbe in der Plantafel</span>
+        <FarbWahl wert={farbe} onWahl={aendern(setFarbe)} />
+        <small className={fehler.felder?.farbe ? "text-xs text-tone-red-fg" : "text-xs text-muted-2"}>{fehler.felder?.farbe ?? "Eigene Farbe: Die Schrift wird automatisch hell oder dunkel gesetzt."}</small>
+      </div>
+
       <label className="flex items-center gap-2 text-sm">
         <input type="checkbox" checked={fest} onChange={(x) => aendern(setFest)(x.target.checked)} className="size-4 [accent-color:var(--ink)]" />
         Fest einplanen und freigeben <span className="text-muted-2">(sonst vorgeplant)</span>
       </label>
 
       <div className="flex flex-wrap items-center justify-between gap-2.5 pt-1">
-        <span>
+        <span className="flex flex-wrap gap-2.5">
+          {e && (
+            <Button onClick={() => speichern(true)} disabled={laeuft} title="Kopie am nächsten Werktag anlegen (vorgeplant)">
+              <Copy className="size-[15px]" />
+              Duplizieren
+            </Button>
+          )}
           {e && (
             <Bestaetigen
               titel="Einsatz löschen?"

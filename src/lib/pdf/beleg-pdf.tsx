@@ -16,7 +16,7 @@ import { eur } from "@/lib/format";
 
 const SCHRIFT = path.join(process.cwd(), "node_modules/@fontsource/inter/files");
 let registriert = false;
-function schriften() {
+export function schriften() {
   if (registriert) return;
   Font.register({
     family: "Inter",
@@ -34,7 +34,7 @@ function schriften() {
 }
 
 // Helle Werte wie in src/styles/tokens.css (Papier)
-const F = { ink: "#171717", ink3: "#4b4f55", muted: "#5f646b", line: "#e9e6e1", lineStrong: "#d9d3ca", logoInk: "#2E2B28", sand: "#8a6140", wasser: "#A33A2E" };
+export const F = { ink: "#171717", ink3: "#4b4f55", muted: "#5f646b", line: "#e9e6e1", lineStrong: "#d9d3ca", logoInk: "#2E2B28", sand: "#8a6140", wasser: "#A33A2E" };
 
 const st = StyleSheet.create({
   seite: { fontFamily: "Inter", fontSize: 10, lineHeight: 1.5, color: F.ink, paddingTop: 42, paddingBottom: 78, paddingHorizontal: 54 },
@@ -122,7 +122,7 @@ const tag = (iso: string | null) => (iso ? `${iso.slice(8, 10)}.${iso.slice(5, 7
 const menge = (n: number) => n.toLocaleString("de-DE", { maximumFractionDigits: 3 });
 const zeilen = (...t: (string | null | undefined)[]) => t.filter((x): x is string => !!x && !!x.trim());
 
-function Logo({ l, breite }: { l: LogoPfade; breite: number }) {
+export function Logo({ l, breite }: { l: LogoPfade; breite: number }) {
   const [, , w, h] = l.viewBoxVoll.split(" ").map(Number);
   return (
     <Svg viewBox={l.viewBoxVoll} style={{ width: breite, height: (breite * h) / w }}>

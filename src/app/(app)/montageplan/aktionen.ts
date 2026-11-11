@@ -5,6 +5,7 @@ import { pruefeSitzung } from "@/lib/auth/sitzung";
 import { suchbegriff } from "@/lib/kunden";
 import { konfliktText, type Konflikt } from "@/lib/montageplan-text";
 import { feiertageImZeitraum } from "@/lib/feiertage";
+import { istHex, istPlanFarbe } from "@/lib/plantafel-logik";
 import { berlinNachUtc, utcNachBerlinLokal } from "@/lib/zeit";
 
 export type Ergebnis = { fehler?: string; ok?: boolean; warnung?: string; felder?: Record<string, string> };
@@ -24,6 +25,10 @@ export type EinsatzDaten = {
   /** null = Freigabe-Stand unverändert lassen (Ziehen in der Tafel) */
   fest: boolean | null;
   hinweis: string | null;
+  /** weitere Ressource (Zeile wie Selbstabholer, Subunternehmer) */
+  ressource_id?: string | null;
+  /** plan-1 … plan-10 oder #RRGGBB, null = Standard nach Typ */
+  farbe?: string | null;
 };
 
 /** Einsatz anlegen oder ändern (Dialog, Ziehen, Verlängern). Konflikte warnen, blockieren aber nicht. */
@@ -40,7 +45,10 @@ export async function einsatzSpeichern(d: EinsatzDaten): Promise<Ergebnis & { id
   if (!ende) felder.ende = "Ungültiges Ende.";
   if (beginn && ende && ende <= beginn) felder.ende = "Das Ende muss nach dem Beginn liegen.";
   const monteure = [...new Set((d.monteure ?? []).filter((m) => UUID.test(m)))];
-  if (!monteure.length) felder.monteure = "Bitte mindestens einen Monteur wählen.";
+  const ressource = d.ressource_id && UUID.test(d.ressource_id) ? d.ressource_id : null;
+  if (!monteure.length && !ressource) felder.monteure = "Bitte mindestens einen Monteur oder eine weitere Ressource wählen.";
+  const farbe = d.farbe ? d.farbe.trim() : null;
+  if (farbe && !istHex(farbe) && !istPlanFarbe(farbe)) felder.farbe = "Bitte eine Farbe aus der Auswahl wählen.";
   if (d.id && !UUID.test(d.id)) return { fehler: "Einsatz nicht gefunden." };
   if (Object.keys(felder).length) return { fehler: Object.values(felder)[0], felder };
 
@@ -54,6 +62,8 @@ export async function einsatzSpeichern(d: EinsatzDaten): Promise<Ergebnis & { id
     p_fahrzeug_id: d.fahrzeug_id || null,
     p_fest: d.fest,
     p_hinweis: d.hinweis?.trim() || null,
+    p_ressource_id: ressource,
+    p_farbe: farbe ? (istHex(farbe) ? farbe.toUpperCase() : farbe) : null,
   });
   if (error || !id) {
     return { fehler: ["23514", "23502", "P0002"].includes(error?.code ?? "") ? error!.message : "Der Einsatz konnte nicht gespeichert werden." };

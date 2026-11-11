@@ -20,11 +20,13 @@ export default async function ServiceplanPage({ searchParams }: PageProps<"/serv
   const sp = await searchParams;
   const heute = await ladeHeute();
   const montag = wocheAus(eins(sp.woche), heute);
+  const wochen = eins(sp.ansicht) === "4" ? 4 : 1;
+  const letzterTag = plusTage(montag, 7 * wochen - 3);
   const ticketId = eins(sp.ticket);
   const { supabase } = await pruefeSitzung();
   const [tafel, terminierbar, ticket] = await Promise.all([
-    ladeTafel(montag),
-    ladeTerminierbar(montag, plusTage(montag, 4), montag === wocheAus("", heute)),
+    ladeTafel(montag, wochen),
+    ladeTerminierbar(montag, letzterTag, heute >= montag && heute <= letzterTag),
     UUID.test(ticketId)
       ? supabase.from("service_ticket").select("id, nummer, thema, kunde:kunde_id(name)").eq("id", ticketId).maybeSingle<{ id: string; nummer: string; thema: string; kunde: { name: string } | null }>()
       : Promise.resolve({ data: null }),
@@ -35,8 +37,8 @@ export default async function ServiceplanPage({ searchParams }: PageProps<"/serv
     <Shell active="serviceplan" crumbs={[{ label: "Montage & Service" }, { label: "Service-Plan" }]}>
       <PageHeader
         title="Service-Plan"
-        sub={`KW ${kalenderwoche(montag)} · ${tag(montag)} – ${tag(plusTage(montag, 4))} · Einsätze zu Service-Tickets · Montagen erscheinen als „belegt“`}
-        actions={<WochenNavigation basis="/serviceplan" montag={montag} heute={heute} />}
+        sub={`KW ${kalenderwoche(montag)}${wochen === 4 ? `–${kalenderwoche(letzterTag)}` : ""} · ${tag(montag)} – ${tag(letzterTag)}${wochen === 4 ? " · tagesgenau" : ""} · Einsätze zu Service-Tickets · Montagen erscheinen als „belegt“`}
+        actions={<WochenNavigation basis="/serviceplan" montag={montag} heute={heute} wochen={wochen} />}
       />
       <ServiceTafel
         key={vorlage?.id ?? "tafel"}
@@ -48,6 +50,9 @@ export default async function ServiceplanPage({ searchParams }: PageProps<"/serv
         konflikte={tafel.konflikte}
         fahrzeuge={tafel.fahrzeuge}
         feiertage={tafel.feiertage}
+        kolonnen={tafel.kolonnen}
+        ressourcen={tafel.ressourcen}
+        gruppen={tafel.gruppen}
         bezugVorlage={vorlage}
         terminierbar={terminierbar}
       />

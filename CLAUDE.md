@@ -609,6 +609,15 @@ Die Monteur-App kommt in Version 2.
 - **Markierte Zeile:** Überfahren hebt die Zeile hervor, Klick auf die Beschriftung markiert sie dauerhaft
   (Sand-Hinterlegung), damit man sieht, wo man sich befindet.
 - Kolonnen und Ressourcen werden in der Plantafel gepflegt, Fahrzeuge unter Team und Ressourcen › Fahrzeuge.
+- **Umsetzung (11.11.2026):** Rechenlogik ohne Oberfläche in `src/lib/plantafel-logik.ts` (Ablegen auf Monteur,
+  Kolonne oder Ressource, Duplizieren, Zeiten im Stunden- und Tagesraster, Pipeline-Stufen, Farben mit Kontrast,
+  Reihenfolge) mit Unit-Tests (`tests/unit/plantafel.test.ts`). Die 4-Wochen-Ansicht zeigt wie die Wochenansicht nur
+  Montag bis Freitag (20 Arbeitstage, `?ansicht=4`); Verschieben dort um Werktage, die Uhrzeiten bleiben. Ein Einsatz
+  braucht mindestens einen Monteur oder eine weitere Ressource. Die Reihenfolge der Gruppen steht in
+  `einstellung.plantafel_gruppen`, die der Zeilen in `reihenfolge` (Kolonnenmitglieder, Monteure ohne Kolonne,
+  Ressourcen). „Abschlag bezahlt“ zählt Abschlagsrechnungen mit Status „bezahlt“. Wochenplan als PDF A4 quer je
+  Monteur oder Kolonne (`/pdf/wochenplan`, Knopf in der Tafel und auf der Mitarbeiterseite); Samstag nur, wenn dort
+  etwas steht.
 
 ### Team und Ressourcen
 

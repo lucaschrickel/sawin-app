@@ -127,7 +127,8 @@ Wahl der Rechnung). Höchstens eine Zahlungsbestätigung je Zahlung. Höchstens 
 |---|---|
 | `einsatz` | Auftrag **oder** Ticket, Beginn, Ende (`ende > beginn`), Fahrzeug, Ressource, `fest` (freigegeben), Farbe (Paletten-Token `plan-1` … `plan-10` oder `#RRGGBB`, geprüft) |
 | `einsatz_monteur` | Einsatz, Mitarbeiter (mehrere Monteure je Einsatz) |
-| `einsatz_speichern()`, `einsatz_loeschen()`, `einsatz_konflikte()` | Funktionen (SECURITY INVOKER): Einsatz zu genau einem Auftrag oder Ticket samt Team und Fahrzeug in einem Schritt speichern (mindestens ein Monteur, entfernte Monteure nur markiert), Einsatz samt Team als gelöscht markieren, Konflikte im Zeitraum (Monteur gleichzeitig in einem anderen Einsatz oder abwesend, beantragt oder genehmigt; Werkstatttermin des Fahrzeugs ohne Mitarbeiter-Bezug). Feiertage prüft die App selbst (`src/lib/feiertage.ts`). Die Arbeitszeit in `einstellung` ist auf volle Stunden beschränkt (Stundenraster der Plantafel). |
+| `einsatz_freigeben()`, `kolonne_speichern()`, `kolonne_monteur()`, `kolonne_loeschen()`, `ressource_loeschen()` | Funktionen (SECURITY INVOKER) der Plantafel: vorgeplante Einsätze gesammelt freigeben (gibt die Anzahl zurück); Kolonne mit Stammfahrzeug und Mitgliedern in Reihenfolge speichern (nur Monteure, entfernte nur markiert); Monteur in eine andere Kolonne verschieben, in eine weitere duplizieren, entfernen oder sortieren; Kolonne samt Mitgliedschaften als gelöscht markieren (Einsätze behalten ihr Team); weitere Ressource nur ohne künftige Einsätze als gelöscht markieren. Reihenfolge der Gruppen in `einstellung.plantafel_gruppen` (`kolonne:<id>`, `solo`, `res`). |
+| `einsatz_speichern()`, `einsatz_loeschen()`, `einsatz_konflikte()` | Funktionen (SECURITY INVOKER): Einsatz zu genau einem Auftrag oder Ticket samt Team, Fahrzeug, weiterer Ressource und Farbe (`plan-1` … `plan-10` oder `#RRGGBB`) in einem Schritt speichern (mindestens ein Monteur oder eine Ressource, nur Monteure, entfernte Monteure nur markiert), Einsatz samt Team als gelöscht markieren, Konflikte im Zeitraum (Monteur gleichzeitig in einem anderen Einsatz oder abwesend, beantragt oder genehmigt; Werkstatttermin des Fahrzeugs ohne Mitarbeiter-Bezug). Feiertage prüft die App selbst (`src/lib/feiertage.ts`). Die Arbeitszeit in `einstellung` ist auf volle Stunden beschränkt (Stundenraster der Plantafel). |
 | `aufgabe` | Titel, Zuständig (Benutzer), fällig, Priorität, Status (offen, in_arbeit, wartet_zulieferer, wartet_kunde, erledigt), erledigt am (Trigger), Notiz, optional Kunde, Anfrage, Auftrag oder Ticket (höchstens einer) |
 | `termin` | Titel, Art (beratung, intern), Datum, Beginn, Ende, optional Kunde/Anfrage/Auftrag, Ort, Notiz. Speichern samt Mitarbeitern über `termin_speichern()`, Löschen über `termin_loeschen()` |
 | `termin_mitarbeiter` | Termin, Mitarbeiter |
@@ -154,6 +155,8 @@ Wahl der Rechnung). Höchstens eine Zahlungsbestätigung je Zahlung. Höchstens 
 4. `…_anfragen_auftraege.sql`: Anfragen, Aufträge, Service-Tickets
 5. `…_belege.sql`: Belege, Positionen, Versionen, Versand, Zahlungen (Modul Belege Schritt 1: `20261111090000_belege_modul.sql` mit Speichern, Fertigstellen, Übergeben, Status-Regeln, Speicher `belege`; Korrekturen `…090100` und `…090200`; Schritt 2 Lexware: `20261112090000_lexware.sql`, Korrektur `…090100`; Zahlungen `20261113090000_zahlungen.sql` und `…090100`; Teil-AB `…090200_teil_ab.sql`; Webhook-Protokoll `20261114090000_lexware_ereignis.sql`, Korrektur Abgleichsbeginn `…090100`)
 6. `…_planung_arbeit.sql`: Einsätze, Zeiten, Aufgaben, Termine, Formulare, Chat, Notizen, Benachrichtigungen, Einkauf
+   (Plantafel fertig: `20261114090200_plantafel.sql` mit Ressource und Farbe am Einsatz, Sammelfreigabe, Kolonnen,
+   Reihenfolge der Gruppen)
 7. `…_rls.sql`: RLS und Policies für alle Tabellen, Rechte für `anon` entzogen, Prüfung am Ende: bricht ab, wenn
    eine Tabelle in `public` ohne RLS ist
 
@@ -191,6 +194,9 @@ und danach wieder entfernt:
 14. **Einkauf:** Lieferant samt Ansprechpartnern (entfernter nur markiert), Lieferanten-Konditionen nur mit Recht,
     Bestellung `BE-JJ-NNN` nur mit Zeilen und Auftrag, gelieferte Bestellung und Lieferant mit offener Bestellung nicht
     löschbar, Löschen nur als Markierung.
+16. **Plantafel:** Kolonne speichern (Reihenfolge, nur Monteure, entfernte nur markiert), Monteur duplizieren, nicht
+    doppelt, entfernen, Kolonne nur markiert; Einsatz mit Ressource ohne Monteur, Farbe nur Palette oder `#RRGGBB`;
+    Ressource mit künftigem Einsatz nicht löschbar; Sammelfreigabe zählt nur vorgeplante.
 15. **Lexware-Webhook:** Server-Funktionen für Benutzer und Admins gesperrt, Doppelzustellung erkannt, nach Fehler
     erneut verarbeitet, Protokoll nur für Admins lesbar.
 11. **Abwesenheiten löschen:** eine entschiedene Abwesenheit löscht nur ein Admin (nur als Markierung), einen Antrag

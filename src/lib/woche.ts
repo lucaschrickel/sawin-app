@@ -35,9 +35,15 @@ const WOCHENTAG = ["So", "Mo", "Di", "Mi", "Do", "Fr", "Sa"];
 /** „Mo 09.11.“ */
 export const tagKurz = (d: string) => `${WOCHENTAG[utc(d).getUTCDay()]} ${d.slice(8, 10)}.${d.slice(5, 7)}.`;
 
-/** Raster: Tage der Woche, Arbeitszeit von/bis in vollen Stunden */
-export type Raster = { tage: string[]; von: number; bis: number };
-export const stundenJeTag = (r: Raster) => r.bis - r.von;
+/** Arbeitstage von n Wochen ab dem Montag (Montag bis Freitag) */
+export const arbeitstageWochen = (montag: string, wochen: number) => Array.from({ length: wochen }, (_, w) => arbeitstage(plusTage(montag, 7 * w))).flat();
+
+/**
+ * Raster: Arbeitstage, Arbeitszeit von/bis in vollen Stunden. Stundenraster (1 Woche): ein Slot je Stunde.
+ * Tagesgenau (4 Wochen): ein Slot je Tag; Zeiten bleiben beim Verschieben erhalten (src/lib/plantafel-logik.ts).
+ */
+export type Raster = { tage: string[]; von: number; bis: number; tagesgenau?: boolean };
+export const stundenJeTag = (r: Raster) => (r.tagesgenau ? 1 : r.bis - r.von);
 export const slotsGesamt = (r: Raster) => r.tage.length * stundenJeTag(r);
 
 /**
@@ -47,9 +53,16 @@ export const slotsGesamt = (r: Raster) => r.tage.length * stundenJeTag(r);
 export function slotAus(lokal: string, r: Raster, art: "beginn" | "ende"): number {
   const d = lokal.slice(0, 10);
   const n = stundenJeTag(r);
-  if (d < r.tage[0]) return 0;
   const i = r.tage.indexOf(d);
-  if (i < 0) return slotsGesamt(r);
+  // Tag außerhalb des Rasters (davor, danach, Wochenende): Beginn am nächsten Arbeitstag, Ende nach dem vorigen
+  if (i < 0) {
+    if (art === "beginn") {
+      const k = r.tage.findIndex((t) => t > d);
+      return k < 0 ? slotsGesamt(r) : k * n;
+    }
+    return r.tage.filter((t) => t < d).length * n;
+  }
+  if (r.tagesgenau) return art === "beginn" ? i : i + 1;
   const stunde = Number(lokal.slice(11, 13)) + Number(lokal.slice(14, 16)) / 60;
   const imTag = Math.min(Math.max(stunde, r.von), r.bis) - r.von;
   return i * n + (art === "beginn" ? Math.floor(imTag) : Math.ceil(imTag));
@@ -57,6 +70,11 @@ export function slotAus(lokal: string, r: Raster, art: "beginn" | "ende"): numbe
 
 /** Rasterposition → Ortszeit. Ein Ende genau am Tagesrand ist das Arbeitsende des Vortags (nicht Arbeitsbeginn). */
 export function lokalAus(slot: number, r: Raster, art: "beginn" | "ende"): string {
+  const zwei = (h: number) => String(h).padStart(2, "0");
+  if (r.tagesgenau) {
+    const i = Math.min(Math.max(art === "ende" ? slot - 1 : slot, 0), r.tage.length - 1);
+    return `${r.tage[i]}T${zwei(art === "ende" ? r.bis : r.von)}:00`;
+  }
   const n = stundenJeTag(r);
   const randEnde = art === "ende" && slot > 0 && slot % n === 0;
   const tagIndex = randEnde ? slot / n - 1 : Math.floor(slot / n);
