@@ -48,7 +48,7 @@ Stand: 11.11.2026, nach Versand (vorläufig), Kopfzeile und OneDrive-Ablage. Ver
 | Einstellungen | Darstellung (Hell, Dunkel, System) | fehlt | Tokens für Dunkel vorhanden |
 | Designsystem | Styleguide | teilweise | Farbwahl der Plantafel, Kopfzeile und Ablage-Karte noch nicht unter `/styleguide` |
 | Übernahme | Datenübernahme aus Airtable | fehlt | |
-| Vercel | Region `fra1`, Crons (Zahlungen, Ablage), Lexware-Webhook | teilweise | gebaut; Projekt auf Vercel noch nicht angelegt |
+| Vercel | Projekt, Region `fra1`, Crons (Zahlungen, Ablage), Lexware-Webhook | teilweise | läuft unter https://sawin-bauelemente-app.vercel.app (Production und Preview bis zum Go-live auf Staging); beide Crons mit 200 geprüft; offen siehe „Vercel“ unten |
 | Version 2 | Monteur-App, Outlook-Versand, automatische Anfragen, KI-Agents | verschoben auf V2 | |
 
 ## Go-live-Checkliste (offen)
@@ -69,6 +69,26 @@ Stand: 11.11.2026, nach Versand (vorläufig), Kopfzeile und OneDrive-Ablage. Ver
 | ASVS Level 1, CSP mit Nonce | offen |
 | AVV | offen |
 | Übergabe-Anleitung | Vercel, Cron, Webhook, OneDrive (Entra) beschrieben |
+
+## Vercel (Stand 11.11.2026)
+
+- Ein Projekt „sawin-app“ (Team Luca, Pro). Production = Branch `main` unter https://sawin-bauelemente-app.vercel.app,
+  Preview = übrige Branches. **Bis zum Go-live zeigen beide auf Staging** (Supabase sawin-staging, Lexware-Testkonto,
+  OneDrive-Basisordner `_App-Test`). Zum Go-live nur die Production-Variablen auf Produktion umstellen.
+- Umgebungsvariablen für Production und Preview gesetzt; `CRON_SECRET` und `MS_TOKEN_SCHLUESSEL` je Umgebung eigen.
+  Lexware (Konto „Musterfirma“) und OneDrive auf der Vercel-Adresse „verbunden“.
+- Crons `/api/cron/zahlungsabgleich` und `/api/cron/ablage` von Hand ausgelöst: Status 200. Deployment-Schutz für
+  Production aus (Webhook muss erreichbar sein; die App verlangt selbst Anmeldung mit MFA).
+- **Offen – Region des Proxys:** Beim Cron-Aufruf lief der Proxy (`src/proxy.ts`, Sitzungsprüfung) in **iad1**
+  (Washington), die Funktion selbst in fra1. Vermutung: Vercel führt den Proxy im Rechenzentrum aus, das dem Aufrufer
+  am nächsten ist (Crons starten in den USA); `regions` in `vercel.json` gilt nur für Serverfunktionen. Für Cron
+  und Webhook unkritisch (der Proxy lässt `/api/cron/` und `/api/lexware/` ohne Sitzung durch). **Zu prüfen:** Region
+  des Proxys bei einem Seitenaufruf aus Deutschland (Vercel › Logs › Request Logs › Execution › Region). fra1 → in
+  Ordnung, festhalten; andere Region → Entscheidung nötig (z. B. Sitzungsprüfung aus dem Proxy in die Serverfunktionen
+  verlagern), weil CLAUDE.md iad1 bzw. Regionen außerhalb Frankfurts ausschließt.
+- **Offen – nächste Schritte:** Supabase-Auth (Staging) auf die Vercel-Adresse umstellen (`SUPABASE_AUTH_SITE_URL`,
+  `localhost:3000` als weitere Weiterleitung, `npm run auth:push`), Lexware-Webhook im Testkonto für
+  `https://sawin-bauelemente-app.vercel.app/api/lexware/webhook` registrieren, Browser-Tests gegen die Vercel-Adresse.
 
 ## Build, Tests, Next.js
 
