@@ -9,7 +9,7 @@ ergänzt.
 | Dienst | Zweck | Konto |
 |---|---|---|
 | Supabase | Datenbank, Anmeldung, Dateien | Konto des Kunden, Region Frankfurt, je Kunde ein Staging- und ein Produktionsprojekt |
-| Vercel | Hosting der App, Region `fra1` | bis zur Übergabe im Team von Luca |
+| Vercel | Hosting der App, Region `fra1` (festgelegt in `vercel.json`, gilt für alle Serverfunktionen) | bis zur Übergabe im Team von Luca |
 | GitHub | Quellcode | Repository wird übergeben |
 | Lexware Office | Rechnungen, Abschläge, Gutschriften | Staging: eigenes Testkonto (Tarif XL), Produktion: Konto des Kunden |
 | Microsoft 365 | OneDrive-Ablage, E-Mail-Versand | Konto des Kunden |
