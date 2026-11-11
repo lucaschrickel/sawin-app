@@ -23,6 +23,8 @@ type Props = {
   ausloeser?: ReactNode;
   /** wird nach dem Schließen aufgerufen (für Dialoge ohne Auslöser) */
   beiSchliessen?: () => void;
+  /** beim Laden schon offen (z. B. aus dem „Neu“-Menü mit ?neu=1); beim Schließen verschwindet ?neu aus der Adresse */
+  startOffen?: boolean;
   children: (s: FormularSteuerung) => ReactNode;
 };
 
@@ -30,8 +32,16 @@ type Props = {
  * Dialog mit Formular. Schließen per ×, Escape, Klick daneben oder „Abbrechen“ fragt nach, wenn es ungespeicherte
  * Änderungen gibt (CLAUDE.md „Speichern“). Bei jedem Öffnen ist das Formular frisch.
  */
-export function FormularDialog({ titel, beschreibung, breit, ausloeser, beiSchliessen, children }: Props) {
-  const [offen, setOffen] = useState(!ausloeser);
+/** ?neu=1 aus der Adresse entfernen, ohne neu zu laden (Dialog aus dem „Neu“-Menü geschlossen) */
+export function neuParameterEntfernen() {
+  const u = new URL(window.location.href);
+  if (!u.searchParams.has("neu")) return;
+  u.searchParams.delete("neu");
+  window.history.replaceState(null, "", u.pathname + u.search + u.hash);
+}
+
+export function FormularDialog({ titel, beschreibung, breit, ausloeser, beiSchliessen, startOffen, children }: Props) {
+  const [offen, setOffen] = useState(!ausloeser || !!startOffen);
   const [geaendert, setGeaendert] = useState(false);
   const [nachfrage, setNachfrage] = useState(false);
   const [schluessel, setSchluessel] = useState(0);
@@ -40,6 +50,7 @@ export function FormularDialog({ titel, beschreibung, breit, ausloeser, beiSchli
     setOffen(false);
     setGeaendert(false);
     setNachfrage(false);
+    if (startOffen) neuParameterEntfernen();
     beiSchliessen?.();
   };
   const oeffnenAendern = (o: boolean) => {

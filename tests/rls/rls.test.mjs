@@ -1102,6 +1102,51 @@ describe("Belege", () => {
   });
 });
 
+describe("Vorläufiger Versand und globale Suche", () => {
+  it("beleg_versenden: kein Entwurf, nur gültige Adressen, friert Angebot ein und protokolliert", async () => {
+    const ag = await belegSpeichern(buero, { art: "angebot", kunde_id: daten.kunde.id, anfrage_id: daten.anfrage.id, titel: `Versand ${lauf}` });
+    const args = { p_id: ag.id, p_empfaenger: ["kunde@example.com"], p_bcc: ["angebot@example.com"], p_betreff: "Angebot", p_text: "Guten Tag", p_datei: "AG_Angebot.pdf" };
+    const entwurf = await buero.client.rpc("beleg_versenden", args);
+    assert.equal(entwurf.error?.code, "23514", "Entwurf versendet");
+    await fertig(buero, ag.id);
+    const falsch = await buero.client.rpc("beleg_versenden", { ...args, p_empfaenger: ["x@y.de\r\nBcc: evil@z.de"] });
+    assert.equal(falsch.error?.code, "23514", "ungültige Adresse angenommen");
+    const leer = await buero.client.rpc("beleg_versenden", { ...args, p_empfaenger: [] });
+    assert.equal(leer.error?.code, "23514", "ohne Empfänger angenommen");
+    const nichtAngemeldet = await anon.rpc("beleg_versenden", args);
+    assert.ok(nichtAngemeldet.error, "nicht angemeldet versendet");
+    const { data: version, error } = await buero.client.rpc("beleg_versenden", args);
+    assert.ifError(error);
+    assert.equal(version, 1);
+    const { data: b } = await service.from("beleg").select("eingefroren_version").eq("id", ag.id).single();
+    assert.equal(b.eingefroren_version, 1, "Version nicht eingefroren");
+    const { data: v } = await service.from("beleg_versand").select("id, kanal, empfaenger, bcc, pdfs").eq("beleg_id", ag.id);
+    assert.equal(v.length, 1);
+    assert.deepEqual([v[0].kanal, v[0].empfaenger, v[0].bcc, v[0].pdfs[0].name], ["email", ["kunde@example.com"], ["angebot@example.com"], "AG_Angebot.pdf"]);
+    const { data: ver } = await service.from("beleg_version").select("id").eq("beleg_id", ag.id);
+    for (const x of ver ?? []) angelegt.push(["beleg_version", x.id]);
+  });
+
+  it("Suche: findet mit den Rechten des Benutzers; nicht angemeldet und ohne MFA nichts; Konditionen und Gelöschtes nie", async () => {
+    const { data: t, error } = await buero.client.rpc("suche", { p_q: `Testkunde ${lauf}`, p_je_bereich: 3 });
+    assert.ifError(error);
+    assert.ok(t.some((x) => x.bereich === "kunde" && x.id === daten.kunde.id), "Kunde nicht gefunden");
+    const a = await anon.rpc("suche", { p_q: `Testkunde ${lauf}`, p_je_bereich: 3 });
+    assert.ok(a.error || !a.data?.length, "nicht angemeldet findet etwas");
+    const ohne = await ohneMfa.client.rpc("suche", { p_q: `Testkunde ${lauf}`, p_je_bereich: 3 });
+    assert.ok(ohne.error || !ohne.data?.length, "ohne MFA findet etwas");
+    // Konditionen („Test: 5 % Rabatt“) werden nicht durchsucht, auch nicht mit dem Recht
+    const { data: k } = await admin.client.rpc("suche", { p_q: "5 % Rabatt", p_je_bereich: 50 });
+    assert.ok(!(k ?? []).some((x) => x.id === daten.kunde.id), "Konditionen durchsucht");
+    const geloescht = await svcInsert("kunde", { name: `Weg ${lauf}` });
+    assert.ifError((await buero.client.rpc("loeschen", { p_tabelle: "kunde", p_id: geloescht.id })).error);
+    const { data: w } = await buero.client.rpc("suche", { p_q: `Weg ${lauf}`, p_je_bereich: 3 });
+    assert.deepEqual(w, [], "gelöschter Kunde gefunden");
+    const { data: platzhalter } = await buero.client.rpc("suche", { p_q: "%_", p_je_bereich: 3 });
+    assert.ok(!(platzhalter ?? []).length || platzhalter.every((x) => /%_/.test(JSON.stringify(x))), "Platzhalter nicht maskiert");
+  });
+});
+
 describe("Plantafel: Kolonnen, Ressourcen, Farbe, Sammelfreigabe", () => {
   const kuerzel = (p) => p + Array.from(randomBytes(3), (x) => "ABCDEFGHIJKLMNOPQRSTUVWXYZ"[x % 26]).join("");
   const mitglieder = async (kolonne) => (await service.from("kolonne_mitglied").select("id, mitarbeiter_id, reihenfolge, deleted_at").eq("kolonne_id", kolonne).order("created_at")).data ?? [];

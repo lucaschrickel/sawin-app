@@ -21,6 +21,8 @@ export type AnfrageDialogDaten = {
 };
 
 type Props = AnfrageDialogDaten & {
+  /** aus dem „Neu“-Menü: beim Laden offen */
+  startOffen?: boolean;
   anfrage?: Anfrage;
   /** Kunde vorbelegt (z. B. von der Kundenseite) */
   kunde?: { id: string; name: string };
@@ -36,6 +38,7 @@ export function AnfrageDialog(props: Props) {
     <FormularDialog
       titel={neu ? "Neue Anfrage" : "Anfrage bearbeiten"}
       breit
+      startOffen={props.startOffen}
       ausloeser={
         props.ausloeser ??
         (neu ? (

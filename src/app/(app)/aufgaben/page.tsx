@@ -50,6 +50,7 @@ export default async function AufgabenPage({ searchParams }: PageProps<"/aufgabe
         actions={
           <AufgabeDialog
             {...kontext}
+            key={String(sp.neu ?? "")} startOffen={!!sp.neu}
             ausloeser={
               <Button variant="primary">
                 <Plus className="size-[15px]" strokeWidth={2.2} />

@@ -73,7 +73,7 @@ const tageText = (n: number) => (n < 0 ? "überfällig" : n === 0 ? "heute" : `i
 /** „Braucht Aufmerksamkeit“ – nur was jetzt zu tun ist, je Thema eine Zeile */
 async function ladeHinweise(z: Zeit, einsaetze: TafelEinsatz[], konflikte: Set<string>): Promise<Hinweis[]> {
   const { supabase } = await pruefeSitzung();
-  const [abw, tickets, pruef, wv, aufgaben, bestellungen, fahrzeuge, namen] = await Promise.all([
+  const [abw, tickets, pruef, wv, aufgaben, bestellungen, fahrzeuge, namen, buchen, rechnungen, angebote, ohneRechnung] = await Promise.all([
     supabase.from("abwesenheit").select("mitarbeiter_id, art, von").eq("status", "beantragt").order("von"),
     supabase.from("service_ticket").select("id, nummer, thema").eq("status", "neu").order("nummer"),
     supabase.from("auftrag").select("id, nummer, pruefhinweis, kunde:kunde_id(name)").not("pruefhinweis", "is", null).returns<{ id: string; nummer: string; pruefhinweis: string; kunde: { name: string } | null }[]>(),
@@ -82,6 +82,20 @@ async function ladeHinweise(z: Zeit, einsaetze: TafelEinsatz[], konflikte: Set<s
     ladeBestellungen({ ansicht: "offen", q: "" }),
     faelligeFahrzeugtermine(z.heute),
     ladeNamen(),
+    // Zahlungen, die das Büro in der App gebucht hat und die Lexware noch nicht kennt
+    supabase.from("zahlung").select("id, beleg:beleg_id(id, nummer)").eq("quelle", "app").eq("lex_abgleich", "offen").returns<{ id: string; beleg: { id: string; nummer: string | null } | null }[]>(),
+    supabase.from("beleg").select("id, nummer").in("art", ["rechnung", "abschlagsrechnung"]).eq("status", "offen").gt("offen_betrag", 0).lt("faellig_am", z.heute).order("faellig_am"),
+    // Angebote nachfassen: offen seit mindestens 5 Tagen
+    supabase.from("beleg").select("id, nummer, kunde:kunde_id(name)").eq("art", "angebot").eq("status", "offen").lte("datum", plusTage(z.heute, -5)).order("datum").returns<{ id: string; nummer: string | null; kunde: { name: string } | null }[]>(),
+    // Aufträge ab Abnahme ohne fertige Schluss- bzw. Rechnung (Teilrechnungen zählen nicht)
+    supabase
+      .from("auftrag")
+      .select("id, nummer, rechnungen:beleg(id, teil)")
+      .in("phase", ["abnahme", "baustelle_fertig", "abgeschlossen"])
+      .eq("rechnungen.art", "rechnung")
+      .neq("rechnungen.status", "entwurf")
+      .order("nummer")
+      .returns<{ id: string; nummer: string; rechnungen: { id: string; teil: boolean }[] }[]>(),
   ]);
   const name = new Map(namen.map((m) => [m.id, m.name]));
   const liste = (xs: string[]) => xs.slice(0, 3).join(" · ") + (xs.length > 3 ? ` · +${xs.length - 3}` : "");
@@ -102,6 +116,14 @@ async function ladeHinweise(z: Zeit, einsaetze: TafelEinsatz[], konflikte: Set<s
   for (const p of pruef.data ?? []) h.push({ titel: `Prüfhinweis bei ${p.nummer}`, info: `${p.kunde?.name ?? ""} · ${p.pruefhinweis.length > 60 ? `${p.pruefhinweis.slice(0, 60)}…` : p.pruefhinweis}`, href: `/auftraege/${p.id}`, ton: "amber" });
   const w = wv.data ?? [];
   if (w.length) h.push({ titel: `${mehrzahl(w.length, "Anfrage", "Anfragen")} zur Wiedervorlage`, info: liste(w.map((x) => x.titel)), href: w.length === 1 ? `/anfragen/${w[0].id}` : "/anfragen", ton: "gray" });
+  const re = rechnungen.data ?? [];
+  if (re.length) h.push({ titel: `${mehrzahl(re.length, "Rechnung", "Rechnungen")} überfällig`, info: liste(re.map((x) => x.nummer ?? "")), href: "/belege/forderungen?status=ueberfaellig", ton: "red" });
+  const bu = (buchen.data ?? []).filter((x) => x.beleg);
+  if (bu.length) h.push({ titel: `${mehrzahl(bu.length, "Zahlung", "Zahlungen")} in Lexware noch buchen`, info: liste([...new Set(bu.map((x) => x.beleg!.nummer ?? ""))]), href: bu.length === 1 ? `/beleg/${bu[0].beleg!.id}` : "/belege/forderungen", ton: "amber" });
+  const ag = angebote.data ?? [];
+  if (ag.length) h.push({ titel: `${mehrzahl(ag.length, "Angebot", "Angebote")} nachfassen`, info: liste(ag.map((x) => `${x.nummer ?? ""} ${x.kunde?.name ?? ""}`.trim())), href: ag.length === 1 ? `/beleg/${ag[0].id}` : "/belege/angebote?status=offen", ton: "blue" });
+  const oR = (ohneRechnung.data ?? []).filter((a) => !a.rechnungen.some((r) => !r.teil));
+  if (oR.length) h.push({ titel: `${mehrzahl(oR.length, "Auftrag", "Aufträge")} ohne Rechnung`, info: liste(oR.map((x) => x.nummer)), href: oR.length === 1 ? `/auftraege/${oR[0].id}` : "/auftraege", ton: "amber" });
   return h;
 }
 
@@ -297,4 +319,13 @@ export async function ladeEinkauf() {
     fehlt,
     lieferanten,
   };
+}
+
+/** Glocke in der Kopfzeile: dieselben Hinweise wie „Braucht Aufmerksamkeit“ im Dashboard (Einsätze ab heute, 6 Wochen) */
+export async function ladeGlocke(): Promise<Hinweis[]> {
+  const z = zeit();
+  const von = utc(z.heute);
+  const bis = utc(plusTage(z.montag, 42));
+  const [einsaetze, konflikte] = await Promise.all([ladeEinsaetze(von, bis), konfliktIds(von, bis)]);
+  return ladeHinweise(z, einsaetze, konflikte);
 }

@@ -39,7 +39,7 @@ export default async function BestellungenPage({ searchParams }: PageProps<"/bes
 
   return (
     <Shell active="bestellungen" crumbs={[{ label: "Einkauf" }, { label: "Bestellungen" }]}>
-      <PageHeader title="Bestellungen" sub="Bestellungen bei Lieferanten · eine Bestellung kann mehrere Aufträge abdecken" actions={<NeueBestellung />} />
+      <PageHeader title="Bestellungen" sub="Bestellungen bei Lieferanten · eine Bestellung kann mehrere Aufträge abdecken" actions={<NeueBestellung key={String(sp.neu ?? "")} startOffen={!!sp.neu} />} />
       <div className="flex flex-col gap-4">
         {fehlt.length > 0 && (
           <Karte titel="Noch nicht bestellt" rechts={<span className="text-sm text-muted-2 tabular">{fehlt.length}</span>}>

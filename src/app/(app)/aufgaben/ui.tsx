@@ -30,11 +30,11 @@ export type AufgabenKontext = { benutzer: { id: string; name: string }[]; ichId:
 // ---------------------------------------------------------------------------------------------------------------------
 // Dialog
 // ---------------------------------------------------------------------------------------------------------------------
-type DialogProps = AufgabenKontext & { aufgabe?: Aufgabe; bezug?: Bezug; ausloeser: ReactNode };
+type DialogProps = AufgabenKontext & { aufgabe?: Aufgabe; bezug?: Bezug; ausloeser: ReactNode; startOffen?: boolean };
 
 export function AufgabeDialog(props: DialogProps) {
   return (
-    <FormularDialog titel={props.aufgabe ? "Aufgabe bearbeiten" : "Neue Aufgabe"} ausloeser={props.ausloeser}>
+    <FormularDialog titel={props.aufgabe ? "Aufgabe bearbeiten" : "Neue Aufgabe"} ausloeser={props.ausloeser} startOffen={props.startOffen}>
       {(s) => <AufgabeFormular {...props} s={s} />}
     </FormularDialog>
   );

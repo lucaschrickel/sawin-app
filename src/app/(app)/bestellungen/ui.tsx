@@ -25,7 +25,7 @@ export type BestellAuswahl = {
   lieferanten: { id: string; name: string }[];
   auftraege: { id: string; nummer: string; titel: string; kunde: string; nochNichtBestellt: string | null }[];
 };
-type Props = { auswahl: BestellAuswahl; bestellung?: Bestellung; vorlage?: { lieferantId?: string; auftragId?: string }; ausloeser?: ReactNode; heute: string };
+type Props = { auswahl: BestellAuswahl; bestellung?: Bestellung; vorlage?: { lieferantId?: string; auftragId?: string }; ausloeser?: ReactNode; heute: string; startOffen?: boolean };
 
 /** Bestellung anlegen oder bearbeiten; Positionen frei eingetippt, je Zeile ein Auftrag */
 export function BestellungDialog(p: Props) {
@@ -33,6 +33,7 @@ export function BestellungDialog(p: Props) {
     <FormularDialog
       titel={p.bestellung ? `Bestellung ${p.bestellung.nummer}` : "Neue Bestellung"}
       breit
+      startOffen={p.startOffen}
       ausloeser={
         p.ausloeser ??
         (p.bestellung ? (

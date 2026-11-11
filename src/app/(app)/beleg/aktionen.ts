@@ -5,7 +5,8 @@ import { pruefeSitzung } from "@/lib/auth/sitzung";
 import { pdfAblegen } from "@/lib/beleg-ablage";
 import { abrechnungAnwenden } from "@/lib/beleg-abrechnung";
 import { aufbereiten, meldung } from "@/lib/beleg-eingabe";
-import { LEXWARE_BELEGARTEN } from "@/lib/belege-status";
+import { BELEGART_TEXT, LEXWARE_BELEGARTEN } from "@/lib/belege-status";
+import { adressenLesen, versandDateiname } from "@/lib/versand";
 import { anLexwareUebertragen, lexwarePdfNachladen } from "@/lib/lexware/uebertragung";
 import { zahlstandHolen } from "@/lib/lexware/zahlungen";
 import type { EditorZustand } from "@/lib/beleg-typen";
@@ -217,4 +218,24 @@ export async function zahlungsstandAbrufen(id: string): Promise<Ergebnis> {
   }
   refresh();
   return { ok: true };
+}
+
+/**
+ * Vorläufiger Versand (CLAUDE.md „Versand in Version 1“): prüfen und protokollieren, bei Angebot und AB die Version
+ * einfrieren. Danach lädt der Browser das PDF herunter und öffnet Outlook per mailto.
+ */
+export async function belegVersenden(id: string, e: { an: string; bcc: string; betreff: string; text: string }): Promise<Ergebnis & { datei?: string; version?: number }> {
+  if (!UUID.test(id)) return { fehler: "Beleg nicht gefunden." };
+  const an = adressenLesen(kurz(e.an, 1000));
+  const bcc = adressenLesen(kurz(e.bcc, 1000));
+  if (!an?.length) return { fehler: "Bitte gültige Empfänger-Adressen angeben." };
+  if (!bcc) return { fehler: "Bitte eine gültige Adresse für die interne Kopie angeben oder das Feld leeren." };
+  const d = await ladeBeleg(id);
+  if (!d) return { fehler: "Beleg nicht gefunden." };
+  const datei = versandDateiname({ nummer: d.beleg.nummer, version: d.beleg.version, artText: BELEGART_TEXT[d.beleg.art], kunde: d.beleg.kunde?.name ?? d.beleg.adresse_name });
+  const { supabase } = await pruefeSitzung();
+  const { data, error } = await supabase.rpc("beleg_versenden", { p_id: id, p_empfaenger: an, p_bcc: bcc, p_betreff: kurz(e.betreff, 500), p_text: kurz(e.text, 5000), p_datei: datei });
+  if (error) return { fehler: meldung(error, "Der Versand konnte nicht vorbereitet werden.") };
+  refresh();
+  return { ok: true, datei, version: Number(data) };
 }

@@ -1,10 +1,11 @@
 "use client";
 
 import Link from "next/link";
-import { Bell, Menu, Plus, Search } from "lucide-react";
+import { Menu } from "lucide-react";
 import { useState, type ReactNode } from "react";
 import { Button } from "@/components/ui/button";
 import { Inaktivitaet } from "./inaktivitaet";
+import { Glocke, GlobaleSuche, NeuMenue } from "./kopfzeile";
 import type { Zaehler } from "./navigation";
 import { Seitenleiste } from "./seitenleiste";
 
@@ -24,7 +25,7 @@ type AppShellProps = {
   children: ReactNode;
 };
 
-/** App-Rahmen: dunkle Seitenleiste, helles Inhaltsfeld, Kopfzeile mit Suche. */
+/** App-Rahmen: dunkle Seitenleiste, helles Inhaltsfeld, Kopfzeile mit Suche, „Neu“-Menü und Glocke. */
 export function AppShell({ active, crumbs, brand, user, zaehler, eingeklappt, inaktivMinuten, lexware, children }: AppShellProps) {
   const [open, setOpen] = useState(false);
 
@@ -54,23 +55,10 @@ export function AppShell({ active, crumbs, brand, user, zaehler, eingeklappt, in
               ),
             )}
           </nav>
-          <form role="search" className="mx-auto flex h-[42px] max-w-[440px] flex-[1_1_240px] items-center gap-2 rounded-full border border-line bg-surface px-3.5 text-muted-2 max-[960px]:order-5 max-[960px]:max-w-none max-[960px]:basis-full">
-            <Search className="size-4" aria-hidden="true" />
-            <input
-              type="search"
-              aria-label="Globale Suche"
-              placeholder="Kunden, Aufträge, Belege suchen…"
-              className="min-w-0 flex-1 bg-transparent text-ink outline-none"
-            />
-          </form>
+          <GlobaleSuche />
           <div className="flex items-center gap-2.5">
-            <Button variant="accent">
-              <Plus className="size-[15px]" strokeWidth={2.2} />
-              Neu
-            </Button>
-            <Button size="icon" aria-label="Hinweise">
-              <Bell className="size-[17px]" />
-            </Button>
+            <NeuMenue />
+            <Glocke />
           </div>
         </header>
         <main className="mx-auto w-full max-w-[1360px] px-8 pt-2 pb-20 max-[960px]:px-4">{children}</main>

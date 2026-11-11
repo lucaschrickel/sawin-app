@@ -28,6 +28,8 @@ function Meldung({ e }: { e: Ergebnis }) {
 }
 
 type DialogProps = {
+  /** aus dem „Neu“-Menü: beim Laden offen */
+  startOffen?: boolean;
   ticket?: Ticket & { auftragInfo?: AuftragWahl | null };
   /** Vorbelegung (z. B. „Ticket“ am Auftrag oder Kunden) */
   vorlage?: { kunde?: { id: string; name: string }; auftrag?: AuftragWahl };
@@ -43,6 +45,7 @@ export function TicketDialog(p: DialogProps) {
     <FormularDialog
       titel={p.ticket ? `Ticket ${p.ticket.nummer}` : "Neues Service-Ticket"}
       breit
+      startOffen={p.startOffen}
       ausloeser={
         p.ausloeser ??
         (p.ticket ? (

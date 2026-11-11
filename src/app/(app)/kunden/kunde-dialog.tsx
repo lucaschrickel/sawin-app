@@ -1,6 +1,7 @@
 "use client";
 
 import { Pencil, Plus, X } from "lucide-react";
+import { neuParameterEntfernen } from "@/components/ui/formular-dialog";
 import { useActionState, useEffect, useRef, useState, type ReactNode } from "react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogTrigger } from "@/components/ui/dialog";
@@ -33,11 +34,13 @@ type Props = {
   onGespeichert?: () => void;
   /** eigener Auslöser statt der Standard-Knöpfe */
   ausloeser?: ReactNode;
+  /** aus dem „Neu“-Menü: beim Laden offen */
+  startOffen?: boolean;
 };
 
 /** Kunde anlegen oder bearbeiten (Kundenmaske als Dialog, auch für den Beleg-Editor gedacht). */
-export function KundeDialog({ kunde, lieferadressen = [], herkunftListe, onAngelegt, onGespeichert, ausloeser }: Props) {
-  const [offen, setOffen] = useState(false);
+export function KundeDialog({ kunde, lieferadressen = [], herkunftListe, onAngelegt, onGespeichert, ausloeser, startOffen }: Props) {
+  const [offen, setOffen] = useState(!!startOffen);
   const [geaendert, setGeaendert] = useState(false);
   const [nachfrage, setNachfrage] = useState(false);
   // Schlüssel erzwingt ein frisches Formular bei jedem Öffnen
@@ -47,6 +50,7 @@ export function KundeDialog({ kunde, lieferadressen = [], herkunftListe, onAngel
     setOffen(false);
     setGeaendert(false);
     setNachfrage(false);
+    if (startOffen) neuParameterEntfernen();
   };
   const oeffnenAendern = (o: boolean) => {
     if (o) {

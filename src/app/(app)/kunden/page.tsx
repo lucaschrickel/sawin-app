@@ -45,7 +45,7 @@ export default async function KundenPage({ searchParams }: PageProps<"/kunden">)
       <PageHeader
         title="Kunden"
         sub="Gepflegt in der App · an Lexware erst mit dem ersten Beleg"
-        actions={<KundeDialog herkunftListe={herkunftListe} />}
+        actions={<KundeDialog herkunftListe={herkunftListe} key={String(sp.neu ?? "")} startOffen={!!sp.neu} />}
       />
       <div className="rounded-lg border border-line-soft bg-surface">
         <div className="flex flex-wrap items-center gap-3 border-b border-line-soft px-4 py-3.5">

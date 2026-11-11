@@ -127,20 +127,33 @@ Eine Codebasis, je Kunde eine eigene Instanz. Diese Datei gilt für jede Arbeit 
   (z. B. Montage über zwei getrennte Tage, zweiter Trupp).
 - **Pipeline-Stufen** je Auftrag ohne Montagetermin: `stufe_datum` je Stufe (Lieferung, Abschlag bezahlt, Warten auf
   Kunde) und `warten_auf_kunde` (Boolean, von Hand). Die aktuelle Stufe wird abgeleitet, nicht gespeichert.
-- **E-Mail-Versand** über Microsoft Graph (`sendMail`) aus dem Postfach des Betriebs. Anhänge kommen aus OneDrive
+- **Versand in Version 1 (Entscheidung 11.11.2026):** Der Versand aus der App über Outlook (unten) kommt in
+  **Version 2**. In Version 1 hat jeder Beleg „PDF herunterladen“ (Dateiname `<Nummer>[_V<n>]_<Belegart>_<Kunde>.pdf`)
+  und „Versenden“: ein kurzer Dialog (Empfänger aus dem Kunden, interne Kopie aus `belegart_einstellung`, Betreff,
+  Text), danach lädt die App das PDF herunter und öffnet Outlook per `mailto`; den Anhang fügt das Büro selbst hinzu.
+  Bei Angebot und AB friert „Versenden“ die Version ein (wie „Als übergeben markieren“), jeder Versand steht in der
+  Historie. Rechnung, Abschlag und Gutschrift nur mit dem Lexware-Original-PDF.
+- **E-Mail-Versand (Version 2)** über Microsoft Graph (`sendMail`) aus dem Postfach des Betriebs. Anhänge kommen aus OneDrive
   oder vom Computer und werden zu frei gewählten **PDF-Gruppen** zusammengefasst (jede Gruppe ein PDF, serverseitig,
   z. B. `pdf-lib`). Lexware-PDFs (Rechnung, Abschlag, Gutschrift) bleiben immer ein eigenes, unverändertes PDF.
   Jeder Versand geht zusätzlich als **BCC an eine interne Adresse je Belegart** (Einstellung, Standard bei Sawin:
   Angebot → `angebot@sawin-be.de`, AB und Teil-AB → `auftrag@sawin-be.de`; Daten, kein fester Wert im Code).
   Jeder Versand wird in der Historie protokolliert (Empfänger, BCC, Betreff, PDFs mit Inhalt).
-- **OneDrive:** über Microsoft Graph.
-  - Auftragsordner `<AB-Nummer>_<Kunde>` mit sechs Unterordnern (`01 Angebot`, `02 Aufmaß`, `03 Bestellung`,
-    `04 Fotos`, `05 Montage`, `06 Rechnung`), angelegt beim Fertigstellen der AB.
-  - Anfragen haben keinen Ordner. Wird aus einer Anfrage ein Auftrag, legt die App die PDFs ihrer Angebote in
-    `01 Angebot` und ihr Aufmaßblatt in `02 Aufmaß` ab.
+- **OneDrive (Ablage, nur Dateien; Entscheidung 11.11.2026, Schema wie das bisherige Make-Szenario):** über
+  Microsoft Graph als Anwendung (Client-Credentials, keine Benutzeranmeldung, keine Mailrechte), Zugriff nur auf die
+  eine SharePoint-Bibliothek (`Lists.SelectedOperations.Selected`, sonst `Sites.Selected` für die eine Website).
+  Basisordner in den Einstellungen (Verbindungen) wählbar; Tests nur im Ordner `_App-Test`. Die App speichert nur die
+  Verknüpfung (Drive-ID, Item-ID), keine Kopie. Ist Microsoft nicht erreichbar, liegt die Datei im privaten
+  Supabase-Speicher als Zwischenspeicher und wird automatisch nachgeladen.
+  - Der Ordner entsteht mit dem **ersten Angebot** einer Anfrage: `<AG-Nummer>_<Kunde>`. Mit der AB wird **derselbe
+    Ordner** in `<AB-Nummer>_<Kunde>` umbenannt (Inhalt und ID bleiben). Ein AB ohne Angebot legt den Ordner als
+    `<AB-Nummer>_<Kunde>` an.
+  - Unterordner: `01 Anfrage`, `02 Angebot` (Angebots-PDFs, jede Version), `03 Aufmaß - Freigabe` (Aufmaßblatt),
+    `04 Auftrag` (Lieferscheine, Bestellungen, Montageprotokoll), `05 ABs` (AB, Teil-AB),
+    `06 Abnahme - Rechnung - Sonstiges` (Rechnungen, Abschläge, Gutschriften, Zahlungsbestätigungen,
+    Übergabeprotokoll). Scans und Dateien ordnet man beim Hochladen einem Unterordner zu.
   - Service-Tickets: mit Ursprungsauftrag als `07 Service/<Ticketnummer>` im Auftragsordner, sonst unter
     `Service/<Ticketnummer>_<Kunde>`.
-  - Formulare und Scans landen im passenden Unterordner (Aufmaß in `02 Aufmaß`, Protokolle in `05 Montage`).
 - **Bezug Auftrag oder Ticket:** Einsätze, Zeitbuchungen, Formulare, Chat, Aufgaben, Ordner und Rechnungen hängen
   entweder an einem Auftrag oder an einem Service-Ticket. Im Datenmodell zwei Fremdschlüssel (`auftrag_id`,
   `ticket_id`) mit CHECK-Constraint „genau einer gesetzt“, keine polymorphen Textverweise. RLS-Policies gelten für
@@ -460,7 +473,8 @@ Die Monteur-App kommt in Version 2.
   Rechnung und Abschlag mit offenem Betrag), Daten (bei Rechnungen mit allen Zahlungen), **Versionen** (bei
   Angebot und AB, mit „Als übergeben markieren“), Lexware- bzw. Ablage-Status, Tags, Kommentar. Von jedem Beleg führt ein Sprung zu Kunde, Anfrage, Auftrag bzw.
   Ticket und zu den anderen Belegen.
-- **Senden:** E-Mail-Dialog mit Empfänger (aus dem Kunden), interner Kopie (BCC, vorbelegt je Belegart, im Dialog
+- **Senden:** In Version 1 vorläufig per Download und `mailto` (siehe Architektur „Versand in Version 1“). Der folgende
+  Ablauf mit PDF-Gruppen kommt in **Version 2**: E-Mail-Dialog mit Empfänger (aus dem Kunden), interner Kopie (BCC, vorbelegt je Belegart, im Dialog
   änderbar oder leer), Betreff und Text. Bei Angebot und AB nennt der Dialog die Version und friert sie beim Senden
   ein. **Versand vorbereiten:** Auf der Belegseite steht direkt unter „Senden“ (oben rechts) die Vorauswahl der
   Anhänge als **PDF-Gruppen**: Jede Gruppe wird ein PDF (z. B. PDF 1 Angebot allein, PDF 2 AGB und
@@ -685,7 +699,7 @@ Die Monteur-App kommt in Version 2.
   Stundenraster der Plantafel, Bundesland für Feiertage, Urlaubsanspruch, weitere Ressourcen), **Belege & Artikel**
   (Gültigkeit Angebot, **Zahlungsbedingungen**, Artikelkatalog, Textvorlagen für alle Belegarten, **Versand**:
   Standard-PDF-Gruppen je Belegart aus Beleg, AGB, Widerrufsbelehrung, Pflegehinweisen, Aufmaßblatt und
-  Vorgängerbeleg), **Verbindungen** (Lexware, OneDrive, E-Mail, **interne Kopie (BCC) je Belegart**), **Darstellung**
+  Vorgängerbeleg; Version 2), **Verbindungen** (Lexware, OneDrive mit Basisordner, E-Mail „kommt mit Version 2“, **interne Kopie (BCC) je Belegart** für den vorläufigen Versand), **Darstellung**
   (**Farbschema Hell, Dunkel oder wie das System**, je Benutzer gemerkt; Seitenleiste hell oder dunkel).
 - **Artikelkatalog:** Bezeichnung (Kurztext), Einheit, Preis netto, formatierbare Beschreibung (wird als
   Positionsbeschreibung übernommen) und Stern „Schnellauswahl“ (Knopf im Beleg-Editor). Anlegen, bearbeiten,
@@ -855,7 +869,8 @@ Maßstab ist OWASP ASVS Level 1. Vor dem Start mit Echtdaten müssen alle Mindes
       (`npm run test:lexware`, 10.11.2026); offen: eine echte Bankzahlung in
       Lexware gebucht und abgeglichen
 - [ ] Nummernkreise der App-Belege mit Sawin abgestimmt (Startwerte je Belegart nach der Airtable-Übernahme)
-- [ ] E-Mail-Versand über Microsoft Graph mit Sawins Postfach getestet (PDF-Gruppen, BCC an angebot@/auftrag@, Protokoll)
+- [ ] OneDrive-Ablage mit Sawins Bibliothek getestet (nur die eine Bibliothek freigegeben, Ordner ab Angebot, Umbenennung mit der AB, Zwischenspeicher)
+- [ ] Vorläufiger Versand (Download, `mailto` mit BCC an angebot@/auftrag@) mit Sawins Outlook geprüft; Versand über Microsoft Graph folgt in Version 2
 - [ ] Steuerarten (Standard, § 13b, steuerfrei), Pflichtangaben auf Rechnungen und das Muster der
       Zahlungsbestätigung (ohne Umsatzsteuer) mit Sawins Steuerberater abgestimmt
 - [ ] Datenübernahme aus Airtable als Probelauf auf Staging durchgeführt und geprüft

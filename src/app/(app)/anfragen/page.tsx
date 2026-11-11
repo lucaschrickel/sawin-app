@@ -68,7 +68,7 @@ export default async function AnfragenPage({ searchParams }: PageProps<"/anfrage
               <Link replace href={href({ ansicht: "archiv", status: "" })} aria-current={archiv ? "true" : undefined} className={chip(archiv)}>Archiv</Link>
             </nav>
             {!archiv && <AnsichtUmschalter ansicht={ansicht} />}
-            <AnfrageDialog benutzer={benutzer} ichId={ich.id} herkunftListe={c.herkunft} produkteListe={c.produkte} />
+            <AnfrageDialog benutzer={benutzer} ichId={ich.id} herkunftListe={c.herkunft} produkteListe={c.produkte} key={String(sp.neu ?? "")} startOffen={!!sp.neu} />
           </>
         }
       />

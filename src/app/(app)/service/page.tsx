@@ -59,7 +59,7 @@ export default async function ServicePage({ searchParams }: PageProps<"/service"
         actions={
           <>
             <AnsichtUmschalter ansicht={ansicht} seite="service" />
-            <TicketDialog benutzer={benutzer} ichId={ich.id} herkunftListe={c.herkunft} />
+            <TicketDialog benutzer={benutzer} ichId={ich.id} herkunftListe={c.herkunft} key={String(sp.neu ?? "")} startOffen={!!sp.neu} />
           </>
         }
       />

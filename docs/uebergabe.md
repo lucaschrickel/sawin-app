@@ -97,6 +97,7 @@ APP_URL=http://localhost:3100 npm run test:aufgaben   # Modul Aufgaben
 APP_URL=http://localhost:3100 npm run test:auftraege  # Modul Aufträge
 APP_URL=http://localhost:3100 npm run test:montageplan # Modul Montageplan (Plantafel, echte Mausbewegungen)
 APP_URL=http://localhost:3100 npm run test:plantafel  # Kolonnen, Ressourcen, Pipeline, Duplizieren, Farbe, Sammelfreigabe, 4 Wochen, Wochenplan-PDF
+APP_URL=http://localhost:3100 npm run test:kopfzeile  # Globale Suche, Neu-Menü, Glocke, vorläufiger Versand (Download, mailto)
 APP_URL=http://localhost:3100 npm run test:mitarbeiter # Modul Mitarbeiter
 APP_URL=http://localhost:3100 npm run test:zeiten      # Modul Zeiterfassung
 APP_URL=http://localhost:3100 npm run test:abwesenheiten # Modul Abwesenheiten (Büro-Benutzer und Admin)

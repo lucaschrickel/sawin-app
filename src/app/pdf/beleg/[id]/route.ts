@@ -3,7 +3,8 @@ import { ladeBeleg } from "@/lib/belege";
 import { LEXWARE_BELEGARTEN } from "@/lib/belege-status";
 import { lexwarePdfNachladen } from "@/lib/lexware/uebertragung";
 import { pruefeSitzung } from "@/lib/auth/sitzung";
-import { pdfDateiname } from "@/lib/pdf/beleg-pdf";
+import { BELEGART_TEXT } from "@/lib/belege-status";
+import { versandDateiname } from "@/lib/versand";
 
 /**
  * PDF eines Belegs. Entwurf: frisch erzeugt mit Wasserzeichen „ENTWURF“. Fertiggestellt: das abgelegte Original
@@ -17,13 +18,15 @@ export async function GET(request: Request, ctx: RouteContext<"/pdf/beleg/[id]">
   if (!d) return new Response("Beleg nicht gefunden", { status: 404 });
 
   let pdf: Buffer | null = null;
-  let name = pdfDateiname(d.beleg);
+  const dateiname = (version: number) => versandDateiname({ nummer: d.beleg.nummer, version, artText: BELEGART_TEXT[d.beleg.art], kunde: d.beleg.kunde?.name ?? d.beleg.adresse_name });
+  let name = dateiname(d.beleg.version);
+  const herunterladen = !!url.searchParams.get("download");
   const version = Number(url.searchParams.get("version"));
   if (version && version !== d.beleg.version) {
     const v = d.versionen.find((x) => x.version === version);
     if (!v?.pdf_pfad) return new Response("Version nicht gefunden", { status: 404 });
     pdf = await pdfLaden(v.pdf_pfad);
-    name = pdfDateiname({ ...d.beleg, version });
+    name = dateiname(version);
   } else if (d.beleg.status === "entwurf") {
     pdf = await erzeugePdf(druckDaten(d), true);
   } else if (LEXWARE_BELEGARTEN.includes(d.beleg.art)) {
@@ -36,6 +39,8 @@ export async function GET(request: Request, ctx: RouteContext<"/pdf/beleg/[id]">
         // Lexware gerade nicht erreichbar: Vorschau der App mit Wasserzeichen
       }
     }
+    // Versendet und heruntergeladen wird nur das Original von Lexware, nie die Vorschau
+    if (!pdf && herunterladen) return new Response("Das Original-PDF von Lexware liegt noch nicht vor.", { status: 409 });
     if (!pdf) pdf = await erzeugePdf(druckDaten(d), true);
   } else {
     if (d.beleg.pdf_pfad) pdf = await pdfLaden(d.beleg.pdf_pfad);
@@ -46,7 +51,7 @@ export async function GET(request: Request, ctx: RouteContext<"/pdf/beleg/[id]">
     }
   }
   if (!pdf) return new Response("PDF nicht verfügbar", { status: 404 });
-  const art = url.searchParams.get("download") ? "attachment" : "inline";
+  const art = herunterladen ? "attachment" : "inline";
   return new Response(new Uint8Array(pdf), {
     headers: {
       "Content-Type": "application/pdf",

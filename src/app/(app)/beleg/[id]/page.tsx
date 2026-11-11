@@ -8,7 +8,9 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { getCustomer } from "@/customers";
 import { STEUERART_TEXT } from "@/lib/beleg-typen";
-import { belegZuEingabe, heuteBerlin, ladeAbrechnung, ladeArtikel, ladeBeleg, ladeBelegTags, ladeKundeFuerBeleg, ladeTextvorlagen, ladeZahlungsbedingungen } from "@/lib/belege";
+import { pruefeSitzung } from "@/lib/auth/sitzung";
+import { belegZuEingabe, heuteBerlin, ladeAbrechnung, ladeArtikel, ladeBeleg, ladeBelegTags, ladeFirma, ladeKundeFuerBeleg, ladeTextvorlagen, ladeZahlungsbedingungen } from "@/lib/belege";
+import { versandDateiname, versandVorlage } from "@/lib/versand";
 import { anzeigeStatus, bearbeitbar, BELEGART_TEXT, belegSchritte, LEXWARE_BELEGARTEN } from "@/lib/belege-status";
 import { eur } from "@/lib/format";
 import { tag, zeitpunkt } from "@/lib/zeit";
@@ -18,6 +20,7 @@ import { ZAHLUNGSART_TEXT } from "@/lib/belege";
 import { AKTIV, LISTE } from "../navigation";
 import { ZahlungenKarte } from "../zahlungen";
 import { AngebotZuruecksetzen, KettenLeiste, LexwarePdfKnopf, SchrittKnoepfe, TagsKommentar, UebergebenKnopf } from "../ui";
+import { VersendenDialog } from "../versand";
 
 export const metadata: Metadata = { title: "Beleg" };
 
@@ -64,7 +67,13 @@ export default async function BelegPage({ params }: PageProps<"/beleg/[id]">) {
   const status = anzeigeStatus(b, d.kette, heute);
   const schritte = belegSchritte(b, d.kette, d.zahlungen);
   const aenderbar = bearbeitbar(b, d.kette);
-  const tags = await ladeBelegTags();
+  const { supabase } = await pruefeSitzung();
+  const [tags, firma, { data: kundeMail }, { data: kopie }] = await Promise.all([
+    ladeBelegTags(),
+    ladeFirma(),
+    b.kunde ? supabase.from("kunde").select("email").eq("id", b.kunde.id).maybeSingle<{ email: string | null }>() : Promise.resolve({ data: null }),
+    supabase.from("belegart_einstellung").select("bcc_email").eq("belegart", b.art).maybeSingle<{ bcc_email: string | null }>(),
+  ]);
   const pdf = `/pdf/beleg/${b.id}`;
   const versionierbar = b.art === "angebot" || b.art === "auftragsbestaetigung";
   const abgelaufen = b.art === "angebot" && b.status === "offen" && b.gueltig_bis && b.gueltig_bis < heute;
@@ -72,6 +81,10 @@ export default async function BelegPage({ params }: PageProps<"/beleg/[id]">) {
   const mitZahlungen = b.art === "rechnung" || b.art === "abschlagsrechnung";
   // Zahlungsstand aus Lexware im Hintergrund abgleichen (höchstens alle 5 Minuten)
   if (lexArt) await zahlungenImHintergrund();
+  // Vorläufiger Versand: Rechnung, Abschlag, Gutschrift nur mit dem Original von Lexware
+  const versandGesperrt = lexArt && !b.pdf_pfad ? "Das Original-PDF von Lexware liegt noch nicht vor." : null;
+  const dateiname = versandDateiname({ nummer: b.nummer, version: b.version, artText: BELEGART_TEXT[b.art], kunde: b.kunde?.name ?? b.adresse_name });
+  const rechnungZurZb = b.art === "zahlungsbestaetigung" ? d.kette.find((x) => x.id === b.vorgaenger_id) : undefined;
   const ueberfaellig = lexArt && b.art !== "gutschrift" && b.status === "offen" && (b.offen_betrag ?? 0) > 0 && !!b.faellig_am && b.faellig_am < heute;
 
   return (
@@ -133,11 +146,37 @@ export default async function BelegPage({ params }: PageProps<"/beleg/[id]">) {
                   <ExternalLink className="size-4" /> {lexArt ? "Lexware-PDF öffnen" : "Vorschau / Drucken"}
                 </a>
               </Button>
-              <Button asChild>
-                <a href={`${pdf}?download=1`} download>
-                  <Download className="size-4" /> PDF herunterladen
-                </a>
-              </Button>
+              {versandGesperrt ? (
+                <>
+                  <Button disabled title={versandGesperrt} data-aktion="herunterladen">
+                    <Download className="size-4" /> PDF herunterladen
+                  </Button>
+                  <Button disabled title={versandGesperrt} data-aktion="versenden">
+                    Versenden
+                  </Button>
+                  <p className="text-xs text-muted-2">{versandGesperrt} Versendet wird nur das Lexware-PDF.</p>
+                </>
+              ) : (
+                <>
+                  <VersendenDialog
+                    belegId={b.id}
+                    pdf={pdf}
+                    dateiname={dateiname}
+                    version={versionierbar ? b.version : null}
+                    vorlage={{
+                      an: kundeMail?.email ?? "",
+                      bcc: kopie?.bcc_email ?? "",
+                      ...versandVorlage({ art: b.art, artText: BELEGART_TEXT[b.art], nummer: b.nummer, datum: b.datum, bauvorhaben: b.bauvorhaben, firma: firma.firma_name, version: b.version }),
+                    }}
+                    zusatz={rechnungZurZb ? { text: `${BELEGART_TEXT[rechnungZurZb.art]} ${rechnungZurZb.nummer ?? ""} herunterladen`, href: `/pdf/beleg/${rechnungZurZb.id}?download=1` } : null}
+                  />
+                  <Button asChild>
+                    <a href={`${pdf}?download=1`} download data-aktion="herunterladen">
+                      <Download className="size-4" /> PDF herunterladen
+                    </a>
+                  </Button>
+                </>
+              )}
               {!lexArt && b.art !== "zahlungsbestaetigung" && (
                 <Button asChild variant="ghost">
                   <Link href={`/beleg/neu?art=${b.art}&kopie=${b.id}`}>
