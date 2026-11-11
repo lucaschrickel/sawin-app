@@ -1,6 +1,6 @@
 # Stand der App
 
-Stand: 11.11.2026, nach Versand (vorläufig), Kopfzeile und OneDrive-Ablage. Vergleich mit dem Klick-Prototyp
+Stand: 12.11.2026, nach Formulare & Protokolle. Vergleich mit dem Klick-Prototyp
 (`docs/demo/sawin-demo.html`) und `CLAUDE.md`. Wird nach jedem größeren Block aktualisiert.
 
 **Entscheidungen 11.11.2026:**
@@ -23,7 +23,7 @@ Stand: 11.11.2026, nach Versand (vorläufig), Kopfzeile und OneDrive-Ablage. Ver
 | Aufgaben | Meine/Alle, Gruppen, Abhaken, Bezug | fertig | |
 | Kunden | Stammdaten, Lieferadressen (Alt), Konditionen, § 13b | fertig | |
 | Anfragen | Liste/Board, Varianten, Archiv, Verloren, Nachtrag, Termine, OneDrive-Ordner | fertig | |
-| Anfragen | Aufmaßblatt | fehlt | Karte ist Platzhalter (Formulare) |
+| Anfragen | Aufmaßblatt | fertig | Karte mit Aufmaßen, „In Angebot übernehmen“; nach der AB Verweis auf den Auftrag |
 | Belege | Editor, Nummernkreise, Ketten, Versionen, „Als übergeben markieren“, Duplizieren | fertig | |
 | Belege | Lexware: Rechnung, Abschläge, Schlussrechnung (centgenau), Gutschrift, Ticket-Rechnung | fertig | |
 | Belege | Teil-AB, Lieferschein, Teilrechnung | fertig | |
@@ -34,14 +34,15 @@ Stand: 11.11.2026, nach Versand (vorläufig), Kopfzeile und OneDrive-Ablage. Ver
 | Belege | Versand per Outlook aus der App, PDF-Gruppen, Versandprotokoll mit Anhängen | verschoben auf V2 | Entscheidung 11.11.2026 |
 | Aufträge | Liste mit AB-Vorschau, Board, Phasen, Prüfhinweis, Reklamation, Ware eingetroffen | fertig | |
 | Aufträge | Karte „OneDrive-Ordner“ (Link, Dateien, Upload) | fertig | |
-| Aufträge | Reiter Chat, Formulare & Protokolle | fehlt | nur Übersicht und Historie |
+| Aufträge | Reiter Formulare & Protokolle | fertig | auch am Ticket |
+| Aufträge | Reiter Chat | fehlt | Tabellen vorhanden |
 | Service | Tickets, Board, Service-Plan „Terminierbar“, Rechnung am Ticket, OneDrive-Ordner | fertig | |
 | Montageplan | Plantafel komplett, Wochenplan-PDF | fertig | |
 | Team | Kalender, Mitarbeiter, Fahrzeuge, Zeiterfassung, Abwesenheiten | fertig | |
 | Einkauf | Lieferanten (Konditionen), Bestellungen | fertig | |
 | Ablage | OneDrive über Microsoft Graph: Ordner ab Angebot, Umbenennen mit der AB, Beleg-PDFs, Upload, Zwischenspeicher, Nachladen | fertig | mit Sawins Bibliothek „Kundenprojekte“ im Ordner `_App-Test` getestet (11.11.2026, localhost); auf Vercel mit dem Deployment |
 | Kommunikation | Chat je Auftrag und Ticket | fehlt | Tabellen vorhanden |
-| Formulare | Aufmaßblatt digital, Protokolle (PDF, Scan) | fehlt | Ablage für Scans steht bereit (Upload in den Unterordner) |
+| Formulare | Aufmaßblatt digital (automatisch speichern, Abschließen/Wieder öffnen, PDF nach „03 Aufmaß - Freigabe“, Nachtragsangebot am Auftrag), Montageprotokoll, Servicebericht, Übergabeprotokoll (Vorlage drucken, Scan hochladen) | fertig | Checklisten je Produkt aus der Konfiguration (Startwerte aus der Demo, mit Sawin abstimmen) |
 | Einstellungen | Firma, Benutzer, Montageplan, Belege & Artikel | fertig | |
 | Einstellungen | Verbindungen (Lexware, OneDrive, E-Mail mit BCC je Belegart) | fertig | |
 | Einstellungen | Versand (Standard-PDF-Gruppen) | verschoben auf V2 | hängt am Outlook-Versand |
@@ -94,7 +95,12 @@ Stand: 11.11.2026, nach Versand (vorläufig), Kopfzeile und OneDrive-Ablage. Ver
 
 - `npm run lint`, `npx tsc --noEmit`, `npm run build`: ohne Fehler. `npm audit --omit=dev`: 0 Befunde.
 - Next.js-Fehlerliste des Dev-Servers: leer (geprüft nach Block 3).
-- Unit 86/86, RLS 85/85. Browser-Tests zuletzt grün: onedrive 24/24 (nachgebauter Graph-Server), kopfzeile 24/24,
+- Unit 96/96, RLS 89/89. Browser-Tests 12.11.2026: formulare 40/40, anfragen 28/28, auftraege 28/28, service 26/26,
+  belege 46/46, plantafel 39/39, onedrive 24/24.
+- Bekannt: Beleg-PDFs zeigen keine Seitenzahl („Seite n von m“). react-pdf 4 rendert render-Texte nicht, solange die
+  Seite eine lineHeight hat; Umbau (lineHeight je Block statt an der Seite) ändert das geprüfte Schriftbild, deshalb
+  noch offen. Fußzeilen von Wochenplan und Formularen waren aus demselben Grund leer und sind behoben.
+- Ältere Läufe: Unit 86/86, RLS 85/85. Browser-Tests zuletzt grün: onedrive 24/24 (nachgebauter Graph-Server), kopfzeile 24/24,
   plantafel 39/39, montageplan 33/33, belege 46/46, lexware 51/51, zahlungen 16/16, katalog 14/14, kunden 28/28,
   anfragen 28/28, aufgaben 19/19, service 26/26, einkauf 30/30, dashboard 23/23, auftraege 28/28, team 26/26.
 - Bekannt: Vercel-Crons laufen nur für Production und öfter als täglich erst ab dem Pro-Tarif. Serverfunktionen auf

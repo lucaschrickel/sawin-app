@@ -154,7 +154,6 @@ function WochenplanDokument({ plan, logo, stand }: { plan: Wochenplan; logo: Log
 
         <View style={st.fuss} fixed>
           <Text>Stand {stand} · Änderungen meldet das Büro telefonisch.</Text>
-          <Text render={({ pageNumber, totalPages }) => `Seite ${pageNumber} von ${totalPages}`} />
         </View>
       </Page>
     </Document>

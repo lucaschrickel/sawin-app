@@ -136,6 +136,10 @@ after(async () => {
         await db.query("delete from public.beleg_versand where beleg_id = $1", [id]);
         await db.query("update public.beleg set vorgaenger_id = null where vorgaenger_id = $1", [id]);
       }
+      if (tabelle === "formular") {
+        await db.query("delete from public.aufmass_zeile where formular_id = $1", [id]);
+        await db.query("delete from public.ablage_datei where formular_id = $1", [id]);
+      }
       await db.query(`delete from public.${pg.escapeIdentifier(tabelle)} where id = $1`, [id]);
     }
     await db.query("commit");
@@ -1309,6 +1313,93 @@ describe("Lexware-Webhook (Eingangsprotokoll)", () => {
     assert.equal(a.versuche, 4);
     assert.ok(a.verarbeitet_am);
     assert.equal(a.fehler, null);
+  });
+});
+
+describe("Formulare & Protokolle", () => {
+  const zeile = (id, teil = {}) => ({ id, raum: "Küche", element: "Fenster", breite_mm: "1230", hoehe_mm: "1480", anzahl: "2", anschlag: "DIN links", bemerkung: "", ...teil });
+
+  it("Aufmaß speichern: Zeilen anlegen, ändern, entfernte nur markieren, Werte geprüft, unveränderte nicht geschrieben", async () => {
+    const { data: f, error } = await buero.client.from("formular").insert({ typ: "aufmass", status: "entwurf", auftrag_id: daten.auftrag.id }).select().single();
+    assert.ifError(error);
+    angelegt.push(["formular", f.id]);
+    const z1 = randomUUID();
+    const z2 = randomUUID();
+    let r = await buero.client.rpc("aufmass_speichern", {
+      p_id: f.id,
+      p_datum: "2026-11-12",
+      p_hinweise: "  Zugang Garten ",
+      p_zeilen: [zeile(z1), zeile(z2, { raum: "Bad", breite_mm: "0", hoehe_mm: "abc", anzahl: "", bemerkung: "x" })],
+    });
+    assert.ifError(r.error);
+    const { data: zeilen } = await service.from("aufmass_zeile").select("id, reihenfolge, raum, breite_mm, hoehe_mm, anzahl, bemerkung, created_by").eq("formular_id", f.id).order("reihenfolge");
+    assert.equal(zeilen.length, 2);
+    assert.deepEqual([zeilen[0].breite_mm, zeilen[0].hoehe_mm, zeilen[0].anzahl, zeilen[0].bemerkung], [1230, 1480, 2, null]);
+    assert.deepEqual([zeilen[1].breite_mm, zeilen[1].hoehe_mm, zeilen[1].anzahl], [null, null, 1], "ungültige Maße übernommen");
+    assert.equal(zeilen[0].created_by, buero.id, "handelnder Benutzer fehlt");
+    const { data: kopf } = await service.from("formular").select("hinweise, datum").eq("id", f.id).single();
+    assert.deepEqual([kopf.hinweise, kopf.datum], ["Zugang Garten", "2026-11-12"]);
+
+    // zweite Speicherung: z2 fehlt (wird markiert), z1 geändert
+    r = await buero.client.rpc("aufmass_speichern", { p_id: f.id, p_datum: null, p_hinweise: "Zugang Garten", p_zeilen: [zeile(z1, { raum: "Wohnen" })] });
+    assert.ifError(r.error);
+    const { data: weg } = await service.from("aufmass_zeile").select("deleted_at").eq("id", z2).single();
+    assert.ok(weg.deleted_at, "entfernte Zeile nicht markiert");
+    const { data: sichtbar } = await buero.client.from("aufmass_zeile").select("raum").eq("formular_id", f.id);
+    assert.deepEqual(sichtbar.map((x) => x.raum), ["Wohnen"]);
+    const vorher = (await buero.client.rpc("historie", { p_tabelle: "aufmass_zeile", p_id: z1 })).data.length;
+    r = await buero.client.rpc("aufmass_speichern", { p_id: f.id, p_datum: null, p_hinweise: "Zugang Garten", p_zeilen: [zeile(z1, { raum: "Wohnen" })] });
+    assert.ifError(r.error);
+    assert.equal((await buero.client.rpc("historie", { p_tabelle: "aufmass_zeile", p_id: z1 })).data.length, vorher, "unveränderte Zeile neu geschrieben");
+
+    // nicht angemeldet bzw. ohne MFA nichts
+    assert.ok((await anon.rpc("aufmass_speichern", { p_id: f.id, p_datum: null, p_hinweise: "", p_zeilen: [] })).error);
+    assert.ok((await ohneMfa.client.rpc("aufmass_speichern", { p_id: f.id, p_datum: null, p_hinweise: "", p_zeilen: [] })).error);
+  });
+
+  it("Abgeschlossenes Aufmaß ist gesperrt, bis es wieder geöffnet wird; Art und Bezug bleiben", async () => {
+    const { data: f } = await buero.client.from("formular").insert({ typ: "aufmass", status: "entwurf", auftrag_id: daten.auftrag.id }).select().single();
+    angelegt.push(["formular", f.id]);
+    const z = randomUUID();
+    assert.ifError((await buero.client.rpc("aufmass_speichern", { p_id: f.id, p_datum: null, p_hinweise: "", p_zeilen: [zeile(z)] })).error);
+    assert.ifError((await buero.client.from("formular").update({ status: "abgeschlossen" }).eq("id", f.id)).error);
+    const r = await buero.client.rpc("aufmass_speichern", { p_id: f.id, p_datum: null, p_hinweise: "", p_zeilen: [zeile(z, { raum: "x" })] });
+    assert.match(r.error?.message ?? "", /abgeschlossen/);
+    assert.ok((await buero.client.from("aufmass_zeile").update({ raum: "x" }).eq("id", z).select("id")).error, "Zeile direkt änderbar");
+    assert.ok((await buero.client.from("aufmass_zeile").insert({ formular_id: f.id, element: "Tür" })).error, "Zeile direkt anlegbar");
+    assert.ok((await buero.client.from("formular").update({ hinweise: "neu" }).eq("id", f.id).select("id")).error, "Kopf änderbar");
+    assert.ok((await buero.client.from("formular").update({ typ: "montageprotokoll", status: "gedruckt" }).eq("id", f.id).select("id")).error, "Art änderbar");
+    assert.ok((await buero.client.from("formular").update({ auftrag_id: null, anfrage_id: daten.anfrage.id }).eq("id", f.id).select("id")).error, "Bezug änderbar");
+    assert.ifError((await buero.client.from("formular").update({ status: "entwurf" }).eq("id", f.id)).error);
+    assert.ifError((await buero.client.rpc("aufmass_speichern", { p_id: f.id, p_datum: null, p_hinweise: "", p_zeilen: [zeile(z, { raum: "Flur" })] })).error);
+  });
+
+  it("Protokolle: nicht an der Anfrage; „Gedruckt“ → „Scan abgelegt“, nicht zurück", async () => {
+    const { data: p, error } = await buero.client.from("formular").insert({ typ: "montageprotokoll", status: "gedruckt", auftrag_id: daten.auftrag.id }).select().single();
+    assert.ifError(error);
+    angelegt.push(["formular", p.id]);
+    assert.ok((await buero.client.from("formular").insert({ typ: "uebergabeprotokoll", status: "gedruckt", anfrage_id: daten.anfrage.id }).select()).error, "Protokoll an einer Anfrage");
+    assert.ok((await buero.client.from("formular").insert({ typ: "servicebericht", status: "entwurf", auftrag_id: daten.auftrag.id }).select()).error, "Protokoll im Entwurf");
+    assert.ifError((await buero.client.from("formular").update({ status: "scan_abgelegt" }).eq("id", p.id)).error);
+    assert.ok((await buero.client.from("formular").update({ status: "gedruckt" }).eq("id", p.id).select("id")).error, "zurück auf Gedruckt");
+    // Scan in der Ablage mit Verweis auf das Formular (nur über den Server)
+    const { data: oid } = await service.rpc("ablage_ordner_setzen", { p_benutzer: buero.id, p_id: null, p_daten: { auftrag_id: daten.auftrag.id, name: `AB_${lauf}`, status: "wartet" } });
+    angelegt.push(["ablage_ordner", oid]);
+    const { data: did, error: e2 } = await service.rpc("ablage_datei_setzen", { p_benutzer: buero.id, p_id: null, p_daten: { ordner_id: oid, name: "Scan.pdf", quelle: "upload", formular_id: p.id, status: "wartet" } });
+    assert.ifError(e2);
+    angelegt.push(["ablage_datei", did]);
+    const { data: d } = await buero.client.from("ablage_datei").select("formular_id").eq("id", did).single();
+    assert.equal(d.formular_id, p.id);
+  });
+
+  it("Mit dem Auftrag wandert das Aufmaß der Anfrage in den Auftrag", async () => {
+    const anfrage = await svcInsert("anfrage", { titel: `Formular ${lauf}`, kunde_id: daten.kunde.id });
+    const { data: f } = await buero.client.from("formular").insert({ typ: "aufmass", status: "abgeschlossen", anfrage_id: anfrage.id }).select().single();
+    angelegt.push(["formular", f.id]);
+    const auftrag = await svcInsert("auftrag", { nummer: `TESTF-${lauf}`, kunde_id: daten.kunde.id, anfrage_id: anfrage.id, titel: "Test" });
+    angelegt.push(["formular", f.id]); // vor dem Auftrag entfernen
+    const { data: neu } = await service.from("formular").select("anfrage_id, auftrag_id").eq("id", f.id).single();
+    assert.deepEqual([neu.anfrage_id, neu.auftrag_id], [null, auftrag.id]);
   });
 });
 

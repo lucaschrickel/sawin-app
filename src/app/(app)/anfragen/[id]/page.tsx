@@ -24,6 +24,7 @@ import { Plus } from "lucide-react";
 import { BelegeKompakt } from "../../beleg/kompakt";
 import { SchrittKnoepfe } from "../../beleg/ui";
 
+import { AufmassKarte } from "../../formulare/karte";
 export const metadata: Metadata = { title: "Anfrage" };
 
 export default async function AnfragePage({ params }: PageProps<"/anfragen/[id]">) {
@@ -124,9 +125,7 @@ export default async function AnfragePage({ params }: PageProps<"/anfragen/[id]"
               <p className="text-sm text-muted">{auftrag ? "Die Angebote sind mit dem Auftrag in dessen Belegkette gewandert." : "Noch keine Angebote."}</p>
             )}
           </Karte>
-          <Karte titel="Aufmaßblatt">
-            <p className="text-sm text-muted">Noch kein Aufmaß. Das digitale Aufmaßblatt kommt mit dem Modul Formulare.</p>
-          </Karte>
+          <AufmassKarte anfrageId={a.id} archiviert={!!a.archiv} auftrag={auftrag ? { id: auftrag.id, nummer: auftrag.nummer } : null} termin={a.aufmass_termin ? zeitpunkt(a.aufmass_termin) : null} />
           <Karte titel="Historie">
             <NotizFormular anfrageId={a.id} />
             <ol className="mt-4 flex flex-col">

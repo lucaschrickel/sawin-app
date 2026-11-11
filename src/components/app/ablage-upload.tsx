@@ -12,6 +12,29 @@ const bezugFelder = (fd: FormData, b: Bezug) => {
 };
 
 /**
+ * Datei hochladen: Upload-Adresse vom Server, Datei direkt in den privaten Zwischenspeicher, danach prüft der Server
+ * Typ und Größe und überträgt nach OneDrive. felder: Bezug und Unterordner bzw. formular_id (Scan eines Protokolls).
+ */
+export async function dateiHochladen(f: File, felder: Record<string, string>): Promise<{ fehler?: string; hinweis?: string }> {
+  const fd = new FormData();
+  for (const [k, v] of Object.entries(felder)) if (v) fd.set(k, v);
+  fd.set("name", f.name);
+  fd.set("groesse", String(f.size));
+  const v = await uploadVorbereitenAktion(fd);
+  if (!v.ok || !v.url || !v.id) return { fehler: v.fehler ?? "Upload nicht möglich." };
+  const body = new FormData();
+  body.append("cacheControl", "3600");
+  body.append("", f);
+  const antwort = await fetch(v.url, { method: "PUT", body, headers: { "x-upsert": "true" } }).catch(() => null);
+  if (!antwort?.ok) {
+    await uploadAbschliessenAktion(v.id); // verwirft die unvollständige Datei
+    return { fehler: "Die Datei konnte nicht hochgeladen werden. Bitte erneut versuchen." };
+  }
+  const r = await uploadAbschliessenAktion(v.id);
+  return r.fehler ? { fehler: r.fehler } : { hinweis: r.hinweis };
+}
+
+/**
  * Upload in drei Schritten: Upload-Adresse vom Server, Datei direkt in den privaten Zwischenspeicher (auch große
  * Scans), danach prüft der Server Typ und Größe und überträgt nach OneDrive.
  */
@@ -26,22 +49,7 @@ export function AblageUpload({ bezug, unterordner }: { bezug: Bezug; unterordner
       const f = datei.current?.files?.[0];
       if (!f) return setMeldung({ fehler: "Bitte eine Datei wählen." });
       setMeldung({});
-      const fd = new FormData();
-      bezugFelder(fd, bezug);
-      fd.set("name", f.name);
-      fd.set("groesse", String(f.size));
-      fd.set("unterordner", ordner);
-      const v = await uploadVorbereitenAktion(fd);
-      if (!v.ok || !v.url || !v.id) return setMeldung({ fehler: v.fehler ?? "Upload nicht möglich." });
-      const body = new FormData();
-      body.append("cacheControl", "3600");
-      body.append("", f);
-      const antwort = await fetch(v.url, { method: "PUT", body, headers: { "x-upsert": "true" } }).catch(() => null);
-      if (!antwort?.ok) {
-        await uploadAbschliessenAktion(v.id); // verwirft die unvollständige Datei
-        return setMeldung({ fehler: "Die Datei konnte nicht hochgeladen werden. Bitte erneut versuchen." });
-      }
-      const r = await uploadAbschliessenAktion(v.id);
+      const r = await dateiHochladen(f, { ...(bezug as Record<string, string>), unterordner: ordner });
       if (r.fehler) return setMeldung({ fehler: r.fehler });
       setMeldung({ ok: r.hinweis });
       if (datei.current) datei.current.value = "";

@@ -15,7 +15,7 @@ const eins = (v: string | string[] | undefined) => (Array.isArray(v) ? v[0] : v)
 export default async function NeuerBelegPage({ searchParams }: PageProps<"/beleg/neu">) {
   const sp = await searchParams;
   const art = (EDITOR_BELEGARTEN as string[]).includes(eins(sp.art) ?? "") ? (eins(sp.art) as Belegart) : "angebot";
-  const p = { art, vorgaenger: eins(sp.vorgaenger), anfrage: eins(sp.anfrage), auftrag: eins(sp.auftrag), ticket: eins(sp.ticket), kunde: eins(sp.kunde), kopie: eins(sp.kopie) };
+  const p = { art, vorgaenger: eins(sp.vorgaenger), anfrage: eins(sp.anfrage), auftrag: eins(sp.auftrag), ticket: eins(sp.ticket), kunde: eins(sp.kunde), kopie: eins(sp.kopie), aufmass: eins(sp.aufmass) };
   const [start, zahlungsbedingungen, tags, artikel, vorlagen] = await Promise.all([neuerBelegZustand(p), ladeZahlungsbedingungen(), ladeBelegTags(), ladeArtikel(), ladeTextvorlagen()]);
   const zurueck = p.vorgaenger
     ? { href: `/beleg/${p.vorgaenger}`, text: "Vorgängerbeleg" }

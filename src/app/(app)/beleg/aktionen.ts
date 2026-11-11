@@ -10,6 +10,7 @@ import { adressenLesen, versandDateiname } from "@/lib/versand";
 import { anLexwareUebertragen, lexwarePdfNachladen } from "@/lib/lexware/uebertragung";
 import { zahlstandHolen } from "@/lib/lexware/zahlungen";
 import { imHintergrund, ordnerFuer, ordnerZumAuftrag } from "@/lib/onedrive/ablage";
+import { aufmasseNachziehen } from "@/lib/formular-ablage";
 import type { EditorZustand } from "@/lib/beleg-typen";
 import { ladeBeleg, ladeKundeFuerBeleg, kundeVorbelegung, type KundeFuerBeleg } from "@/lib/belege";
 
@@ -38,7 +39,11 @@ export async function belegSpeichern(z: EditorZustand): Promise<Ergebnis> {
   if (d?.beleg.art === "angebot" && d.beleg.anfrage) {
     const { benutzer } = await pruefeSitzung();
     const anfrageId = d.beleg.anfrage.id;
-    imHintergrund(() => ordnerFuer({ anfrage_id: anfrageId }, benutzer.id), "Ordner zur Anfrage");
+    // abgeschlossene Aufmaßblätter der Anfrage warten auf den Ordner und werden danach abgelegt
+    imHintergrund(async () => {
+      await ordnerFuer({ anfrage_id: anfrageId }, benutzer.id);
+      await aufmasseNachziehen({ anfrage_id: anfrageId }, benutzer.id);
+    }, "Ordner zur Anfrage");
   }
   if (d && d.beleg.status !== "entwurf") {
     try {
@@ -80,7 +85,10 @@ export async function belegFertigstellen(z: EditorZustand): Promise<Ergebnis> {
   if (z.kopf.art === "auftragsbestaetigung" && erg.auftrag_id) {
     const { benutzer } = await pruefeSitzung();
     const auftragId = erg.auftrag_id;
-    imHintergrund(() => ordnerZumAuftrag(auftragId, benutzer.id), "Ordner zum Auftrag");
+    imHintergrund(async () => {
+      await ordnerZumAuftrag(auftragId, benutzer.id);
+      await aufmasseNachziehen({ auftrag_id: auftragId }, benutzer.id);
+    }, "Ordner zum Auftrag");
   }
   return { ok: true, id: r.id, nummer: erg.nummer, auftragId: erg.auftrag_id, hinweis };
 }

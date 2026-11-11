@@ -2,6 +2,8 @@ import "server-only";
 import { pruefeSitzung } from "@/lib/auth/sitzung";
 import type { Kunde, Lieferadresse } from "@/lib/kunden";
 import { heuteBerlin } from "@/lib/zeit";
+import { getCustomer } from "@/customers";
+import { aufmassZuPositionen } from "./formular-logik";
 import { leerePosition, neuerSchluessel, STANDARD_TEXTE, type EditorZustand, type KopfEingabe, type PositionEingabe } from "./beleg-typen";
 import { BELEGART_TEXT, ketteSortiert, type Belegart, type BelegKurz } from "./belege-status";
 import { belegSummen, type Steuerart } from "./beleg-summen";
@@ -450,7 +452,7 @@ export function abzugZeilen(k: AbrechnungKontext): PositionEingabe[] {
 
 const plusTage = (iso: string, n: number) => new Date(Date.parse(`${iso}T12:00:00Z`) + n * 864e5).toISOString().slice(0, 10);
 
-export type NeuParameter = { art: Belegart; vorgaenger?: string; anfrage?: string; auftrag?: string; ticket?: string; kunde?: string; kopie?: string };
+export type NeuParameter = { art: Belegart; vorgaenger?: string; anfrage?: string; auftrag?: string; ticket?: string; kunde?: string; kopie?: string; aufmass?: string };
 
 /**
  * Neuer Beleg: Vorbelegung aus Vorgänger (Kette: Positionen und Texte), Anfrage, Auftrag oder Kunde,
@@ -684,6 +686,18 @@ export async function neuerBelegZustand(p: NeuParameter): Promise<{ zustand: Edi
       if (p.vorgaenger) Object.assign(kopf, { kunde_id: vor.kunde_id, kunde_name: vor.kunde_name, kunde_nummer: vor.kunde_nummer });
       else Object.assign(kopf, { ...vor, objekt: kopf.objekt || vor.objekt });
     }
+  }
+  // „In Angebot übernehmen“ aus einem Aufmaßblatt: Elemente als Positionen (Preise aus dem Katalog, sonst leer)
+  if (p.aufmass && p.art === "angebot" && !p.vorgaenger) {
+    const [{ data: f }, { data: zeilen }, katalog] = await Promise.all([
+      supabase.from("formular").select("id, datum").eq("id", p.aufmass).eq("typ", "aufmass").maybeSingle(),
+      supabase.from("aufmass_zeile").select("raum, element, breite_mm, hoehe_mm, anzahl, anschlag, bemerkung").eq("formular_id", p.aufmass).order("reihenfolge"),
+      ladeArtikel(),
+    ]);
+    if (!f) return { fehler: "Aufmaß nicht gefunden." };
+    positionen = aufmassZuPositionen(zeilen ?? [], katalog, getCustomer().aufmass, { brutto: kopf.preise_brutto, frei: kopf.steuerart !== "standard" });
+    kopf.kommentar_intern = `Positionen aus dem Aufmaß vom ${datumDe(f.datum)} übernommen. Preise prüfen.`;
+    hinweis = positionen.length ? `Positionen aus dem Aufmaß vom ${datumDe(f.datum)} übernommen. Bitte Preise prüfen.` : "Das Aufmaß enthält noch keine Elemente.";
   }
   if (!positionen.length && p.art !== "abschlagsrechnung") positionen = [leerePosition()];
   return { zustand: { kopf, positionen }, hinweis };

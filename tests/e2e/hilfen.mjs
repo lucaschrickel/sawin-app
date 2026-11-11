@@ -93,9 +93,23 @@ export async function ablageAufraeumen({ anfrage = [], auftrag = [], ticket = []
   if (ordner.length) await dbAbfrage("delete from public.ablage_ordner where id = any($1)", [ordner]);
 }
 
+/** Formulare (Aufmaßblätter mit Zeilen, Protokolle) zu Anfragen, Aufträgen, Tickets entfernen; vor ihren Vorgängen */
+export async function formulareAufraeumen({ anfrage = [], auftrag = [], ticket = [] }) {
+  if (!anfrage.length && !auftrag.length && !ticket.length) return;
+  const ids = (await dbAbfrage("select id from public.formular where anfrage_id = any($1) or auftrag_id = any($2) or ticket_id = any($3)", [anfrage, auftrag, ticket])).map((x) => x.id);
+  if (!ids.length) return;
+  const dateien = await dbAbfrage("select id, puffer_pfad from public.ablage_datei where formular_id = any($1)", [ids]);
+  const pfade = dateien.map((x) => x.puffer_pfad).filter(Boolean);
+  if (pfade.length) await service.storage.from("ablage-puffer").remove(pfade);
+  await dbAbfrage("delete from public.ablage_datei where formular_id = any($1)", [ids]);
+  await dbAbfrage("delete from public.aufmass_zeile where formular_id = any($1)", [ids]);
+  await dbAbfrage("delete from public.formular where id = any($1)", [ids]);
+}
+
 export async function aufraeumen() {
   const nach = (t) => zeilen.filter(([x]) => x === t).map(([, id]) => id);
   await ablageAufraeumen({ anfrage: nach("anfrage"), auftrag: nach("auftrag"), ticket: nach("service_ticket"), beleg: nach("beleg") }).catch((e) => console.error("Aufräumen Ablage:", e.message));
+  await formulareAufraeumen({ anfrage: nach("anfrage"), auftrag: nach("auftrag"), ticket: nach("service_ticket") }).catch((e) => console.error("Aufräumen Formulare:", e.message));
   const db = new pg.Client({ connectionString: DB_URL, ssl: { rejectUnauthorized: false } });
   await db.connect();
   try {
@@ -256,6 +270,7 @@ async function belegeAufraeumenEinmal(kundeId) {
   const auftraege = (await dbAbfrage("select id from public.auftrag where kunde_id = $1", [kundeId])).map((x) => x.id);
   const tickets = (await dbAbfrage("select id from public.service_ticket where kunde_id = $1", [kundeId])).map((x) => x.id);
   await ablageAufraeumen({ anfrage: anfragen, auftrag: auftraege, ticket: tickets, beleg: ids });
+  await formulareAufraeumen({ anfrage: anfragen, auftrag: auftraege, ticket: tickets });
   if (ids.length) {
     const pfade = (await dbAbfrage("select name from storage.objects where bucket_id = 'belege' and split_part(name, '/', 1) = any($1)", [ids])).map((x) => x.name);
     if (pfade.length) await service.storage.from("belege").remove(pfade);
@@ -263,6 +278,8 @@ async function belegeAufraeumenEinmal(kundeId) {
     await dbAbfrage("update public.beleg set vorgaenger_id = null where id = any($1)", [ids]);
     await dbAbfrage("delete from public.beleg where id = any($1)", [ids]);
   }
+  // Nachtragsanfragen ohne eigenen Auftrag verweisen auf den Ursprungsauftrag: zuerst entfernen
+  await dbAbfrage("delete from public.anfrage a where kunde_id = $1 and nachtrag_zu is not null and not exists (select 1 from public.auftrag x where x.anfrage_id = a.id)", [kundeId]);
   await dbAbfrage("delete from public.auftrag where kunde_id = $1 and not exists (select 1 from public.einsatz e where e.auftrag_id = auftrag.id) and not exists (select 1 from public.bestellzeile z where z.auftrag_id = auftrag.id)", [kundeId]);
   await dbAbfrage("delete from public.anfrage a where kunde_id = $1 and not exists (select 1 from public.auftrag x where x.anfrage_id = a.id)", [kundeId]);
 }

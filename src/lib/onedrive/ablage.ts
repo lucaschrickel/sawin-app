@@ -41,6 +41,7 @@ export type DateiZeile = {
   quelle: string;
   beleg_id: string | null;
   version: number | null;
+  formular_id: string | null;
   mime: string | null;
   groesse: number | null;
   item_id: string | null;
@@ -54,7 +55,7 @@ export type DateiZeile = {
 };
 
 const ORDNER_FELDER = "id, anfrage_id, auftrag_id, ticket_id, name, drive_id, item_id, web_url, unterordner, status, fehler";
-const DATEI_FELDER = "id, ordner_id, unterordner, name, quelle, beleg_id, version, mime, groesse, item_id, web_url, status, puffer_pfad, versuche, fehler, abgelegt_am, created_at";
+const DATEI_FELDER = "id, ordner_id, unterordner, name, quelle, beleg_id, version, formular_id, mime, groesse, item_id, web_url, status, puffer_pfad, versuche, fehler, abgelegt_am, created_at";
 const fehlerText = (e: unknown) => (e instanceof Error ? e.message : String(e)).slice(0, 500);
 
 async function ordnerSetzen(benutzer: string | null, id: string | null, daten: Record<string, unknown>) {
@@ -241,7 +242,18 @@ async function hochladen(driveId: string, elternId: string, name: string, inhalt
   return item;
 }
 
-type Ablegen = { bezug: Bezug; unterordner: string | null; name: string; inhalt: Buffer; mime: string; quelle: "beleg" | "upload" | "formular"; beleg_id?: string | null; version?: number | null };
+type Ablegen = {
+  bezug: Bezug;
+  unterordner: string | null;
+  name: string;
+  inhalt: Buffer;
+  mime: string;
+  quelle: "beleg" | "upload" | "formular";
+  beleg_id?: string | null;
+  version?: number | null;
+  /** PDF eines Aufmaßblatts (quelle formular, eines je Formular, wird beim erneuten Abschließen ersetzt) */
+  formular_id?: string | null;
+};
 
 /** Datei ablegen: direkt nach OneDrive, sonst in den Zwischenspeicher (wird nachgeladen) */
 export async function dateiAblegen(a: Ablegen, benutzer: string | null): Promise<DateiZeile> {
@@ -252,8 +264,11 @@ export async function dateiAblegen(a: Ablegen, benutzer: string | null): Promise
   if (a.beleg_id) {
     const { data } = await admin.from("ablage_datei").select(DATEI_FELDER).eq("beleg_id", a.beleg_id).eq("version", a.version ?? 1).is("deleted_at", null).maybeSingle<DateiZeile>();
     vorhanden = data;
+  } else if (a.formular_id && a.quelle === "formular") {
+    const { data } = await admin.from("ablage_datei").select(DATEI_FELDER).eq("formular_id", a.formular_id).eq("quelle", "formular").is("deleted_at", null).maybeSingle<DateiZeile>();
+    vorhanden = data;
   }
-  const basis = { ordner_id: ordner.id, unterordner: a.unterordner, name, quelle: a.quelle, beleg_id: a.beleg_id ?? null, version: a.version ?? null, mime: a.mime, groesse: a.inhalt.length };
+  const basis = { ordner_id: ordner.id, unterordner: a.unterordner, name, quelle: a.quelle, beleg_id: a.beleg_id ?? null, version: a.version ?? null, formular_id: a.formular_id ?? null, mime: a.mime, groesse: a.inhalt.length };
   const id = vorhanden?.id ?? (await dateiSetzen(benutzer, null, { ...basis, status: "wartet" }));
   if (ordner.status === "angelegt") {
     try {
@@ -348,11 +363,11 @@ async function dateiUebertragen(x: DateiZeile, v: Verbindung, benutzer: string |
  * Upload vom Browser (große Scans): Zeile mit Status „upload“ und eine signierte, einmalige Upload-Adresse in den
  * Zwischenspeicher. Erst uploadAbschliessen prüft die Datei und überträgt sie.
  */
-export async function uploadVorbereiten(bezug: Bezug, name: string, groesse: number, unterordner: string | null, benutzer: string) {
+export async function uploadVorbereiten(bezug: Bezug, name: string, groesse: number, unterordner: string | null, benutzer: string, formularId: string | null = null) {
   const ordner = await ordnerFuer(bezug, benutzer);
   const datei = sharepointName(name, 150);
   const pfad = `${crypto.randomUUID()}/${datei}`;
-  const id = await dateiSetzen(benutzer, null, { ordner_id: ordner.id, unterordner, name: datei, quelle: "upload", groesse, status: "upload", puffer_pfad: pfad });
+  const id = await dateiSetzen(benutzer, null, { ordner_id: ordner.id, unterordner, name: datei, quelle: "upload", formular_id: formularId, groesse, status: "upload", puffer_pfad: pfad });
   const { data, error } = await createAdminClient().storage.from(PUFFER).createSignedUploadUrl(pfad);
   if (error || !data) throw new Error(`Upload konnte nicht vorbereitet werden: ${error?.message ?? ""}`);
   return { id, url: data.signedUrl };
@@ -381,10 +396,10 @@ export async function uploadAbschliessen(id: string, benutzer: string, pruefen: 
   const v = await verbindungLaden();
   if (!v) {
     await dateiSetzen(benutzer, id, { fehler: "OneDrive ist noch nicht verbunden." });
-    return { abgelegt: false, name: x.name };
+    return { abgelegt: false, name: x.name, formular_id: x.formular_id };
   }
   const ok = await dateiUebertragen({ ...x, status: "wartet", mime }, v, benutzer, inhalt);
-  return { abgelegt: ok, name: x.name };
+  return { abgelegt: ok, name: x.name, formular_id: x.formular_id };
 }
 
 export async function offeneAnzahl() {

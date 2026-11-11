@@ -101,6 +101,7 @@ APP_URL=http://localhost:3100 npm run test:montageplan # Modul Montageplan (Plan
 APP_URL=http://localhost:3100 npm run test:plantafel  # Kolonnen, Ressourcen, Pipeline, Duplizieren, Farbe, Sammelfreigabe, 4 Wochen, Wochenplan-PDF
 APP_URL=http://localhost:3100 npm run test:kopfzeile  # Globale Suche, Neu-Menü, Glocke, vorläufiger Versand (Download, mailto)
 APP_URL=http://localhost:3100 npm run test:onedrive   # OneDrive-Ablage gegen den nachgebauten Graph-Server (siehe „OneDrive“)
+APP_URL=http://localhost:3100 npm run test:formulare  # Aufmaßblatt, Protokolle, Scan; App ohne Microsoft-Zugang starten (MS_GRAPH_…= leer)
 APP_URL=http://localhost:3100 npm run test:mitarbeiter # Modul Mitarbeiter
 APP_URL=http://localhost:3100 npm run test:zeiten      # Modul Zeiterfassung
 APP_URL=http://localhost:3100 npm run test:abwesenheiten # Modul Abwesenheiten (Büro-Benutzer und Admin)

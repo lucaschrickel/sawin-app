@@ -529,13 +529,27 @@ Die Monteur-App kommt in Version 2.
 
 - **Aufmaßblatt digital:** vor Ort auf Tablet oder Handy (Büro-Zugang). Je Zeile Raum, Element, Breite und Höhe in
   mm, Anzahl, Anschlag, Bemerkung, dazu Hinweise zur Baustelle. Speichert automatisch, Status Entwurf/Abgeschlossen,
-  PDF in `02 Aufmaß`. „In Angebot übernehmen“ erzeugt einen Angebots-Entwurf mit den Elementen als Positionen;
+  PDF in `03 Aufmaß - Freigabe`. „In Angebot übernehmen“ erzeugt einen Angebots-Entwurf mit den Elementen als Positionen;
   am Aufmaß eines Auftrags ist das ein Nachtragsangebot (eigene Anfrage mit `nachtrag_zu`, siehe Architektur).
   Version 1 setzt eine Netzverbindung voraus.
 - **Montageprotokoll, Servicebericht, Übergabeprotokoll:** vorausgefüllte PDF-Vorlagen zum Drucken
   (Kunde, Objekt, Checkliste je Produkt, Leistungen aus der AB, Unterschriftsfelder). Auf der Baustelle von Hand
   ausgefüllt und unterschrieben, danach lädt das Büro den Scan hoch. Status Gedruckt → Scan abgelegt.
 - Formulare hängen an einem Auftrag, einem Ticket oder (nur Aufmaß) an einer Anfrage.
+- **Umsetzung (12.11.2026):** Reiter „Formulare & Protokolle“ an Auftrag und Ticket (am Ticket der Servicebericht zuerst),
+  Karte „Aufmaßblatt“ an der Anfrage. Aufmaß-Editor `/formulare/[id]` speichert 0,7 s nach der letzten Eingabe über
+  `aufmass_speichern` (RLS, unveränderte Zeilen werden nicht geschrieben, entfernte nur markiert); abgeschlossen ist es
+  in der Datenbank gesperrt, bis „Wieder öffnen“. Mit der AB wandert das Aufmaß der Anfrage in den Auftrag (Trigger).
+  „In Angebot übernehmen“: je Zeile eine Position, Titel = Katalogartikel zum Element (Zuordnung in der Konfiguration
+  `aufmass.artikel`) mit Maß, sonst das Element ohne Preis; dazu die Zusatzartikel (`aufmass.zusatz`, z. B. Montage),
+  wenn es sie im Katalog gibt. Das Aufmaß-PDF geht beim Abschließen nach `03 Aufmaß - Freigabe`; an einer Anfrage ohne
+  Ordner wartet es und wird mit dem ersten Angebot nachgezogen (Name `<Nummer>_Aufmassblatt_<Kunde>.pdf`, an der Anfrage
+  mit der Angebotsnummer wie der Ordner). „… drucken“ legt das Protokoll mit Status „Gedruckt“ an und öffnet die Vorlage
+  (`/pdf/formular/[id]`); der Scan geht über die Ablage nach `04 Auftrag` (Montageprotokoll) bzw. `06 …`
+  (Servicebericht, Übergabeprotokoll), am Ticket in dessen Ordner, als `<Nummer>_<Protokoll>_<Kunde>_unterschrieben`,
+  und setzt „Scan abgelegt“. Checklisten je Produkt stehen in der Konfiguration (`checklisten`). Ein Aufmaß im Entwurf
+  oder ein gedrucktes Protokoll ohne Scan lässt sich entfernen (Markierung). Logik `src/lib/formular-logik.ts` mit
+  Unit-Tests (`tests/unit/formulare.test.ts`).
 
 ### Aufgaben
 

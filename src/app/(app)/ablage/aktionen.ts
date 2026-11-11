@@ -4,7 +4,9 @@ import { refresh } from "next/cache";
 import { pruefeAdmin, pruefeSitzung } from "@/lib/auth/sitzung";
 import { nachladen, ordnerFuer, uploadAbschliessen, uploadVorbereiten, verbindungPruefen, type Bezug } from "@/lib/onedrive/ablage";
 import { graphEingerichtet } from "@/lib/onedrive/graph";
-import { dateiTypErkennen, sharepointName, UNTERORDNER, UPLOAD_GRENZE } from "@/lib/onedrive/schema";
+import { dateiTypErkennen, FORMULAR_UNTERORDNER, sharepointName, UNTERORDNER, UPLOAD_GRENZE } from "@/lib/onedrive/schema";
+import { scanDateiname } from "@/lib/formular-ablage";
+import { ladeFormular } from "@/lib/formulare";
 
 export type Ergebnis = { ok?: boolean; fehler?: string; hinweis?: string };
 
@@ -36,17 +38,27 @@ function erlaubterTyp(inhalt: Buffer, name: string): string | null {
  */
 export async function uploadVorbereitenAktion(fd: FormData): Promise<Ergebnis & { id?: string; url?: string }> {
   const { benutzer } = await pruefeSitzung();
-  const bezug = await bezugPruefen(fd);
-  if (!bezug) return { fehler: "Vorgang nicht gefunden." };
-  const name = String(fd.get("name") ?? "").trim();
+  let bezug = await bezugPruefen(fd);
+  let name = String(fd.get("name") ?? "").trim();
   const groesse = Number(fd.get("groesse"));
-  const unterordner = String(fd.get("unterordner") ?? "");
+  let unterordner = String(fd.get("unterordner") ?? "");
+  // Scan eines Protokolls: Vorgang, Unterordner und Dateiname bestimmt das Formular (Montageprotokoll in „04 Auftrag“,
+  // Servicebericht und Übergabeprotokoll in „06 …“, am Ticket in dessen Ordner)
+  const formularId = String(fd.get("formular_id") ?? "");
+  if (UUID.test(formularId)) {
+    const f = await ladeFormular(formularId);
+    if (!f || f.typ === "aufmass" || f.bezug.art === "anfrage") return { fehler: "Formular nicht gefunden." };
+    bezug = f.bezug.art === "ticket" ? { ticket_id: f.bezug.id } : { auftrag_id: f.bezug.id };
+    unterordner = f.bezug.art === "ticket" ? "" : FORMULAR_UNTERORDNER[f.typ];
+    if (name) name = scanDateiname(f.typ, f.bezug.nummer, f.kunde?.name ?? null, name);
+  }
+  if (!bezug) return { fehler: "Vorgang nicht gefunden." };
   if (!name) return { fehler: "Bitte eine Datei wählen." };
   if (!Number.isFinite(groesse) || groesse <= 0) return { fehler: "Die Datei ist leer." };
   if (groesse > UPLOAD_GRENZE) return { fehler: "Die Datei ist größer als 50 MB." };
   if (unterordner && !(UNTERORDNER as readonly string[]).includes(unterordner)) return { fehler: "Bitte einen Unterordner aus der Liste wählen." };
   try {
-    const r = await uploadVorbereiten(bezug, sharepointName(name, 150), groesse, unterordner || null, benutzer.id);
+    const r = await uploadVorbereiten(bezug, sharepointName(name, 150), groesse, unterordner || null, benutzer.id, UUID.test(formularId) ? formularId : null);
     return { ok: true, ...r };
   } catch (e) {
     return { fehler: e instanceof Error ? e.message : "Der Upload konnte nicht vorbereitet werden." };
@@ -59,6 +71,11 @@ export async function uploadAbschliessenAktion(id: string): Promise<Ergebnis> {
   if (!UUID.test(id)) return { fehler: "Upload nicht gefunden." };
   try {
     const r = await uploadAbschliessen(id, benutzer.id, erlaubterTyp, UPLOAD_GRENZE);
+    // Scan eines Protokolls: Status „Scan abgelegt“ (auch wenn die Datei noch im Zwischenspeicher wartet)
+    if (r.formular_id) {
+      const { supabase } = await pruefeSitzung();
+      await supabase.from("formular").update({ status: "scan_abgelegt" }).eq("id", r.formular_id).neq("typ", "aufmass");
+    }
     refresh();
     return r.abgelegt ? { ok: true, hinweis: `${r.name} liegt im OneDrive-Ordner.` } : { ok: true, hinweis: `${r.name} ist zwischengespeichert und wird nach OneDrive übertragen, sobald die Verbindung steht.` };
   } catch (e) {
