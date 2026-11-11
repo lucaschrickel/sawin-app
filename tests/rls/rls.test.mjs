@@ -128,6 +128,14 @@ after(async () => {
   try {
     await db.query("begin");
     for (const [tabelle, id] of angelegt.reverse()) {
+      if (tabelle === "beleg") {
+        // Abhängige Zeilen, die beim erneuten Speichern bzw. über Funktionen entstanden sind (nicht in „angelegt“)
+        await db.query("delete from public.zahlung where beleg_id = $1 or zahlungsbestaetigung_id = $1", [id]);
+        await db.query("delete from public.beleg_position where beleg_id = $1 or abzug_beleg_id = $1", [id]);
+        await db.query("delete from public.beleg_version where beleg_id = $1", [id]);
+        await db.query("delete from public.beleg_versand where beleg_id = $1", [id]);
+        await db.query("update public.beleg set vorgaenger_id = null where vorgaenger_id = $1", [id]);
+      }
       await db.query(`delete from public.${pg.escapeIdentifier(tabelle)} where id = $1`, [id]);
     }
     await db.query("commit");
