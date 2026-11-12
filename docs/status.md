@@ -47,7 +47,7 @@ Stand: 12.11.2026, nach Formulare & Protokolle, Chat, erweiterter Suche, Zurück
 | Einstellungen | Versand (Standard-PDF-Gruppen) | verschoben auf V2 | hängt am Outlook-Versand |
 | Einstellungen | Darstellung (Hell, Dunkel, System; Seitenleiste hell oder dunkel) | fertig | je Benutzer; im Dunkelmodus Seitenleiste immer dunkel; Belege und Formulare bleiben hell (PDF) |
 | Designsystem | Styleguide | fertig | auch Zurück-Knopf, Suchtreffer, Farbwahl der Plantafel, Ablage-Upload, Formular-Status, Chat |
-| Übernahme | Datenübernahme aus Airtable | teilweise | Skript, Zuordnung, Altbestand-Schalter, Kopfbeleg, Storno und Prüfbericht fertig (`docs/airtable-uebernahme.md`, `npm run test:altbestand` 17/17). Probelauf auf Staging am 12.11.2026: 861 Kunden, 166 Anfragen, 105 Aufträge, 578 Belege, 148 Ordner, 8 Aufgaben, ohne Fehler; wiederholbar geprüft. Offen: Lieferantenkürzel von Sawin, Nummernkreise für den Go-live |
+| Übernahme | Datenübernahme aus Airtable | teilweise | Skript, Zuordnung, Altbestand-Schalter, Kopfbeleg, Storno und Prüfbericht fertig (`docs/airtable-uebernahme.md`, `npm run test:altbestand` 17/17). Probelauf auf Staging am 12.11.2026: 861 Kunden, 166 Anfragen, 105 Aufträge, 578 Belege, 148 Ordner, 8 Aufgaben, ohne Fehler; wiederholbar geprüft. Startwerte der Nummernkreise gesetzt, Go-live-Prüfung `npm run golive:pruefen`. Offen: Lieferantenkürzel von Sawin; `main` erst nach Merge des PR (bis dahin läuft auf Vercel der alte Code gegen die importierten Daten) |
 | Vercel | Projekt, Region `fra1`, Crons (Zahlungen, Ablage), Lexware-Webhook | teilweise | läuft unter https://sawin-bauelemente-app.vercel.app (Production und Preview bis zum Go-live auf Staging); beide Crons mit 200 geprüft; Lexware-Webhook im Testkonto registriert; Browser-Tests gegen Vercel grün; Region des Proxys: Vercel › Logs › Seitenaufruf bzw. Header `x-vercel-id` |
 | Version 2 | Monteur-App, Outlook-Versand, automatische Anfragen, KI-Agents | verschoben auf V2 | |
 
@@ -61,7 +61,7 @@ Stand: 12.11.2026, nach Formulare & Protokolle, Chat, erweiterter Suche, Zurück
 | Backups (PITR) und Wiederherstellungstest | offen |
 | Lexware-Testpunkte | erledigt bis auf `vatfree` und das Zahlungs-Event (Webhook gebaut) |
 | Belegerstellung gegen das Testkonto | erledigt bis auf eine echte Bankzahlung |
-| Nummernkreise mit Sawin | offen |
+| Nummernkreise mit Sawin | festgelegt 12.11.2026: AG1261000, AB2261000, LS1000 (ohne Jahr), Kunden ab 30000 (`nummernkreis.start`); `npm run golive:pruefen` auf Staging ok; am Go-live gegen Sawins Lexware wiederholen |
 | OneDrive mit Sawins Bibliothek | erledigt in `_App-Test` (App-Registrierung „Sawin App Ablage“, Freigabe nur „Kundenprojekte“); Variablen in Vercel gesetzt, dort „verbunden“; offen: Basisordner `2026` in Produktion |
 | Vorläufiger Versand mit Sawins Outlook | offen (mailto mit BCC prüfen) |
 | Steuerberater | offen |

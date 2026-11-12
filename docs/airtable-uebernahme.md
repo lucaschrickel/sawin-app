@@ -156,16 +156,22 @@ neuer Kontakt).
 
 ## Nummernkreise
 
-Am Go-live-Tag rechnet der Lauf sie neu (`letzte` wird nie verringert) und schreibt sie in den Bericht:
+Startwerte für den Go-live (12.11.2026), gegen Sawins Lexware geprüft (dort als Nächstes AG1260510, AB2260237, LS0012,
+Kunde 10875). Sie stehen in `nummernkreis.start` (Migration, gilt auch in Produktion); die App vergibt nie weniger,
+auch nach „Staging leeren“ oder der Übernahme:
 
-| Kreis | höchste in Airtable (12.11.) | nächste Nummer |
+| Kreis | höchste aus Übernahme bzw. Lexware | Startwert der App |
 |---|---|---|
-| Angebot | AG1260508 | AG1260509 |
-| Auftragsbestätigung | AB2260236 (+ 8 neue für Aufträge ohne AB) | AB2260245 |
-| Lieferschein | nur `LS0011` (altes Format) | LS1260001 |
-| Zahlungsbestätigung | – | ZB1260001 |
-| Kunde | 10874 | 10875 |
-| Anfrage, Service-Ticket, Bestellung | – | 1, ST-26-0001, BE-26-001 |
+| Angebot | AG1260509 (Lexware) | AG1261000 (ab 2027 wieder AG1270001) |
+| Auftragsbestätigung | AB2260236 | AB2261000; die 8 Aufträge ohne AB bekommen AB2261000–AB2261007 |
+| Lieferschein | LS0011 | LS1000 (vierstellig, ohne Jahr wie in Lexware) |
+| Kunde | 10874 (Lexware als Nächstes 10875) | 30000 |
+| Zahlungsbestätigung, Anfrage, Service-Ticket, Bestellung | – | ZB1260001, 1, ST-26-0001, BE-26-001 |
+
+`npm run golive:pruefen` liest die Nummern aus der App und (nur GET) aus Lexware und meldet mit Exit-Code 1, wenn ein
+Startwert nicht über der höchsten fremden Nummer liegt (Übernahme bzw. Lexware; Nummern, die die App selbst ab dem
+Startwert vergeben hat, zählen nicht). Kundennummern schickt die App nicht an Lexware; Lexware lehnt eine vorgegebene
+Nummer ab und vergibt eine eigene, deshalb gibt es keine Überschneidung.
 
 Rechnung, Abschlag und Gutschrift nummeriert Lexware.
 

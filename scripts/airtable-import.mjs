@@ -164,18 +164,21 @@ async function schreiben(db, plan) {
 
   // Nummernkreise vor den Aufträgen ohne AB (die eine neue Nummer aus dem AB-Kreis bekommen)
   for (const [art, n] of Object.entries(plan.nummernkreise)) {
-    const { rows } = await db.query("select letzte, jahr, jaehrlich from public.nummernkreis where art = $1 and deleted_at is null", [art]);
+    const { rows } = await db.query("select letzte, jahr, jaehrlich, start, start_jahr from public.nummernkreis where art = $1 and deleted_at is null", [art]);
     if (!rows[0]) continue;
     const vorher = rows[0].jaehrlich && rows[0].jahr !== jahr ? 0 : rows[0].letzte;
     const nachher = Math.max(vorher, n);
     await db.query("update public.nummernkreis set letzte = $2, jahr = $3 where art = $1 and deleted_at is null", [art, nachher, rows[0].jaehrlich ? jahr : rows[0].jahr]);
-    nk[art] = { vorher, airtable: n, nachher };
+    // Startwert (Go-live): die App vergibt nie weniger (app.naechste_nummer); er muss über allem Übernommenen liegen
+    const start = rows[0].start != null && (!rows[0].jaehrlich || rows[0].start_jahr === jahr) ? rows[0].start : null;
+    nk[art] = { vorher, airtable: n, nachher, start };
   }
 
   await tabelleSchreiben(db, "anfrage", plan.anfragen, ids, ergebnis, fehler, (r) => ({ kunde_id: id(ids, "kunde", r._kunde) }));
   await tabelleSchreiben(db, "auftrag", plan.auftraege, ids, ergebnis, fehler, (r) => ({ kunde_id: id(ids, "kunde", r._kunde) }), async () => (await db.query("select app.naechste_nummer('auftragsbestaetigung') as n")).rows[0].n);
   const { rows: abNach } = await db.query("select letzte from public.nummernkreis where art = 'auftragsbestaetigung' and deleted_at is null");
   if (nk.auftragsbestaetigung && abNach[0]) nk.auftragsbestaetigung.nachher = abNach[0].letzte;
+  for (const x of Object.values(nk)) x.naechste = Math.max(x.nachher + 1, x.start ?? 0);
   const vorgangIds = (r) => ({ anfrage_id: id(ids, "anfrage", r._anfrage), auftrag_id: id(ids, "auftrag", r._auftrag) });
   await tabelleSchreiben(db, "ablage_ordner", plan.ordner, ids, ergebnis, fehler, vorgangIds);
   await tabelleSchreiben(db, "beleg", plan.belege, ids, ergebnis, fehler, (r) => ({
@@ -333,10 +336,11 @@ function bericht({ plan, daten, ergebnis, fehler, nk, lex, proben, summen, vorha
   t.push(`- Belege: ${z(plan.belege.map((b) => `${b.art} ${b.status}`))}`);
   t.push(`- Belege je Bezug: ${z(plan.belege.map((b) => (b._auftrag ? "Auftrag" : b._anfrage ? "Anfrage" : "nur Kunde")))}`);
   t.push(`- OneDrive-Ordner: ${z(plan.ordner.map((o) => (o.item_id ? "mit ID" : "nur Link")))}`);
-  t.push(``, `## Nummernkreise`, ``, `| Kreis | vorher | höchste aus Airtable | ${SCHREIBEN ? "jetzt" : "Vorschlag"} |`, `|---|---:|---:|---:|`);
+  t.push(``, `## Nummernkreise`, ``, `Laufende Nummern. Die App vergibt nie unter dem Startwert (Go-live); Prüfung gegen Lexware: npm run golive:pruefen.`, ``, `| Kreis | vorher | höchste aus Airtable | Startwert | nächste laufende Nummer | |`, `|---|---:|---:|---:|---:|---|`);
   for (const [art, n] of Object.entries(plan.nummernkreise)) {
     const x = nk?.[art];
-    t.push(`| ${art} | ${x?.vorher ?? "–"} | ${n} | ${x?.nachher ?? n} |`);
+    const warnung = x?.start != null && x.start <= n ? "**Startwert nicht über der höchsten Nummer**" : "";
+    t.push(`| ${art} | ${x?.vorher ?? "–"} | ${n} | ${x?.start ?? "–"} | ${x?.naechste ?? "–"} | ${warnung} |`);
   }
   if (summen) t.push(``, `## Summen (brutto)`, ``, ...summen);
   t.push(``, `## Hinweise`, ``);

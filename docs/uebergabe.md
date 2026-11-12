@@ -277,12 +277,15 @@ Plan, Zuordnung und Regeln: `docs/airtable-uebernahme.md`. Am Go-live-Tag, nachd
    `NEXT_PUBLIC_SUPABASE_URL`, `SUPABASE_DB_URL`, `AIRTABLE_TOKEN`, `AIRTABLE_BASE_ID`, Sawins `LEXWARE_API_KEY` und
    `LEXWARE_ALTBESTAND=aktiv`.
 2. Lieferantenkürzel in `scripts/airtable/lieferanten.json` den Lieferanten der App zuordnen (Lieferanten vorher anlegen).
-3. Probelauf: `npm run import:airtable -- --env=.env.produktion`. Den Bericht in `berichte/` prüfen, vor allem
+3. Nummernkreise prüfen: `npm run golive:pruefen -- --env=.env.produktion` (liest Sawins Lexware, nur GET). Meldet sie
+   einen Fehler, den Startwert in `public.nummernkreis.start` per Migration anheben.
+4. Probelauf: `npm run import:airtable -- --env=.env.produktion`. Den Bericht in `berichte/` prüfen, vor allem
    Nummernkreise, Fehler und Datensätze ohne Zuordnung.
-4. Schreiben: `npm run import:airtable -- --env=.env.produktion --schreiben --projekt=<produktion-ref> --lexware-lesen`.
+5. Schreiben: `npm run import:airtable -- --env=.env.produktion --schreiben --projekt=<produktion-ref> --lexware-lesen`.
    Bericht prüfen (Summen, Stichproben, Positionen aus Lexware).
-5. In Vercel (Production) `LEXWARE_ALTBESTAND=aktiv` und `ONEDRIVE_ALTBESTAND=aktiv` setzen und neu bereitstellen.
-6. Lexware-Webhook für die Produktionsadresse registrieren (`node scripts/lexware-webhook.mjs`, siehe „Lexware“).
+6. In Vercel (Production) `LEXWARE_ALTBESTAND=aktiv` und `ONEDRIVE_ALTBESTAND=aktiv` setzen und neu bereitstellen.
+7. `npm run golive:pruefen -- --env=.env.produktion` erneut (nach dem Import).
+8. Lexware-Webhook für die Produktionsadresse registrieren (`node scripts/lexware-webhook.mjs`, siehe „Lexware“).
 
 Der Lauf ist wiederholbar: Ein zweiter Lauf legt nichts doppelt an und überschreibt nichts, was inzwischen in der App
 geändert wurde.

@@ -39,8 +39,13 @@ Eine Codebasis, je Kunde eine eigene Instanz. Diese Datei gilt für jede Arbeit 
   - **Lexware-Belege:** Rechnung, Abschlagsrechnung und Gutschrift. Erst „Fertigstellen“ legt sie über die
     Lexware-API an, Lexware vergibt die Nummer und liefert das PDF. Entwürfe davon liegen nur in der App (ohne Nummer).
   - **Nummernkreise der App** je Belegart über eine Postgres-Funktion mit Sequenz (transaktionssicher, kein
-    `max()+1`). Format wie bisher bei Sawin: Präfix, Ziffer, Jahr, laufende Nummer (z. B. `AG1260432`,
-    `AB2260227`, `LS1260070`, `ZB1260001`). Das Angebot erhält seine Nummer **beim ersten Speichern des Entwurfs**, AB
+    `max()+1`). Format wie bisher bei Sawin: Präfix, Ziffer, Jahr, laufende Nummer (z. B. `AG1261000`,
+    `AB2261000`, `ZB1260001`); der Lieferschein vierstellig ohne Jahr wie in Lexware (`LS1000`).
+    **Startwerte für den Go-live (12.11.2026, gegen Sawins Lexware geprüft, dort als Nächstes AG1260510, AB2260237,
+    LS0012, Kunde 10875):** Angebot `AG1261000`, AB `AB2261000`, Lieferschein `LS1000`, Kunden ab `30000`. Sie stehen in
+    `nummernkreis.start` (bei AG und AB nur für 2026, ab 2027 beginnt der Kreis bei 1); `app.naechste_nummer` vergibt
+    nie weniger. `npm run golive:pruefen` meldet einen Startwert, der nicht über der höchsten Nummer aus Übernahme und
+    Lexware liegt. Das Angebot erhält seine Nummer **beim ersten Speichern des Entwurfs**, AB
     und Lieferschein beim Fertigstellen, die Zahlungsbestätigung beim Erstellen (sie hat keinen Entwurf). Verworfene Angebots-Entwürfe hinterlassen eine Lücke; die Nummer wird nie
     wiederverwendet (für App-Belege zulässig, die GoBD-relevanten Rechnungsnummern vergibt Lexware).
   - **Teil-AB:** Nummer = AB-Nummer mit Zusatz `-01`, `-02` … (z. B. `AB2260227-01`). Enthält ausgewählte Positionen
@@ -291,8 +296,11 @@ Die Monteur-App kommt in Version 2.
   zurück (beim Speichern des Kunden und vor jedem Lexware-Beleg, erkannt über eine Prüfsumme `lexware_hash`).
   Lexware-Kontakt: Firma (mit Ansprechpartner; § 13b-Kunden mit `allowTaxFreeInvoices`) bzw. Person, nur die
   Rechnungsadresse (Lexware erlaubt nur eine Lieferadresse am Kontakt; das Objekt steht auf dem Beleg). Die
-  Kundennummer vergibt Lexware selbst (über die API nicht setzbar); auf dem Lexware-PDF steht deshalb die
-  Lexware-Kundennummer.
+  Kundennummer vergibt Lexware selbst: Eine mitgeschickte Nummer lehnt Lexware ab (`roles.customer.number`,
+  `invalid_value`, im Testkonto am 12.11.2026 geprüft); die App schickt keine. Kunden der App haben deshalb ab dem Go-live
+  eine App-Nummer ab 30000 und nach der ersten Übertragung zusätzlich eine Lexware-Nummer aus Lexwares Kreis (10875 …);
+  eine Überschneidung ist ausgeschlossen. Übernommene Kunden behalten ihre Lexware-Nummer als App-Nummer. Auf dem
+  Lexware-PDF steht die Lexware-Kundennummer, in der Lexware-Notiz des Kontakts die App-Nummer.
 - Die Kundenseite zeigt alle Anfragen, Aufträge, Service-Tickets und Belege des Kunden.
 - **Konditionen:** Freitextfeld je Kunde (z. B. aktuelle Rabatte). Sehen und ändern dürfen es nur Benutzer mit dem
   Recht „Konditionen sehen“. Die Konditionen liegen in einer eigenen Tabelle mit eigener RLS-Policy, nicht als Spalte
@@ -928,7 +936,8 @@ Maßstab ist OWASP ASVS Level 1. Vor dem Start mit Echtdaten müssen alle Mindes
       (`npm run test:zahlungen`, 10.11.2026); Teil-AB → Lieferschein → Teilrechnung und Schlussrechnung mit Abzug der Teilrechnung erledigt
       (`npm run test:lexware`, 10.11.2026); offen: eine echte Bankzahlung in
       Lexware gebucht und abgeglichen
-- [ ] Nummernkreise der App-Belege mit Sawin abgestimmt (Startwerte je Belegart nach der Airtable-Übernahme)
+- [x] Nummernkreise der App-Belege mit Sawin abgestimmt (Startwerte AG1261000, AB2261000, LS1000, Kunden 30000;
+      12.11.2026); vor dem Go-live `npm run golive:pruefen` gegen Sawins Lexware
 - [ ] OneDrive-Ablage mit Sawins Bibliothek getestet (nur die eine Bibliothek freigegeben, Ordner ab Angebot, Umbenennung mit der AB, Zwischenspeicher)
 - [ ] Vorläufiger Versand (Download, `mailto` mit BCC an angebot@/auftrag@) mit Sawins Outlook geprüft; Versand über Microsoft Graph folgt in Version 2
 - [ ] Steuerarten (Standard, § 13b, steuerfrei), Pflichtangaben auf Rechnungen und das Muster der

@@ -161,12 +161,12 @@ try {
   await b.klickText("[data-schritte] a", "Lieferschein");
   pruefe("Lieferschein-Editor ohne Preise", await b.warte("!!document.querySelector('[data-beleg-editor=lieferschein]') && !document.querySelector('[data-summenleiste]')"));
   await b.klick("[data-aktion=fertigstellen]");
-  pruefe("Lieferschein fertiggestellt (LS1…)", await b.warte("document.querySelector('[data-status]')?.dataset.status === 'erstellt'", 20000));
+  pruefe("Lieferschein fertiggestellt (LS…)", await b.warte("document.querySelector('[data-status]')?.dataset.status === 'erstellt'", 20000));
   const lsId = await belegId();
   merken("beleg", lsId);
   const ls = await beleg(lsId);
   await pdfSichern(lsId, "lieferschein");
-  pruefe("LS hängt an Auftrag und Kette", /^LS1\d{6}$/.test(ls.nummer) && ls.auftrag_id === auftrag.id && ls.kette_id === ab.kette_id, ls.nummer);
+  pruefe("LS hängt an Auftrag und Kette", /^LS\d{4,}$/.test(ls.nummer) && ls.auftrag_id === auftrag.id && ls.kette_id === ab.kette_id, ls.nummer);
   await b.gehe(`/beleg/${abId}`);
   pruefe("AB jetzt „In Abwicklung“ und gesperrt", await b.warte("document.querySelector('[data-status]')?.dataset.status === 'in_abwicklung' && !document.querySelector('[data-aktion=bearbeiten]')"));
 

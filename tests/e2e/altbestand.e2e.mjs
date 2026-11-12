@@ -74,7 +74,8 @@ try {
   await b.gehe("/belege/forderungen");
   pruefe(
     "Offene Forderungen: Altrechnung ja, stornierter Abschlag nein",
-    await b.warte(`!!document.querySelector('[data-beleg-zeile="${alt.id}"]')`) && !(await b.js(`!!document.querySelector('[data-beleg-zeile="${storno.id}"]')`)),
+    await b.warte(`!!document.querySelector('[data-beleg-zeile="${alt.id}"]')`, 20000) && !(await b.js(`!!document.querySelector('[data-beleg-zeile="${storno.id}"]')`)),
+    await b.js(`location.pathname + location.search + ' Zeilen: ' + document.querySelectorAll('[data-beleg-zeile]').length + ' Storno: ' + !!document.querySelector('[data-beleg-zeile="${storno.id}"]')`),
   );
 
   // Rechnung am Auftrag: kein Abzug (Abschlag storniert); neuer Kontakt im Testkonto statt der übernommenen ID

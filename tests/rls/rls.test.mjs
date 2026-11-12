@@ -845,7 +845,7 @@ describe("Belege", () => {
     const ls = await belegSpeichern(buero, { art: "lieferschein", kunde_id: daten.kunde.id, auftrag_id: daten.auftrag.id });
     assert.equal(ls.nummer, null, "Lieferschein-Entwurf hat schon eine Nummer");
     const { nummer } = await fertig(buero, ls.id);
-    assert.match(nummer, /^LS1\d{6}$/);
+    assert.match(nummer, /^LS\d{4,}$/);
     const titel = await buero.client.from("beleg").update({ titel: "geändert" }).eq("id", ls.id);
     assert.equal(titel.error?.code, "42501", "fertiger Lieferschein geändert");
     const pos = await buero.client.from("beleg_position").insert({ beleg_id: ls.id, titel: "nachträglich" });
