@@ -15,10 +15,17 @@
 
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import pg from "pg";
+
+// Datumsspalten als Text (JJJJ-MM-TT) statt als Datum in der lokalen Zeitzone
+pg.types.setTypeParser(1082, (v) => v);
 import { belegSummen } from "../src/lib/beleg-summen.ts";
 import { lexwareZuBeleg, planen } from "./airtable/zuordnung.mjs";
 
-const arg = (name) => process.argv.find((a) => a === `--${name}` || a.startsWith(`--${name}=`))?.split("=").slice(1).join("=") ?? (process.argv.includes(`--${name}`) ? true : undefined);
+/** --name → true, --name=wert → "wert", fehlt → undefined */
+const arg = (name) => {
+  if (process.argv.includes(`--${name}`)) return true;
+  return process.argv.find((a) => a.startsWith(`--${name}=`))?.split("=").slice(1).join("=");
+};
 const envDatei = arg("env") || ".env.local";
 if (existsSync(envDatei)) process.loadEnvFile(envDatei);
 const SCHREIBEN = !!arg("schreiben");
@@ -111,6 +118,8 @@ async function tabelleSchreiben(db, tabelle, rows, ids, ergebnis, fehler, aufloe
           continue;
         }
         if (daten.nummer == null) delete daten.nummer;
+        // Wurzel einer Kette (ohne _wurzel): kette_id ist die eigene ID
+        if (tabelle === "beleg" && !("kette_id" in daten)) daten.kette_id = x.id;
         const k = Object.keys(daten).filter((s) => s !== "airtable_id");
         await db.query(
           `update public.${tabelle} set ${k.map((s, i) => `${s} = $${i + 2}`).join(", ")}, import_stand = now() where id = $1`,

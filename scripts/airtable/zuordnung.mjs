@@ -55,6 +55,14 @@ const produkte = (f) => Object.entries(PRODUKT).filter(([feld]) => f[feld]).map(
 const PHASE = { Bestellung: "bestellung", Montage: "montage", Abnahme: "abnahme", "Baustelle fertig": "baustelle_fertig", Reklamation: "reklamation", Abgeschlossen: "abgeschlossen" };
 const MONTAGE = { Offen: "nicht_begonnen", "Nicht begonnen": "nicht_begonnen", Bereit: "bereit", "In Arbeit": "in_arbeit", "Teilweise abgeschlossen": "teilweise_abgeschlossen", Abgeschlossen: "abgeschlossen" };
 const ART = { Angebot: "angebot", "Auftragsbestätigung": "auftragsbestaetigung", Lieferschein: "lieferschein", Abschlagsrechnung: "abschlagsrechnung", Rechnung: "rechnung", Rechnungskorrektur: "gutschrift" };
+const VORGAENGER_ART = {
+  angebot: [],
+  auftragsbestaetigung: ["angebot"],
+  lieferschein: ["auftragsbestaetigung", "angebot"],
+  abschlagsrechnung: ["auftragsbestaetigung", "angebot"],
+  rechnung: ["lieferschein", "auftragsbestaetigung", "angebot"],
+  gutschrift: ["rechnung", "abschlagsrechnung"],
+};
 const LEXWARE_ARTEN = ["rechnung", "abschlagsrechnung", "gutschrift"];
 const AUFGABE_STATUS = { Offen: "offen", "In Arbeit": "in_arbeit", "Wartet auf Zulieferer": "wartet_zulieferer", "Wartet auf Kunde": "wartet_kunde", Erledigt: "erledigt" };
 const PRIO = { Hoch: "hoch", Normal: "normal", Niedrig: "niedrig" };
@@ -205,7 +213,9 @@ export function planen({ daten, benutzer, lieferanten, einstellung, heute }) {
     return true;
   });
   const nachLex = new Map(belegeRoh.map((r) => [einzeilig(r.fields["Lexware-Beleg-ID"]), r]));
-  const vorgaengerVon = (r) =>
+  // „Vorgänger-IDs“ enthält in Airtable die verknüpften Lexware-Belege in beide Richtungen (das Angebot nennt auch seine
+  // AB und Rechnungen). Es bildet die Kette; die Richtung ergibt sich aus der Belegart (vorgaengerIn).
+  const verwandte = (r) =>
     String(r.fields["Vorgänger-IDs"] ?? "")
       .split(/[\s,;]+/)
       .filter(Boolean)
@@ -213,7 +223,7 @@ export function planen({ daten, benutzer, lieferanten, einstellung, heute }) {
       .filter((x) => x && x.id !== r.id);
   const eltern = new Map(belegeRoh.map((r) => [r.id, r.id]));
   const wurzel = (x) => (eltern.get(x) === x ? x : (eltern.set(x, wurzel(eltern.get(x))), eltern.get(x)));
-  for (const r of belegeRoh) for (const v of vorgaengerVon(r)) eltern.set(wurzel(r.id), wurzel(v.id));
+  for (const r of belegeRoh) for (const v of verwandte(r)) eltern.set(wurzel(r.id), wurzel(v.id));
   const ketten = new Map();
   for (const r of belegeRoh) {
     const k = wurzel(r.id);
@@ -224,6 +234,22 @@ export function planen({ daten, benutzer, lieferanten, einstellung, heute }) {
   const kundeVonBeleg = (r) => kundeNachId.get(erstes(r.fields.Kunde)) ?? kundeNachLex.get(einzeilig(r.fields["Lexware-Kontakt-ID"])) ?? null;
   const art = (r) => ART[r.fields.Belegart];
   const fertig = (r) => r.fields.Status !== "Entwurf";
+  /** Vorgänger in der Kette nach Belegart (Angebot → AB → Lieferschein → Abschlag → Rechnung → Gutschrift), der jüngste davor */
+  const vorgaengerIn = (r, kandidaten) => {
+    const andere = kandidaten.filter((x) => x !== r);
+    // Gutschrift: die Rechnung bzw. der Abschlag, auf den sie sich in Lexware bezieht
+    if (art(r) === "gutschrift") {
+      const bezug = verwandte(r).find((x) => andere.includes(x) && ["rechnung", "abschlagsrechnung"].includes(art(x)));
+      if (bezug) return bezug;
+    }
+    for (const va of VORGAENGER_ART[art(r)] ?? []) {
+      const c = andere.filter((x) => art(x) === va).sort((x, y) => x.fields.Belegdatum.localeCompare(y.fields.Belegdatum));
+      if (!c.length) continue;
+      const davor = c.filter((x) => x.fields.Belegdatum <= r.fields.Belegdatum);
+      return (davor.length ? davor : c).at(-1);
+    }
+    return null;
+  };
 
   // ---------- Vorgänge: Airtable-Aufträge ----------
   const auftraege = [];
@@ -266,7 +292,7 @@ export function planen({ daten, benutzer, lieferanten, einstellung, heute }) {
         airtable_id: a.id,
         nummer: abNr || null,
         _kunde: kundeKey,
-        titel: prod.join(", ") || null,
+        titel: prod.join(", ") || belegTitel(bs),
         phase: PHASE[f.Status] ?? "bestellung",
         montagestatus: MONTAGE[f.Montagestatus] ?? "nicht_begonnen",
         zustaendig_id: benutzerVon(f.Mitarbeiter),
@@ -329,7 +355,7 @@ export function planen({ daten, benutzer, lieferanten, einstellung, heute }) {
         airtable_id: `kette:${ab.id}`,
         nummer: nr,
         _kunde: kunde.airtable_id,
-        titel: einzeilig(ab.fields.Titel) && einzeilig(ab.fields.Titel) !== "Auftragsbestätigung" ? einzeilig(ab.fields.Titel) : null,
+        titel: belegTitel(kette),
         phase: fertigAbgerechnet ? "abgeschlossen" : "bestellung",
         montagestatus: fertigAbgerechnet ? "abgeschlossen" : "nicht_begonnen",
         zustaendig_id: null,
@@ -371,27 +397,26 @@ export function planen({ daten, benutzer, lieferanten, einstellung, heute }) {
     const v = ketteVorgang.get(w) ?? null;
     // Reihenfolge: Vorgänger vor Nachfolger, sonst nach Datum
     const sortiert = [...kette].sort((x, y) => x.fields.Belegdatum.localeCompare(y.fields.Belegdatum) || String(x.fields.Belegnummer).localeCompare(String(y.fields.Belegnummer)));
-    const abschlaege = sortiert.filter((r) => art(r) === "abschlagsrechnung");
-    const rechnungenGueltig = sortiert.filter((r) => art(r) === "rechnung" && fertig(r) && r.fields.Status !== "Storniert");
-    const schluss = v?.typ === "auftrag" ? (rechnungenGueltig.filter((r) => r.fields.Schlussrechnung).at(-1) ?? rechnungenGueltig.at(-1) ?? null) : null;
+    const kundeIn = (r) => kundeVonBeleg(r) ?? kundeVonBeleg(kette.find((x) => kundeVonBeleg(x)) ?? r);
+    for (const r of sortiert.filter((x) => !kundeIn(x)))
+      problem("Belege", r.id, r.fields.Belegnummer, "Kein Kunde (weder verknüpft noch über die Lexware-Kontakt-ID) – nicht übernommen");
+    const geplant = sortiert.filter((x) => kundeIn(x));
+    // Reihenfolge: Vorgänger vor Nachfolger (die Wurzel der Kette zuerst)
     const ordnung = [];
     const gesehen = new Set();
     const besuchen = (r) => {
       if (gesehen.has(r.id)) return;
       gesehen.add(r.id);
-      for (const x of vorgaengerVon(r)) if (kette.includes(x)) besuchen(x);
+      const vor = vorgaengerIn(r, geplant);
+      if (vor) besuchen(vor);
       ordnung.push(r);
     };
-    for (const r of sortiert) besuchen(r);
+    for (const r of geplant) besuchen(r);
     const wurzelBeleg = ordnung[0];
     for (const r of ordnung) {
       const f = r.fields;
       const a = art(r);
-      const kunde = kundeVonBeleg(r) ?? kundeVonBeleg(kette.find((x) => kundeVonBeleg(x)) ?? r);
-      if (!kunde) {
-        problem("Belege", r.id, f.Belegnummer, "Kein Kunde (weder verknüpft noch über die Lexware-Kontakt-ID) – nicht übernommen");
-        continue;
-      }
+      const kunde = kundeIn(r);
       const st = steuer(f["Betrag netto"], f["Betrag brutto"]);
       if (st.satz === 0) hinweise.steuer0.push(`${f.Belegnummer} (${f.Belegart})`);
       if (st.satz === null && st.steuern.length) problem("Belege", r.id, f.Belegnummer, "Steuersatz nicht erkennbar – 19 % angenommen");
@@ -406,7 +431,7 @@ export function planen({ daten, benutzer, lieferanten, einstellung, heute }) {
       } else {
         status = f.Status === "Entwurf" ? "entwurf" : "fertiggestellt";
       }
-      const vg = vorgaengerVon(r).find((x) => kette.includes(x) && x.id !== r.id);
+      const vg = vorgaengerIn(r, geplant);
       const offen = LEXWARE_ARTEN.includes(a) && status !== "entwurf" ? (status === "offen" ? rund(f["Offener Betrag"] ?? f["Betrag brutto"] ?? 0) : 0) : null;
       const nummer = status === "entwurf" && a !== "angebot" ? null : einzeilig(f.Belegnummer) || null;
       belege.push({
@@ -436,8 +461,9 @@ export function planen({ daten, benutzer, lieferanten, einstellung, heute }) {
         steuern: st.steuern,
         offen_betrag: offen,
         lexware_offen: offen,
-        abschlag_nr: a === "abschlagsrechnung" ? abschlaege.indexOf(r) + 1 : null,
-        teil: a === "rechnung" && v?.typ === "auftrag" && rechnungenGueltig.includes(r) && r !== schluss,
+        abschlag_nr: null,
+        teil: false,
+        _schlussHaken: !!f.Schlussrechnung,
         lexware_id: einzeilig(f["Lexware-Beleg-ID"]) || null,
         lexware_status: LEXWARE_ARTEN.includes(a) && status !== "entwurf" ? "fertig" : null,
         lexware_link: f.Deeplink ?? null,
@@ -447,6 +473,23 @@ export function planen({ daten, benutzer, lieferanten, einstellung, heute }) {
         created_at: `${f.Belegdatum}T12:00:00Z`,
       });
     }
+  }
+
+  // Abschläge je Auftrag (bzw. Kette) nach Datum nummerieren; je Auftrag eine Schlussrechnung, weitere Rechnungen
+  // sind Teilrechnungen (ein Auftrag kann mehrere Ketten haben)
+  const gruppen = new Map();
+  for (const x of belege) {
+    const k = x._auftrag ?? `kette:${x._wurzel ?? x.airtable_id}`;
+    if (!gruppen.has(k)) gruppen.set(k, []);
+    gruppen.get(k).push(x);
+  }
+  const nachDatum = (x, y) => x.datum.localeCompare(y.datum) || String(x.nummer).localeCompare(String(y.nummer));
+  for (const g of gruppen.values()) {
+    g.filter((x) => x.art === "abschlagsrechnung").sort(nachDatum).forEach((x, i) => (x.abschlag_nr = i + 1));
+    if (!g[0]._auftrag) continue;
+    const rechnungen = g.filter((x) => x.art === "rechnung" && !["entwurf", "storniert"].includes(x.status)).sort(nachDatum);
+    const schluss = rechnungen.filter((x) => x._schlussHaken).at(-1) ?? rechnungen.at(-1);
+    for (const x of rechnungen) x.teil = x !== schluss;
   }
 
   // ---------- OneDrive-Ordner ----------
@@ -547,6 +590,12 @@ export function planen({ daten, benutzer, lieferanten, einstellung, heute }) {
   };
 
   return { kunden, lieferadressen, anfragen, auftraege, ordner, belege, bestellungen, bestellzeilen, aufgaben, nummernkreise, probleme, hinweise };
+}
+
+/** Titel eines Auftrags aus seinen Belegen (ohne die Standardtitel „Angebot“, „Auftragsbestätigung“ …), sonst leer */
+const STANDARDTITEL = new Set(["Angebot", "Auftragsbestätigung", "Rechnung", "Abschlagsrechnung", "Lieferschein", "Schlussrechnung", "Teilrechnung"]);
+function belegTitel(belege) {
+  return belege.map((r) => einzeilig(r.fields.Titel)).find((t) => t && !STANDARDTITEL.has(t) && !/^d+. Abschlagsrechnung$/.test(t)) ?? "";
 }
 
 function anfrageTitel(angebote, prod, laufendeNr) {

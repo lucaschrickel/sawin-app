@@ -1,7 +1,19 @@
 # Datenübernahme aus Airtable
 
 Stand 12.11.2026. Plan am 12.11.2026 bestätigt (E1–E8 wie empfohlen). Gebaut sind das Import-Skript, die Schalter für
-den Altbestand und das Leeren von Staging. Der Probelauf auf Staging steht noch aus. Grundlage: Base „Sawin
+den Altbestand und das Leeren von Staging.
+
+**Probelauf auf Staging (12.11.2026):**
+- Staging wurde geleert und importiert, ohne Fehler beim Schreiben.
+- Ein zweiter Lauf legte nichts neu an (alles „aktualisiert“).
+- Eine in der App geänderte Zeile blieb erhalten („übersprungen“).
+- Summen: Abschläge und ABs centgleich mit Airtable. Bei Angeboten (1.912,93 €) und Rechnungen (190,40 €) fehlen genau
+  die vier Belege ohne Kunden.
+- Stichproben gleich.
+
+Erkenntnis aus dem Lauf: Das Airtable-Feld „Vorgänger-IDs“ enthält die verknüpften Lexware-Belege in **beide**
+Richtungen. Die Kette bildet sich daraus; die Richtung bestimmt die Belegart. Abschlagsnummern und Teilrechnungen gelten
+je Auftrag. Grundlage: Base „Sawin
 Bauelemente“ (`AIRTABLE_BASE_ID`, nicht die Kopie), nur lesend über `AIRTABLE_TOKEN`.
 
 ## Ablauf
