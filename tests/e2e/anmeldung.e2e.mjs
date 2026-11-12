@@ -179,7 +179,7 @@ try {
 
   // 7. Inaktivität: Zeitstempel älter als 60 Minuten
   const host = new URL(APP).hostname;
-  await cdp("Network.setCookie", { name: "app_letzte_aktivitaet", value: String(Date.now() - 61 * 60_000), domain: host, path: "/", httpOnly: true });
+  await cdp("Network.setCookie", { name: "app_letzte_aktivitaet", value: String(Date.now() - 61 * 60_000), domain: host, path: "/", httpOnly: true, secure: APP.startsWith("https:") });
   await gehe("/styleguide");
   pruefe("nach 60 Minuten ohne Aktivität abgemeldet", (await pfad()) === "/anmelden?grund=inaktiv", await pfad());
   pruefe("Hinweis auf der Anmeldeseite", (await text()).includes("ohne Aktivität abgemeldet"));

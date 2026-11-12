@@ -48,7 +48,7 @@ Stand: 12.11.2026, nach Formulare & Protokolle, Chat, erweiterter Suche, Zurück
 | Einstellungen | Darstellung (Hell, Dunkel, System; Seitenleiste hell oder dunkel) | fertig | je Benutzer; im Dunkelmodus Seitenleiste immer dunkel; Belege und Formulare bleiben hell (PDF) |
 | Designsystem | Styleguide | fertig | auch Zurück-Knopf, Suchtreffer, Farbwahl der Plantafel, Ablage-Upload, Formular-Status, Chat |
 | Übernahme | Datenübernahme aus Airtable | fehlt | |
-| Vercel | Projekt, Region `fra1`, Crons (Zahlungen, Ablage), Lexware-Webhook | teilweise | läuft unter https://sawin-bauelemente-app.vercel.app (Production und Preview bis zum Go-live auf Staging); beide Crons mit 200 geprüft; offen siehe „Vercel“ unten |
+| Vercel | Projekt, Region `fra1`, Crons (Zahlungen, Ablage), Lexware-Webhook | teilweise | läuft unter https://sawin-bauelemente-app.vercel.app (Production und Preview bis zum Go-live auf Staging); beide Crons mit 200 geprüft; Lexware-Webhook im Testkonto registriert; Browser-Tests gegen Vercel grün; offen nur die Region des Proxys (siehe unten) |
 | Version 2 | Monteur-App, Outlook-Versand, automatische Anfragen, KI-Agents | verschoben auf V2 | |
 
 ## Go-live-Checkliste (offen)
@@ -86,9 +86,20 @@ Stand: 12.11.2026, nach Formulare & Protokolle, Chat, erweiterter Suche, Zurück
   des Proxys bei einem Seitenaufruf aus Deutschland (Vercel › Logs › Request Logs › Execution › Region). fra1 → in
   Ordnung, festhalten; andere Region → Entscheidung nötig (z. B. Sitzungsprüfung aus dem Proxy in die Serverfunktionen
   verlagern), weil CLAUDE.md iad1 bzw. Regionen außerhalb Frankfurts ausschließt.
-- **Offen – nächste Schritte:** Supabase-Auth (Staging) auf die Vercel-Adresse umstellen (`SUPABASE_AUTH_SITE_URL`,
-  `localhost:3000` als weitere Weiterleitung, `npm run auth:push`), Lexware-Webhook im Testkonto für
-  `https://sawin-bauelemente-app.vercel.app/api/lexware/webhook` registrieren, Browser-Tests gegen die Vercel-Adresse.
+- **Erledigt 12.11.2026:**
+  - Supabase-Auth (Staging): Site-URL ist die Vercel-Adresse, erlaubte Weiterleitungen `localhost:3000/**` und
+    `sawin-bauelemente-app.vercel.app/**` (geprüft über die Management-API). Achtung: `.env.local` hat noch
+    `SUPABASE_AUTH_SITE_URL=http://localhost:3000` und `config.toml` keine weiteren Weiterleitungen; vor dem nächsten
+    `npm run auth:push` beides angleichen, sonst wird die Einstellung zurückgedreht.
+  - Lexware-Webhook im Testkonto „Musterfirma“ für `https://sawin-bauelemente-app.vercel.app/api/lexware/webhook`
+    registriert (`payment.changed`, `invoice.status.changed`, `credit-note.status.changed`); Adresse antwortet,
+    unsignierte Aufrufe werden mit 401 abgelehnt.
+  - Browser-Tests gegen Vercel: anmeldung 28/28, navigation 35/35, kopfzeile 24/24, dashboard 23/23, kunden 28/28,
+    anfragen 28/28, aufgaben 19/19, auftraege 28/28, service 26/26, einkauf 30/30, team 26/26, seitenleiste 11/11,
+    belege 46/46, plantafel 39/39, montageplan 33/33, katalog 14/14, oberflaeche 14/14, formulare 40/40, chat 26/26,
+    zahlungen 16/16, lexware 51/51 (lexware und anmeldung je im zweiten Lauf; erster Lauf scheiterte an Wartezeiten bzw.
+    an einem Testfehler beim sicheren Cookie, behoben). Formulare und Chat legen dabei echte Testordner in `_App-Test` an.
+  - Antwort-Header eines Aufrufs aus Deutschland: `x-vercel-id: fra1::fra1::…`.
 
 ## Build, Tests, Next.js
 
