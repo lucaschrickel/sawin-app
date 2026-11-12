@@ -164,12 +164,20 @@ try {
   pruefe("Abmelden", await warte("location.pathname === '/anmelden'"), await pfad());
   await formular({ email, passwort });
   pruefe("zweite Anmeldung fragt den Code ab", await warte("location.pathname === '/anmelden/code'"), await pfad());
-  await formular({ code: "000000" });
+  // Code-Feld: nur Ziffern, sendet nach 6 Ziffern selbst; falscher Code leert das Feld und setzt den Fokus zurück
+  await warte("[...document.querySelectorAll('[name=code]')].some((x) => x.getClientRects().length)");
+  await sleep(300);
+  pruefe("Code-Feld: one-time-code, numerisch", await js("(() => { const f = [...document.querySelectorAll('[name=code]')].find((x) => x.getClientRects().length); return f.autocomplete === 'one-time-code' && f.inputMode === 'numeric'; })()"), await js("JSON.stringify([...document.querySelectorAll('[name=code]')].map((x) => [x.autocomplete, x.inputMode, x.getClientRects().length, location.pathname]))"));
+  await js("(() => { const f = [...document.querySelectorAll('[name=code]')].find((x) => x.getClientRects().length); f.focus(); Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set.call(f, '00a0'); f.dispatchEvent(new Event('input', { bubbles: true })); })()");
+  pruefe("Code-Feld nimmt nur Ziffern", await warte("[...document.querySelectorAll('[name=code]')].find((x) => x.getClientRects().length).value === '000'"), await js("[...document.querySelectorAll('[name=code]')].map((x) => x.value).join('|')"));
+  await js("(() => { const f = [...document.querySelectorAll('[name=code]')].find((x) => x.getClientRects().length); Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set.call(f, '000000'); f.dispatchEvent(new Event('input', { bubbles: true })); })()");
   await warte("document.body.innerText.includes('Code stimmt nicht')");
-  pruefe("falscher Code wird abgelehnt", (await text()).includes("Der Code stimmt nicht"));
+  pruefe("falscher Code: automatisch geprüft und abgelehnt", (await text()).includes("Der Code stimmt nicht"));
+  pruefe("falscher Code: Feld geleert, Fokus zurück", await warte("[...document.querySelectorAll('[name=code]')].find((x) => x.getClientRects().length).value === '' && document.activeElement === [...document.querySelectorAll('[name=code]')].find((x) => x.getClientRects().length)"));
   code = await frischerCode(secret, code);
-  await formular({ code });
-  pruefe("richtiger Code: angemeldet", await warte("location.pathname === '/'"), await pfad());
+  // Einfügen aus der Zwischenablage mit Leerzeichen (wie viele Apps es anzeigen): sendet selbst
+  await js(`(() => { const f = [...document.querySelectorAll('[name=code]')].find((x) => x.getClientRects().length); const dt = new DataTransfer(); dt.setData('text', '${code.slice(0, 3)} ${code.slice(3)}'); f.dispatchEvent(new ClipboardEvent('paste', { clipboardData: dt, bubbles: true, cancelable: true })); })()`);
+  pruefe("richtiger Code eingefügt: automatisch angemeldet", await warte("location.pathname === '/'"), await pfad());
 
   // 6. Nicht-Admin: keine Benutzerverwaltung
   await service.from("benutzer").update({ admin: false }).eq("id", angelegt.user.id);

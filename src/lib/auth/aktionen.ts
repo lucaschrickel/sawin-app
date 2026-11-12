@@ -38,7 +38,7 @@ export async function codePruefen(_: Zustand, fd: FormData): Promise<Zustand> {
   if (!stand.angemeldet) redirect("/anmelden");
   if (!stand.faktor) redirect("/anmelden/einrichten");
   const { error } = await stand.supabase.auth.mfa.challengeAndVerify({ factorId: stand.faktor.id, code });
-  if (error) return { fehler: "Der Code stimmt nicht. Bitte den aktuellen Code aus der App eingeben." };
+  if (error) return { fehler: "Der Code stimmt nicht oder ist abgelaufen. Bitte den aktuellen Code aus der App eingeben." };
   redirect(sicheresZiel(fd.get("weiter")));
 }
 
@@ -69,7 +69,7 @@ export async function faktorBestaetigen(_: Zustand, fd: FormData): Promise<Zusta
     return { fehler: "Die Einrichtung ist abgelaufen. Bitte Seite neu laden." };
   }
   const { error } = await stand.supabase.auth.mfa.challengeAndVerify({ factorId, code });
-  if (error) return { fehler: "Der Code stimmt nicht. Bitte den aktuellen Code aus der App eingeben." };
+  if (error) return { fehler: "Der Code stimmt nicht oder ist abgelaufen. Bitte den aktuellen Code aus der App eingeben." };
   redirect("/");
 }
 

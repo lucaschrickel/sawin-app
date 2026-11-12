@@ -236,9 +236,12 @@ export async function browser() {
       const felder = await js("JSON.stringify({ email: document.querySelector('[name=email]')?.value, pwLaenge: document.querySelector('[name=passwort]')?.value.length })");
       throw new Error(`Code-Seite fehlt (${await pfad()}) · Felder ${felder} · Seite: ${(await js("document.querySelector('main')?.innerText") ?? "").replace(/\s+/g, " ").slice(0, 160)}`);
     }
+    // Der Code wird nach 6 Ziffern automatisch abgeschickt; nur falls nicht, den Knopf auf der Code-Seite klicken
     await tippe("[name=code]", totp(admin.secret));
-    await klick("button[type=submit]");
-    if (!(await warte("!location.pathname.startsWith('/anmelden')"))) throw new Error(`Anmeldung fehlgeschlagen (${await pfad()})`);
+    if (!(await warte("!location.pathname.startsWith('/anmelden')", 8000))) {
+      await js("location.pathname === '/anmelden/code' && document.querySelector('main button[type=submit]:not([disabled])')?.click()");
+      if (!(await warte("!location.pathname.startsWith('/anmelden')"))) throw new Error(`Anmeldung fehlgeschlagen (${await pfad()})`);
+    }
   };
   const ende = () => { ws.close(); proc.kill(); try { rmSync(profil, { recursive: true, force: true }); } catch { /* belegt */ } };
   return { cdp, js, warte, da, klick, klickText, tippe, taste, gehe, pfad, text, enthaelt, foto, anmelden, ende };

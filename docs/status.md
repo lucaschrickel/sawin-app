@@ -45,6 +45,7 @@ Stand: 12.11.2026, nach Formulare & Protokolle, Chat, erweiterter Suche, Zurück
 | Einstellungen | Firma, Benutzer, Montageplan, Belege & Artikel | fertig | |
 | Einstellungen | Verbindungen (Lexware, OneDrive, E-Mail mit BCC je Belegart) | fertig | |
 | Einstellungen | Versand (Standard-PDF-Gruppen) | verschoben auf V2 | hängt am Outlook-Versand |
+| Anmeldung | Zwei-Faktor-Code: sendet nach 6 Ziffern selbst, Einfügen (auch mit Leerzeichen), nur Ziffern, one-time-code, kein doppeltes Absenden, falscher Code leert das Feld | fertig | 13.11.2026, test:anmeldung 31/31 |
 | Konto | Passwort ändern (aktuelles Passwort serverseitig geprüft, aal2, andere Sitzungen abgemeldet, Audit-Log) | fertig | 13.11.2026, npm run test:konto 10/10 |
 | Einstellungen | Darstellung (Hell, Dunkel, System; Seitenleiste hell oder dunkel) | fertig | je Benutzer; im Dunkelmodus Seitenleiste immer dunkel; Belege und Formulare bleiben hell (PDF) |
 | Designsystem | Styleguide | fertig | auch Zurück-Knopf, Suchtreffer, Farbwahl der Plantafel, Ablage-Upload, Formular-Status, Chat |
