@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { verlaufNeuBeginnen } from "./verlauf";
-import { ChevronLeft, ChevronRight, LogOut } from "lucide-react";
+import { ChevronLeft, ChevronRight, KeyRound, LogOut } from "lucide-react";
 import { useSyncExternalStore, type ReactNode } from "react";
 import { Avatar } from "@/components/ui/avatar";
 import { seitenleisteSetzen } from "@/lib/ansicht-aktion";
@@ -166,6 +166,16 @@ export function Seitenleiste({ active, brand, user, zaehler, eingeklappt, offen,
             <b className="block truncate text-base font-semibold text-frame-strong">{user.name}</b>
             <small className="block text-xs text-frame-muted">{user.role}</small>
           </span>
+          <Link
+            href="/konto/passwort"
+            onClick={verlaufNeuBeginnen}
+            aria-label="Passwort ändern"
+            title="Passwort ändern"
+            data-passwort-aendern
+            className="inline-flex size-9 items-center justify-center rounded-full text-frame-muted hover:bg-frame-hover hover:text-frame-strong"
+          >
+            <KeyRound className="size-[17px]" aria-hidden="true" />
+          </Link>
           {/* Abmelden per POST an den Route-Handler (kein Link, damit nichts vorab geladen wird) */}
           <form action="/abmelden" method="post">
             <button

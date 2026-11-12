@@ -45,6 +45,7 @@ Stand: 12.11.2026, nach Formulare & Protokolle, Chat, erweiterter Suche, Zurück
 | Einstellungen | Firma, Benutzer, Montageplan, Belege & Artikel | fertig | |
 | Einstellungen | Verbindungen (Lexware, OneDrive, E-Mail mit BCC je Belegart) | fertig | |
 | Einstellungen | Versand (Standard-PDF-Gruppen) | verschoben auf V2 | hängt am Outlook-Versand |
+| Konto | Passwort ändern (aktuelles Passwort serverseitig geprüft, aal2, andere Sitzungen abgemeldet, Audit-Log) | fertig | 13.11.2026, npm run test:konto 10/10 |
 | Einstellungen | Darstellung (Hell, Dunkel, System; Seitenleiste hell oder dunkel) | fertig | je Benutzer; im Dunkelmodus Seitenleiste immer dunkel; Belege und Formulare bleiben hell (PDF) |
 | Designsystem | Styleguide | fertig | auch Zurück-Knopf, Suchtreffer, Farbwahl der Plantafel, Ablage-Upload, Formular-Status, Chat |
 | Übernahme | Datenübernahme aus Airtable | teilweise | Skript, Zuordnung, Altbestand-Schalter, Kopfbeleg, Storno und Prüfbericht fertig (`docs/airtable-uebernahme.md`, `npm run test:altbestand` 17/17). Probelauf auf Staging am 12.11.2026: 861 Kunden, 166 Anfragen, 105 Aufträge, 578 Belege, 148 Ordner, 8 Aufgaben, ohne Fehler; wiederholbar geprüft. Startwerte der Nummernkreise gesetzt, Go-live-Prüfung `npm run golive:pruefen`. Seit dem Merge (12.11.2026, Deployment „Ready“) läuft auf Vercel der neue Code. Offen: Lieferantenkürzel von Sawin |
