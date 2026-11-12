@@ -161,7 +161,7 @@ function BezugAuswahl({ onWahl, fehler }: { onWahl: (b: Bezug) => void; fehler?:
 // Liste
 // ---------------------------------------------------------------------------------------------------------------------
 /** Eine Aufgabe mit Haken. Abhaken speichert sofort; ein Klick auf den Titel öffnet die Aufgabe. */
-export function AufgabeZeile({ aufgabe: a, kontext, zeigeZustaendig, zeigeBezug = true }: { aufgabe: Aufgabe; kontext: AufgabenKontext; zeigeZustaendig?: boolean; zeigeBezug?: boolean }) {
+export function AufgabeZeile({ aufgabe: a, kontext, zeigeZustaendig, zeigeBezug = true, startOffen }: { aufgabe: Aufgabe; kontext: AufgabenKontext; zeigeZustaendig?: boolean; zeigeBezug?: boolean; startOffen?: boolean }) {
   const [erledigt, setErledigt] = useOptimistic(a.status === "erledigt");
   const [fehler, setFehler] = useState<string>();
   const [, starten] = useTransition();
@@ -188,6 +188,7 @@ export function AufgabeZeile({ aufgabe: a, kontext, zeigeZustaendig, zeigeBezug 
         <AufgabeDialog
           {...kontext}
           aufgabe={a}
+          startOffen={startOffen}
           ausloeser={
             <button type="button" className={cn("text-left font-medium hover:underline", erledigt && "text-muted line-through")}>
               {a.titel}

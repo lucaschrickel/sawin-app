@@ -53,7 +53,8 @@
   --logo-ink: #2e2b28;
 }
 
-/* Dunkles Theme (Anmeldeseite): Look der Website, Primäraktion in Sawin-Sand */
+/* Dunkles Theme (Farbschema Dunkel bzw. System, Anmeldeseite): Look der Website, Primäraktion in Sawin-Sand */
+[data-customer="sawin"][data-theme="dark"],
 [data-customer="sawin"] [data-theme="dark"] {
   --accent: #d1b19a;
   --accent-hover: #c4a089;

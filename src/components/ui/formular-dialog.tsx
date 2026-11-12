@@ -35,8 +35,10 @@ type Props = {
 /** ?neu=1 aus der Adresse entfernen, ohne neu zu laden (Dialog aus dem „Neu“-Menü geschlossen) */
 export function neuParameterEntfernen() {
   const u = new URL(window.location.href);
-  if (!u.searchParams.has("neu")) return;
-  u.searchParams.delete("neu");
+  // ?neu (Neu-Menü), ?aufgabe und ?termin (Treffer der Suche) öffnen einen Dialog nur einmal
+  const einmal = ["neu", "aufgabe", "termin"].filter((p) => u.searchParams.has(p));
+  if (!einmal.length) return;
+  for (const p of einmal) u.searchParams.delete(p);
   window.history.replaceState(null, "", u.pathname + u.search + u.hash);
 }
 

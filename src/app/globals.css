@@ -27,6 +27,12 @@
   --color-frame-ink: var(--frame-ink);
   --color-frame-muted: var(--frame-muted);
   --color-frame-line: var(--frame-line);
+  --color-frame-text: var(--frame-text);
+  --color-frame-strong: var(--frame-strong);
+  --color-frame-hover: var(--frame-hover);
+  --color-frame-chip: var(--frame-chip);
+  --color-frame-alarm: var(--frame-alarm);
+  --color-frame-alarm-ink: var(--frame-alarm-ink);
 
   --color-accent: var(--accent);
   --color-accent-hover: var(--accent-hover);

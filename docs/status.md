@@ -1,6 +1,6 @@
 # Stand der App
 
-Stand: 12.11.2026, nach Formulare & Protokolle und Chat. Vergleich mit dem Klick-Prototyp
+Stand: 12.11.2026, nach Formulare & Protokolle, Chat, erweiterter Suche, Zurück-Verlauf und Darstellung. Vergleich mit dem Klick-Prototyp
 (`docs/demo/sawin-demo.html`) und `CLAUDE.md`. Wird nach jedem größeren Block aktualisiert.
 
 **Entscheidungen 11.11.2026:**
@@ -14,8 +14,8 @@ Stand: 12.11.2026, nach Formulare & Protokolle und Chat. Vergleich mit dem Klick
 | Bereich | Funktion | Stand | Begründung |
 |---|---|---|---|
 | Rahmen | Seitenleiste (Gruppen, einklappbar, Zähler, „folgt“) | fertig | wie Demo |
-| Rahmen | Zurück-Verlauf „← vorherige Maske“ | teilweise | Brotkrumen und Zurück im Editor; Verlauf je Tab mit Filter und Ansicht fehlt |
-| Rahmen | Globale Suche (Vorschläge je Bereich, Fundstelle, Pfeiltasten, Strg+K, Ergebnisseite) | fertig | Kunden, Anfragen, Aufträge, Belege (auch Positionen, Tags, Kommentar), Tickets; Datenbankfunktion mit RLS. Lieferanten, Bestellungen, Aufgaben, Termine aus der Demo noch nicht |
+| Rahmen | Zurück-Verlauf „← vorherige Maske“ | fertig | Verlauf je Tab mit Filter und Reiter; Seitenleiste beginnt neu (nur Name der Maske); direkt geöffnet: fachlicher Pfad; Browser-Zurück verhält sich gleich |
+| Rahmen | Globale Suche (Vorschläge je Bereich, Fundstelle, Pfeiltasten, Strg+K, Ergebnisseite) | fertig | Kunden, Anfragen, Aufträge, Belege (auch Positionen, Tags, Kommentar), Tickets, Lieferanten (auch Ansprechpartner), Bestellungen (auch Positionen), Aufgaben, Termine; Datenbankfunktion mit RLS |
 | Rahmen | „Neu“-Menü | fertig | Kunde, Anfrage, Angebot, Auftrag, Ticket, Bestellung, Aufgabe; Dialoge öffnen direkt |
 | Rahmen | Glocke | fertig | Hinweise wie im Dashboard, dazu überfällige Rechnungen, „in Lexware noch buchen“, Angebote nachfassen, Aufträge ohne Rechnung, Erwähnungen im Chat |
 | Rahmen | Lexware-Status und Benutzer im Fuß der Seitenleiste | fertig | |
@@ -45,7 +45,7 @@ Stand: 12.11.2026, nach Formulare & Protokolle und Chat. Vergleich mit dem Klick
 | Einstellungen | Firma, Benutzer, Montageplan, Belege & Artikel | fertig | |
 | Einstellungen | Verbindungen (Lexware, OneDrive, E-Mail mit BCC je Belegart) | fertig | |
 | Einstellungen | Versand (Standard-PDF-Gruppen) | verschoben auf V2 | hängt am Outlook-Versand |
-| Einstellungen | Darstellung (Hell, Dunkel, System) | fehlt | Tokens für Dunkel vorhanden |
+| Einstellungen | Darstellung (Hell, Dunkel, System; Seitenleiste hell oder dunkel) | fertig | je Benutzer; im Dunkelmodus Seitenleiste immer dunkel; Belege und Formulare bleiben hell (PDF) |
 | Designsystem | Styleguide | teilweise | Farbwahl der Plantafel, Kopfzeile und Ablage-Karte noch nicht unter `/styleguide` |
 | Übernahme | Datenübernahme aus Airtable | fehlt | |
 | Vercel | Projekt, Region `fra1`, Crons (Zahlungen, Ablage), Lexware-Webhook | teilweise | läuft unter https://sawin-bauelemente-app.vercel.app (Production und Preview bis zum Go-live auf Staging); beide Crons mit 200 geprüft; offen siehe „Vercel“ unten |
@@ -55,7 +55,7 @@ Stand: 12.11.2026, nach Formulare & Protokolle und Chat. Vergleich mit dem Klick
 
 | Punkt | Stand |
 |---|---|
-| RLS, Policies, Advisors | RLS-Tests 85/85; Advisors: nur „Schutz vor geleakten Passwörtern“ (Pro-Tarif) |
+| RLS, Policies, Advisors | RLS-Tests 92/92; Advisors: nur „Schutz vor geleakten Passwörtern“ (Pro-Tarif) |
 | MFA | in der App erzwungen |
 | SMTP, Sitzungsgrenze 60 Minuten, Passwortschutz | offen (Pro-Tarif, eigener SMTP) |
 | Backups (PITR) und Wiederherstellungstest | offen |
@@ -94,8 +94,10 @@ Stand: 12.11.2026, nach Formulare & Protokolle und Chat. Vergleich mit dem Klick
 
 - `npm run lint`, `npx tsc --noEmit`, `npm run build`: ohne Fehler. `npm audit --omit=dev`: 0 Befunde.
 - Next.js-Fehlerliste des Dev-Servers: leer (geprüft nach Block 3).
-- Unit 102/102, RLS 92/92. Browser-Tests 12.11.2026: chat 26/26, formulare 40/40, anfragen 28/28, auftraege 28/28,
-  service 26/26, belege 46/46, plantafel 39/39, onedrive 24/24, kopfzeile 24/24, dashboard 23/23.
+- Unit 111/111, RLS 92/92. Browser-Tests 12.11.2026 (nach Suche, Zurück-Verlauf, Darstellung): navigation 35/35,
+  kopfzeile 24/24, dashboard 23/23, seitenleiste 11/11, oberflaeche 14/14, kunden 28/28, anfragen 28/28, aufgaben 19/19,
+  auftraege 28/28, service 26/26, belege 46/46, einkauf 30/30, team 26/26, plantafel 39/39, montageplan 33/33,
+  katalog 14/14, chat 26/26, formulare 40/40, zahlungen 16/16, lexware 51/51, onedrive 24/24.
 - Bekannt: Beleg-PDFs zeigen keine Seitenzahl („Seite n von m“). react-pdf 4 rendert render-Texte nicht, solange die
   Seite eine lineHeight hat; Umbau (lineHeight je Block statt an der Seite) ändert das geprüfte Schriftbild, deshalb
   noch offen. Fußzeilen von Wochenplan und Formularen waren aus demselben Grund leer und sind behoben.

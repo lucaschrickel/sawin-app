@@ -8,7 +8,7 @@ import { Bestaetigen } from "@/components/ui/bestaetigen";
 import { Button } from "@/components/ui/button";
 import { Field, Input, Textarea } from "@/components/ui/field";
 import { Formular } from "@/components/ui/formular";
-import { FormularDialog, type FormularSteuerung } from "@/components/ui/formular-dialog";
+import { FormularDialog, neuParameterEntfernen, type FormularSteuerung } from "@/components/ui/formular-dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import type { Bezug } from "@/lib/aufgaben-status";
 import { cn } from "@/lib/cn";
@@ -27,6 +27,8 @@ type Props = {
   eintraege: KalenderEintrag[];
   feiertage: { datum: string; name: string }[];
   mitarbeiter: { id: string; name: string }[];
+  /** Termin, der beim Öffnen gleich angezeigt wird (Treffer der Suche) */
+  oeffnen?: string;
 };
 
 const VON_H = 6;
@@ -51,7 +53,8 @@ const zeitText = (e: KalenderEintrag, d: string) =>
 
 /** Kalenderinhalt je Ansicht; Klick öffnet Auftrag, Ticket, Anfrage, Abwesenheit oder den Termin-Dialog */
 export function KalenderInhalt(p: Props) {
-  const [offen, setOffen] = useState<TerminDaten | null>(null);
+  // Treffer der Suche (?termin=<id>): Termin gleich geöffnet
+  const [offen, setOffen] = useState<TerminDaten | null>(() => (p.oeffnen ? (p.eintraege.find((e) => e.termin?.id === p.oeffnen)?.termin ?? null) : null));
   const pfad = usePathname();
   const params = useSearchParams();
   const tagHref = (d: string) => {
@@ -220,7 +223,7 @@ export function KalenderInhalt(p: Props) {
   return (
     <>
       {inhalt}
-      {offen && <TerminDialog key={offen.id} termin={offen} mitarbeiter={p.mitarbeiter} heute={p.heute} beiSchliessen={() => setOffen(null)} />}
+      {offen && <TerminDialog key={offen.id} termin={offen} mitarbeiter={p.mitarbeiter} heute={p.heute} beiSchliessen={() => { setOffen(null); neuParameterEntfernen(); }} />}
     </>
   );
 }

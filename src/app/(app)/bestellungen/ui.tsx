@@ -1,5 +1,6 @@
 "use client";
 
+import { verlaufVergessen } from "@/components/app/verlauf";
 import { Check, Pencil, Plus, Trash2, X } from "lucide-react";
 import { useActionState, useState, useTransition, type ReactNode } from "react";
 import { Bestaetigen } from "@/components/ui/bestaetigen";
@@ -189,7 +190,7 @@ export function BestellungLoeschen({ id, nummer }: { id: string; nummer: string 
         text={<>Bestellung <b className="font-mono text-ink">{nummer}</b> wird samt Positionen als gelöscht markiert. Schon (teilweise) gelieferte Bestellungen bleiben erhalten.</>}
         knopf="Löschen"
         gefahr
-        ausfuehren={() => starten(async () => setE((await bestellungLoeschen(id)) ?? {}))}
+        ausfuehren={() => starten(async () => (verlaufVergessen(), setE((await bestellungLoeschen(id)) ?? {})))}
       >
         <Button variant="danger" disabled={laeuft}>
           <Trash2 className="size-[15px]" />

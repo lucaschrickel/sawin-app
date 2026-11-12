@@ -163,7 +163,8 @@ Wahl der Rechnung). Höchstens eine Zahlungsbestätigung je Zahlung. Höchstens 
    Reihenfolge der Gruppen; OneDrive-Ablage `20261116090000_onedrive.sql`, `…090100` Upload-Status, `…090200` Verwerfen;
    Versand `20261115090000_versand_vorlaeufig.sql`, Suche `20261115090100_suche.sql`; Formulare
    `20261117090000_formulare.sql` mit `aufmass_speichern`, Sperren und `ablage_datei.formular_id`, `…090100` als INVOKER;
-   Chat `20261117090200_chat.sql` mit Speicher `chat-fotos`, `chat_ungelesen`, `chat_gelesen_setzen`)
+   Chat `20261117090200_chat.sql` mit Speicher `chat-fotos`, `chat_ungelesen`, `chat_gelesen_setzen`; Suche über
+   Lieferanten, Bestellungen, Aufgaben, Termine `20261118090000_suche_erweitert.sql`)
 7. `…_rls.sql`: RLS und Policies für alle Tabellen, Rechte für `anon` entzogen, Prüfung am Ende: bricht ab, wenn
    eine Tabelle in `public` ohne RLS ist
 

@@ -1,5 +1,6 @@
 "use client";
 
+import { verlaufVergessen } from "@/components/app/verlauf";
 import { ChatZahl } from "../chat/ui";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
@@ -317,7 +318,7 @@ export function AuftragLoeschen({ id, nummer }: { id: string; nummer: string }) 
         }
         knopf="Löschen"
         gefahr
-        ausfuehren={() => starten(async () => setErgebnis((await auftragLoeschen(id)) ?? {}))}
+        ausfuehren={() => starten(async () => (verlaufVergessen(), setErgebnis((await auftragLoeschen(id)) ?? {})))}
       >
         <Button variant="danger" disabled={laeuft}>
           <Trash2 className="size-[15px]" />

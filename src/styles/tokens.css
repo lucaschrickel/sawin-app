@@ -31,8 +31,15 @@
   --frame-muted: #9ca3af;
   --frame-line: rgb(255 255 255 / 0.08);
   --frame-focus-ring: #e9e6e2;
-  /* Logo-Konturen und Wortmarke auf der (immer dunklen) Seitenleiste */
+  /* Logo-Konturen und Wortmarke auf der Seitenleiste */
   --frame-logo-ink: #ffffff;
+  /* Menüpunkte, hervorgehobener Text, Hover- und Symbolflächen, Warnzahl der Seitenleiste */
+  --frame-text: #c9c6c1;
+  --frame-strong: #ffffff;
+  --frame-hover: rgb(255 255 255 / 0.05);
+  --frame-chip: rgb(255 255 255 / 0.07);
+  --frame-alarm: #b5473a;
+  --frame-alarm-ink: #ffffff;
 
   /* Logo-Konturen und Wortmarke auf hellem Grund (je Kunde überschreibbar) */
   --logo-ink: #171717;
@@ -121,10 +128,12 @@
 }
 
 /*
-  Dunkles Theme, z. B. für die Anmeldeseite. Auf ein Element innerhalb von <html> setzen
-  (data-theme="dark"), nicht auf <html> selbst, sonst gewinnt das helle Kunden-Theme.
-  Kunden überschreiben den Akzent über [data-customer="<kunde>"] [data-theme="dark"].
+  Dunkles Theme: auf <html> (Farbschema des Benutzers, Einstellungen › Darstellung; :root erhöht die Spezifität über
+  das helle Kunden-Theme) oder auf einem umschließenden Element (Anmeldeseite, Styleguide).
+  Kunden überschreiben den Akzent über [data-customer="<kunde>"][data-theme="dark"] bzw. [data-customer] [data-theme].
+  Belege, Formulare und Wochenplan sind PDFs und bleiben immer hell (Papier).
 */
+:root[data-theme="dark"],
 [data-theme="dark"] {
   color-scheme: dark;
 
@@ -195,4 +204,22 @@
   --shadow-card: none;
   --shadow-hover: none;
   --shadow-pop: 0 4px 6px -1px rgb(0 0 0 / 0.5), 0 2px 4px -1px rgb(0 0 0 / 0.4);
+}
+
+/*
+  Helle Seitenleiste (Einstellungen › Darstellung, nur im hellen Farbschema; im Dunkelmodus ist sie immer dunkel).
+  Kontrast: --frame-muted auf --frame 5,7:1, --frame-text 9:1.
+*/
+:root[data-seitenleiste="hell"]:not([data-theme="dark"]) {
+  --frame: #efede8;
+  --frame-2: #e6e3dd;
+  --frame-ink: #1c1b18;
+  --frame-muted: #5f5b53;
+  --frame-line: rgb(0 0 0 / 0.08);
+  --frame-focus-ring: var(--focus-ring);
+  --frame-logo-ink: var(--logo-ink);
+  --frame-text: #3d3a35;
+  --frame-strong: #1c1b18;
+  --frame-hover: rgb(0 0 0 / 0.05);
+  --frame-chip: rgb(0 0 0 / 0.06);
 }

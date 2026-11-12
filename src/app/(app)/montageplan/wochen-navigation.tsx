@@ -11,10 +11,10 @@ export function WochenNavigation({ basis, montag, heute, wochen = 1 }: { basis: 
   return (
     <nav aria-label="Woche" className="flex flex-wrap items-center gap-2">
       <span role="group" aria-label="Ansicht" className="mr-1 inline-flex h-10 items-center gap-0.5 rounded-full border border-line bg-surface p-1">
-        <Link replace scroll={false} href={`${basis}?woche=${montag}`} aria-current={wochen === 1 ? "page" : undefined} className={cn(segment, wochen === 1 ? "bg-ink text-white" : "text-muted hover:text-ink")}>
+        <Link replace scroll={false} href={`${basis}?woche=${montag}`} aria-current={wochen === 1 ? "page" : undefined} className={cn(segment, wochen === 1 ? "bg-ink text-surface" : "text-muted hover:text-ink")}>
           1 Woche
         </Link>
-        <Link replace scroll={false} href={`${basis}?woche=${montag}&ansicht=4`} aria-current={wochen === 4 ? "page" : undefined} className={cn(segment, wochen === 4 ? "bg-ink text-white" : "text-muted hover:text-ink")}>
+        <Link replace scroll={false} href={`${basis}?woche=${montag}&ansicht=4`} aria-current={wochen === 4 ? "page" : undefined} className={cn(segment, wochen === 4 ? "bg-ink text-surface" : "text-muted hover:text-ink")}>
           4 Wochen
         </Link>
       </span>

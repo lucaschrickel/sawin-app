@@ -1,13 +1,15 @@
 "use client";
 
-import Link from "next/link";
 import { Menu } from "lucide-react";
-import { useState, type ReactNode } from "react";
+import { Suspense, useState, type ReactNode } from "react";
 import { Button } from "@/components/ui/button";
+import type { Darstellung } from "@/lib/darstellung";
+import { DarstellungAbgleich } from "./darstellung";
 import { Inaktivitaet } from "./inaktivitaet";
 import { Glocke, GlobaleSuche, NeuMenue } from "./kopfzeile";
 import type { Zaehler } from "./navigation";
 import { Seitenleiste } from "./seitenleiste";
+import { Pfad, Verlauf } from "./verlauf";
 
 type AppShellProps = {
   active: string;
@@ -22,16 +24,19 @@ type AppShellProps = {
   inaktivMinuten: number;
   /** Lexware-Anbindung eingerichtet (Schlüssel auf dem Server gesetzt) */
   lexware: boolean;
+  /** Farbschema und Seitenleiste des Benutzers (Einstellungen › Darstellung) */
+  darstellung: Darstellung;
   children: ReactNode;
 };
 
 /** App-Rahmen: dunkle Seitenleiste, helles Inhaltsfeld, Kopfzeile mit Suche, „Neu“-Menü und Glocke. */
-export function AppShell({ active, crumbs, brand, user, zaehler, eingeklappt, inaktivMinuten, lexware, children }: AppShellProps) {
+export function AppShell({ active, crumbs, brand, user, zaehler, eingeklappt, inaktivMinuten, lexware, darstellung, children }: AppShellProps) {
   const [open, setOpen] = useState(false);
 
   return (
     <div className="flex min-h-screen py-3 pr-3 max-[960px]:p-0">
       <Inaktivitaet minuten={inaktivMinuten} />
+      <DarstellungAbgleich {...darstellung} />
       <Seitenleiste active={active} brand={brand} user={user} zaehler={zaehler} eingeklappt={eingeklappt} offen={open} lexware={lexware} />
 
       {open && (
@@ -43,18 +48,9 @@ export function AppShell({ active, crumbs, brand, user, zaehler, eingeklappt, in
           <Button size="icon" className="min-[961px]:hidden" aria-label="Menü öffnen" onClick={() => setOpen(true)}>
             <Menu className="size-[18px]" />
           </Button>
-          <nav aria-label="Pfad" className="flex min-w-0 items-center gap-2 text-[13.5px] text-muted-2">
-            {crumbs.map((c, i) =>
-              i === crumbs.length - 1 ? (
-                <b key={c.label} className="truncate font-semibold text-ink">{c.label}</b>
-              ) : (
-                <span key={c.label} className="flex items-center gap-2">
-                  {c.href ? <Link href={c.href} className="hover:text-ink">{c.label}</Link> : c.label}
-                  <span aria-hidden="true">›</span>
-                </span>
-              ),
-            )}
-          </nav>
+          <Suspense fallback={<Pfad crumbs={crumbs} />}>
+            <Verlauf crumbs={crumbs} />
+          </Suspense>
           <GlobaleSuche />
           <div className="flex items-center gap-2.5">
             <NeuMenue />

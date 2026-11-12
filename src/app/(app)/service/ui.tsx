@@ -1,5 +1,6 @@
 "use client";
 
+import { verlaufVergessen } from "@/components/app/verlauf";
 import { ChatZahl } from "../chat/ui";
 import Link from "next/link";
 import { AlertTriangle, Check, Pencil, Plus, Trash2 } from "lucide-react";
@@ -324,7 +325,7 @@ export function TicketLoeschen({ id, nummer }: { id: string; nummer: string }) {
         text={<>Ticket <b className="font-mono text-ink">{nummer}</b> wird als gelöscht markiert. Das geht nur ohne Einsätze, Zeiten und Belege.</>}
         knopf="Löschen"
         gefahr
-        ausfuehren={() => starten(async () => setE((await ticketLoeschen(id)) ?? {}))}
+        ausfuehren={() => starten(async () => (verlaufVergessen(), setE((await ticketLoeschen(id)) ?? {})))}
       >
         <Button variant="danger" disabled={laeuft}>
           <Trash2 className="size-[15px]" />

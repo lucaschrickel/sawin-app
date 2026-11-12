@@ -4,6 +4,7 @@ import "@fontsource-variable/inter";
 import "@fontsource/jetbrains-mono/500.css";
 import "./globals.css";
 import { getCustomer } from "@/customers";
+import { DARSTELLUNG_SKRIPT } from "@/lib/darstellung";
 
 const customer = getCustomer();
 
@@ -14,7 +15,11 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
-    <html lang="de" data-customer={customer.id} className="h-full">
+    // suppressHydrationWarning: das Skript im <head> setzt data-theme / data-seitenleiste vor dem ersten Zeichnen
+    <html lang="de" data-customer={customer.id} className="h-full" suppressHydrationWarning>
+      <head>
+        <script dangerouslySetInnerHTML={{ __html: DARSTELLUNG_SKRIPT }} />
+      </head>
       <body className="min-h-full">{children}</body>
     </html>
   );

@@ -6,7 +6,7 @@ import { Shell } from "@/components/app/shell";
 import { ladeDashboardAnsicht } from "@/lib/ansicht";
 import { pruefeSitzung } from "@/lib/auth/sitzung";
 import { zahlungenImHintergrund } from "@/lib/lexware/zahlungen";
-import { DASHBOARD_ANSICHTEN, ladeEinkauf, ladeGeschaeftsfuehrung, ladeMontage } from "@/lib/dashboard";
+import { ladeEinkauf, ladeGeschaeftsfuehrung, ladeMontage } from "@/lib/dashboard";
 import { kalenderwoche } from "@/lib/woche";
 import { heuteBerlin, utcNachBerlinLokal } from "@/lib/zeit";
 import { NeueBestellung } from "./bestellungen/neu";
@@ -26,8 +26,8 @@ export default async function DashboardPage() {
   const stunde = Number(jetzt.slice(11, 13));
   const datum = `${WOCHENTAG[new Date(`${heute}T12:00:00Z`).getUTCDay()]}, ${Number(heute.slice(8, 10))}. ${MONAT[Number(heute.slice(5, 7)) - 1]} ${heute.slice(0, 4)}`;
   const umschalter = <DashboardUmschalter ansicht={ansicht} />;
-  const titel = DASHBOARD_ANSICHTEN.find((a) => a.wert === ansicht)!.text;
-  const crumbs = [{ label: "Übersicht" }, { label: "Dashboard" }, { label: titel }];
+  // Die Ansicht steht im Umschalter; im Pfad und im Zurück-Knopf heißt die Maske „Dashboard“
+  const crumbs = [{ label: "Übersicht" }, { label: "Dashboard" }];
 
   if (ansicht === "montage") {
     const d = await ladeMontage();

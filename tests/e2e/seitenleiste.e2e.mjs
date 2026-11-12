@@ -56,7 +56,7 @@ try {
   merken("abwesenheit", abw.id);
   await b.gehe("/aufgaben");
   pruefe("Zähler Anfragen zählt die neue Anfrage", await b.warte(`Number(document.querySelector("aside [data-zaehler='anfragen']")?.textContent ?? 0) === ${anfragenVorher + 1}`));
-  pruefe("Zähler Abwesenheiten rot hervorgehoben", await b.js(`document.querySelector("aside [data-zaehler='abwesenheiten']")?.className.includes("bg-tone-red-fg")`));
+  pruefe("Zähler Abwesenheiten rot hervorgehoben", await b.js(`document.querySelector("aside [data-zaehler='abwesenheiten']")?.className.includes("bg-frame-alarm")`));
 
   // 4. Einklappen: Symbolleiste mit Zählern, gemerkt je Benutzer
   await b.klick("aside button[aria-label='Seitenleiste einklappen']");

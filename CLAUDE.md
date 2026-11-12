@@ -199,6 +199,12 @@ Die Monteur-App kommt in Version 2.
   ersetzen den letzten Eintrag statt einen neuen anzulegen; der Browser-Zurück-Knopf verhält sich gleich. Ein Klick
   in die Seitenleiste beginnt den Verlauf neu, dann steht oben links nur der Name der Maske. Beim direkten Öffnen
   per Link ohne Verlauf zeigt die Leiste den fachlichen Pfad.
+  **Umsetzung (12.11.2026):** `src/lib/verlauf.ts` (Logik, Unit-Tests `tests/unit/verlauf.test.ts`) und
+  `src/components/app/verlauf.tsx`; Verlauf im sessionStorage des Tabs. Maske = Pfad ohne Filter; Beleg-Entwurf,
+  Beleg und „Bearbeiten“ desselben Belegs sind eine Maske. Kehrt man zu einer früheren Maske zurück (Knopf,
+  Browser-Zurück oder Link), endet der Verlauf dort. Der Knopf nutzt `history.back()`, wenn der Browser-Verlauf genau
+  dorthin führt, sonst öffnet er die gemerkte Adresse. Gelöschte Vorgänge (Auftrag, Anfrage, Kunde, Ticket, Bestellung,
+  Lieferant) verschwinden aus dem Verlauf.
 - Gruppen und Reihenfolge:
   - **Übersicht:** Dashboard, Aufgaben
   - **Kunden & Anfragen:** Kunden, Anfragen
@@ -232,6 +238,10 @@ Die Monteur-App kommt in Version 2.
   Bereich (mit Anzahl) und einer Tabelle je Bereich. Durchsucht werden Namen, Nummern, Adressen, Lieferadressen,
   Telefon, E-Mail, Belegpositionen, Bauvorhaben, Tags, Kommentare und Notizen. Im echten Betrieb serverseitig
   (Postgres-Volltext, RLS gilt; Konditionen werden nie durchsucht).
+  **Umsetzung (12.11.2026):** Datenbankfunktion `public.suche` (SECURITY INVOKER) über alle neun Bereiche;
+  Lieferanten auch über Ansprechpartner und Produktgruppen, Bestellungen über Positionen, Auftragsnummern der Zeilen und
+  die AB-Nummer des Lieferanten. Aufgaben und Termine haben keine eigene Seite: der Treffer öffnet die Aufgabenliste
+  bzw. die Tagesansicht des Kalenders mit geöffnetem Dialog (`?aufgabe=` / `?termin=`, nach dem Schließen entfernt).
 - „Neu“-Menü oben: Kunde, Anfrage, Angebot, Auftrag, Service-Ticket, Bestellung, Aufgabe. „Angebot“ und „Auftrag“
   öffnen direkt den Beleg-Editor (Angebot bzw. AB), ohne Zwischendialog.
 - Glocke: Hinweise wie Erwähnungen im Chat, Abwesenheiten zur Genehmigung, nicht freigegebene Vorplanung,
@@ -840,6 +850,13 @@ Maßstab ist OWASP ASVS Level 1. Vor dem Start mit Echtdaten müssen alle Mindes
   Wochenplan, PDF und Druck setzen die hellen Werte lokal neu und bleiben immer hell (Papier). Im Dunkelmodus ist
   die Seitenleiste immer dunkel. Kontrast in beiden Modi mindestens 4,5:1 für Text; Planungspalette und
   Kalenderfarben haben eigene Dunkel-Werte.
+  **Umsetzung (12.11.2026):** Einstellungen › Darstellung (je Benutzer in `benutzer_einstellung.farbschema` und
+  `seitenleiste_hell`, wirkt sofort). Gesetzt wird `data-theme="dark"` bzw. `data-seitenleiste="hell"` auf `<html>`
+  (Dialoge und Auswahllisten hängen am `<body>`); ein kleines Skript im `<head>` setzt die zuletzt gewählte
+  Darstellung aus dem localStorage vor dem ersten Zeichnen, die App gleicht sie danach mit der Datenbank ab („Wie das
+  System“ folgt einem Wechsel des Betriebssystems sofort). Bei der CSP mit Nonce muss das Skript die Nonce bekommen. Die
+  Seitenleiste nutzt nur Frame-Tokens (`--frame-text`, `--frame-strong`, `--frame-hover`, `--frame-chip`,
+  `--frame-alarm`); die helle Seitenleiste setzt sie unter `:root[data-seitenleiste="hell"]:not([data-theme="dark"])`.
 - **Logo:** exakt das Logo von sawin-bauelemente.de, als SVG nachgezeichnet: Gebäude-Symbol (Konturen in Strichfarbe,
   Flächen Sand `#D2B19A` und Grau `#B3B3B3`) und Wortmarke „SAWIN“ (Sand) mit „BAUELEMENTE“ und Linie darunter.
   Konturen, „BAUELEMENTE“ und Linie sind weiß auf dunklem und anthrazit (`#2E2B28`) auf hellem Grund (Token

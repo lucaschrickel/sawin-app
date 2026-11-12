@@ -5,6 +5,10 @@ export const SUCH_BEREICHE = [
   ["auftrag", "Aufträge"],
   ["beleg", "Belege"],
   ["ticket", "Service-Tickets"],
+  ["lieferant", "Lieferanten"],
+  ["bestellung", "Bestellungen"],
+  ["aufgabe", "Aufgaben"],
+  ["termin", "Termine"],
 ] as const;
 export type SuchBereich = (typeof SUCH_BEREICHE)[number][0];
 

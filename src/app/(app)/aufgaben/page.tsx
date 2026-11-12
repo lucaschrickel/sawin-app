@@ -19,6 +19,8 @@ export default async function AufgabenPage({ searchParams }: PageProps<"/aufgabe
   const sp = await searchParams;
   const { benutzer: ich } = await pruefeSitzung();
   const alle = eins(sp.wer) === "alle";
+  // Treffer der Suche: diese Aufgabe gleich geöffnet
+  const oeffnen = eins(sp.aufgabe);
   const zustand = eins(sp.zustand) === "erledigt" ? "erledigt" : eins(sp.zustand) === "alle" ? "alle" : "offen";
   const [{ liste, anzahl }, benutzer] = await Promise.all([ladeAufgaben({ meine: !alle, zustand }), ladeBenutzerAuswahl()]);
   const heute = heuteBerlin();
@@ -82,7 +84,7 @@ export default async function AufgabenPage({ searchParams }: PageProps<"/aufgabe
                   {titel}
                   <span className="text-xs font-normal text-muted-2 tabular">{l.length}</span>
                 </h2>
-                <ul>{l.map((a) => <AufgabeZeile key={a.id} aufgabe={a} kontext={kontext} zeigeZustaendig={alle} />)}</ul>
+                <ul>{l.map((a) => <AufgabeZeile key={a.id} aufgabe={a} kontext={kontext} zeigeZustaendig={alle} startOffen={!!oeffnen && a.id === oeffnen} />)}</ul>
               </section>
             ))}
         </div>

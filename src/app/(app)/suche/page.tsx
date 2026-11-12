@@ -26,7 +26,7 @@ export default async function SuchePage({ searchParams }: PageProps<"/suche">) {
       <PageHeader title="Suche" sub={q.length >= 2 ? `${treffer.length === 1 ? "1 Ergebnis" : `${treffer.length} Ergebnisse`} für „${q}“` : "Bitte mindestens zwei Zeichen eingeben."} />
       {q.length >= 2 && (
         <nav aria-label="Bereiche" className="mb-4 flex flex-wrap gap-2" data-such-filter>
-          <Link href={`/suche?q=${encodeURIComponent(q)}`} replace className={cn(chip, !bereich ? "border-ink bg-ink text-white" : "border-line bg-surface hover:border-line-strong")}>
+          <Link href={`/suche?q=${encodeURIComponent(q)}`} replace className={cn(chip, !bereich ? "border-ink bg-ink text-surface" : "border-line bg-surface hover:border-line-strong")}>
             Alle <span className="tabular opacity-70">{treffer.length}</span>
           </Link>
           {gruppen.map((g) => (
@@ -35,7 +35,7 @@ export default async function SuchePage({ searchParams }: PageProps<"/suche">) {
               href={`/suche?q=${encodeURIComponent(q)}&bereich=${g.b}`}
               replace
               aria-disabled={!g.liste.length}
-              className={cn(chip, bereich === g.b ? "border-ink bg-ink text-white" : "border-line bg-surface hover:border-line-strong", !g.liste.length && "pointer-events-none opacity-50")}
+              className={cn(chip, bereich === g.b ? "border-ink bg-ink text-surface" : "border-line bg-surface hover:border-line-strong", !g.liste.length && "pointer-events-none opacity-50")}
             >
               {g.text} <span className="tabular opacity-70">{g.liste.length}</span>
             </Link>

@@ -1,5 +1,6 @@
 "use client";
 
+import { verlaufVergessen } from "@/components/app/verlauf";
 import Link from "next/link";
 import { RotateCcw, Trash2, XCircle } from "lucide-react";
 import { useActionState, useState, useTransition } from "react";
@@ -173,7 +174,7 @@ export function AnfrageAktionen({ id, titel, archiv, hatAuftrag }: { id: string;
           text={<><b className="text-ink">{titel}</b> wird als gelöscht markiert und verschwindet aus allen Listen. Die Daten bleiben im Protokoll erhalten.</>}
           knopf="Löschen"
           gefahr
-          ausfuehren={() => tun(() => anfrageLoeschen(id))}
+          ausfuehren={() => tun(() => (verlaufVergessen(), anfrageLoeschen(id)))}
         >
           <Button variant="danger" disabled={laeuft}>
             <Trash2 className="size-[15px]" />

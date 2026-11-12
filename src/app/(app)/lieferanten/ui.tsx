@@ -1,5 +1,6 @@
 "use client";
 
+import { verlaufVergessen } from "@/components/app/verlauf";
 import { Lock, Pencil, Plus, Trash2, X } from "lucide-react";
 import { useActionState, useState, useTransition } from "react";
 import { Bestaetigen } from "@/components/ui/bestaetigen";
@@ -144,7 +145,7 @@ export function LieferantLoeschen({ id, name }: { id: string; name: string }) {
         text={<><b className="text-ink">{name}</b> wird samt Ansprechpartnern als gelöscht markiert. Das geht nur ohne offene Bestellungen.</>}
         knopf="Löschen"
         gefahr
-        ausfuehren={() => starten(async () => setE((await lieferantLoeschen(id)) ?? {}))}
+        ausfuehren={() => starten(async () => (verlaufVergessen(), setE((await lieferantLoeschen(id)) ?? {})))}
       >
         <Button variant="danger" disabled={laeuft}>
           <Trash2 className="size-[15px]" />

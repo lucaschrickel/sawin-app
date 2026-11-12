@@ -71,7 +71,7 @@ try {
   pruefe("Werkstatttermin eingetragen", await b.warte(`!!document.querySelector('[data-werkstatt]') && document.querySelector('main').innerText.includes("Inspektion")`));
   await b.gehe("/fahrzeuge");
   pruefe("Liste: TÜV rot, Service gelb, Hinweis oben", await b.warte(`(() => { const z = [...document.querySelectorAll('main tr')].find((r) => r.innerText.includes("GF-T ${lauf.toUpperCase()}")); return z && z.querySelector("[data-pruefung=tuev_am] span")?.className.includes("tone-red") && z.querySelector("[data-pruefung=service_am] span")?.className.includes("tone-amber") && document.querySelector('main [role=alert]')?.innerText.includes("überfällig"); })()`));
-  pruefe("Seitenleiste zählt fällige Fahrzeuge (rot)", await b.js(`Number(document.querySelector("aside [data-zaehler='fahrzeuge']")?.textContent) >= 1 && document.querySelector("aside [data-zaehler='fahrzeuge']").className.includes("bg-tone-red-fg")`));
+  pruefe("Seitenleiste zählt fällige Fahrzeuge (rot)", await b.js(`Number(document.querySelector("aside [data-zaehler='fahrzeuge']")?.textContent) >= 1 && document.querySelector("aside [data-zaehler='fahrzeuge']").className.includes("bg-frame-alarm")`));
   if (fotos) await b.foto(path.join(fotos, "fahrzeuge.png"));
 
   // ---------- Plantafel: Fahrzeug im Termin-Dialog, Werkstatt-Konflikt ----------

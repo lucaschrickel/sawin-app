@@ -158,7 +158,7 @@ export default async function KalenderPage({ searchParams }: PageProps<"/kalende
         </aside>
 
         <div className="min-w-0 overflow-hidden rounded-lg border border-line-soft bg-surface" data-kalender={ansicht}>
-          <KalenderInhalt ansicht={ansicht} von={zr.von} bis={zr.bis} monat={datum.slice(0, 7)} heute={heute} eintraege={sichtbar} feiertage={k.feiertage} mitarbeiter={k.mitarbeiter} />
+          <KalenderInhalt oeffnen={UUID.test(eins(sp.termin)) ? eins(sp.termin) : undefined} ansicht={ansicht} von={zr.von} bis={zr.bis} monat={datum.slice(0, 7)} heute={heute} eintraege={sichtbar} feiertage={k.feiertage} mitarbeiter={k.mitarbeiter} />
         </div>
       </div>
     </Shell>

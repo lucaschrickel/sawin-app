@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { verlaufNeuBeginnen } from "./verlauf";
 import { ChevronLeft, ChevronRight, LogOut } from "lucide-react";
 import { useSyncExternalStore, type ReactNode } from "react";
 import { Avatar } from "@/components/ui/avatar";
@@ -64,6 +65,7 @@ export function Seitenleiste({ active, brand, user, zaehler, eingeklappt, offen,
         {/* Logo wie in der Demo: ausgeklappt ganzes Logo (178 px), eingeklappt nur das Symbol; Konturen weiß auf der dunklen Leiste */}
         <Link
           href="/"
+          onClick={verlaufNeuBeginnen}
           aria-label={`${brand.name} – Dashboard`}
           data-logo
           className="flex min-w-0 flex-1 items-center rounded-sm [--logo-ink:var(--frame-logo-ink)]"
@@ -76,7 +78,7 @@ export function Seitenleiste({ active, brand, user, zaehler, eingeklappt, offen,
           onClick={umschalten}
           aria-label={mini ? "Seitenleiste ausklappen" : "Seitenleiste einklappen"}
           title={mini ? "Ausklappen" : "Einklappen"}
-          className="inline-flex size-8 shrink-0 cursor-pointer items-center justify-center rounded-full text-frame-muted hover:bg-white/5 hover:text-white max-[960px]:hidden"
+          className="inline-flex size-8 shrink-0 cursor-pointer items-center justify-center rounded-full text-frame-muted hover:bg-frame-hover hover:text-frame-strong max-[960px]:hidden"
         >
           {mini ? <ChevronRight className="size-4" strokeWidth={2} /> : <ChevronLeft className="size-4" strokeWidth={2} />}
         </button>
@@ -98,14 +100,14 @@ export function Seitenleiste({ active, brand, user, zaehler, eingeklappt, offen,
               mini ? "justify-center px-[5px] max-[960px]:justify-start max-[960px]:pr-2.5" : "pr-2.5 pl-[5px]",
             );
             const symbol = (
-              <span className={cn("relative inline-flex size-7 shrink-0 items-center justify-center rounded-full", on ? "bg-accent text-accent-ink" : "bg-white/[0.07] text-[#cfcac4]")}>
+              <span className={cn("relative inline-flex size-7 shrink-0 items-center justify-center rounded-full", on ? "bg-accent text-accent-ink" : "bg-frame-chip text-frame-text")}>
                 <Icon className="size-[15px]" strokeWidth={1.8} aria-hidden="true" />
                 {mini && zahl && (
                   <i
                     aria-hidden="true"
                     className={cn(
                       "absolute -top-1 -right-1.5 min-w-4 rounded-full px-1 text-center text-[10px] leading-4 font-semibold not-italic max-[960px]:hidden",
-                      zahl.dringend ? "bg-tone-red-fg text-white" : "bg-accent text-accent-ink",
+                      zahl.dringend ? "bg-frame-alarm text-frame-alarm-ink" : "bg-accent text-accent-ink",
                     )}
                   >
                     {zahl.n}
@@ -117,7 +119,7 @@ export function Seitenleiste({ active, brand, user, zaehler, eingeklappt, offen,
 
             if (!item.bereit) {
               return (
-                <span key={item.key} aria-disabled="true" title={`${item.label} (folgt)`} data-folgt={item.key} className={cn(zeile, "cursor-default text-[#c9c6c1] opacity-45")}>
+                <span key={item.key} aria-disabled="true" title={`${item.label} (folgt)`} data-folgt={item.key} className={cn(zeile, "cursor-default text-frame-text opacity-45")}>
                   {symbol}
                   {text}
                   <small className={cn("text-[10.5px] tracking-[0.04em] text-frame-muted", nurSymbol("hidden max-[960px]:inline"))}>folgt</small>
@@ -128,9 +130,10 @@ export function Seitenleiste({ active, brand, user, zaehler, eingeklappt, offen,
               <Link
                 key={item.key}
                 href={item.href}
+                onClick={verlaufNeuBeginnen}
                 title={mini ? item.label : undefined}
                 aria-current={on ? "page" : undefined}
-                className={cn(zeile, on ? "bg-accent/15 font-medium text-white" : "text-[#c9c6c1] hover:bg-white/5 hover:text-white")}
+                className={cn(zeile, on ? "bg-accent/15 font-medium text-frame-strong" : "text-frame-text hover:bg-frame-hover hover:text-frame-strong")}
               >
                 {symbol}
                 {text}
@@ -140,7 +143,7 @@ export function Seitenleiste({ active, brand, user, zaehler, eingeklappt, offen,
                     className={cn(
                       "rounded-full px-1.5 text-xs tabular",
                       nurSymbol("hidden max-[960px]:inline"),
-                      zahl.dringend ? "bg-tone-red-fg/90 font-semibold text-white" : "text-frame-muted",
+                      zahl.dringend ? "bg-frame-alarm font-semibold text-frame-alarm-ink" : "text-frame-muted",
                     )}
                   >
                     {zahl.n}
@@ -153,14 +156,14 @@ export function Seitenleiste({ active, brand, user, zaehler, eingeklappt, offen,
       ))}
 
       <div className={cn("mt-auto flex flex-col gap-2.5 border-t border-frame-line pt-3.5", mini ? "items-center max-[960px]:items-stretch" : "px-1")}>
-        <div className="flex items-center gap-2 text-xs text-[#bdb9b3]" title={lexware ? "Rechnungen, Abschläge und Gutschriften gehen an Lexware" : "Kein Lexware-Schlüssel eingerichtet"} data-lexware-status={lexware ? "verbunden" : "aus"}>
+        <div className="flex items-center gap-2 text-xs text-frame-text" title={lexware ? "Rechnungen, Abschläge und Gutschriften gehen an Lexware" : "Kein Lexware-Schlüssel eingerichtet"} data-lexware-status={lexware ? "verbunden" : "aus"}>
           <span className={cn("size-2 shrink-0 rounded-full", lexware ? "bg-tone-green-fg" : "bg-frame-muted")} aria-hidden="true" />
           <span className={nurSymbol("sr-only max-[960px]:not-sr-only")}>{lexware ? "Buchhaltung: Lexware verbunden" : "Buchhaltung: Lexware nicht verbunden"}</span>
         </div>
         <div className={cn("flex items-center gap-2.5", mini && "flex-col max-[960px]:flex-row")}>
           <Avatar initials={user.initials} size="lg" className="bg-accent text-accent-ink" />
           <span className={cn("min-w-0 flex-1", nurSymbol("hidden max-[960px]:block"))}>
-            <b className="block truncate text-base font-semibold text-white">{user.name}</b>
+            <b className="block truncate text-base font-semibold text-frame-strong">{user.name}</b>
             <small className="block text-xs text-frame-muted">{user.role}</small>
           </span>
           {/* Abmelden per POST an den Route-Handler (kein Link, damit nichts vorab geladen wird) */}
@@ -169,7 +172,7 @@ export function Seitenleiste({ active, brand, user, zaehler, eingeklappt, offen,
               type="submit"
               aria-label="Abmelden"
               title="Abmelden"
-              className="inline-flex size-9 cursor-pointer items-center justify-center rounded-full text-frame-muted hover:bg-white/5 hover:text-white"
+              className="inline-flex size-9 cursor-pointer items-center justify-center rounded-full text-frame-muted hover:bg-frame-hover hover:text-frame-strong"
             >
               <LogOut className="size-[17px]" aria-hidden="true" />
             </button>

@@ -1,5 +1,6 @@
 "use client";
 
+import { verlaufVergessen } from "@/components/app/verlauf";
 import { Trash2 } from "lucide-react";
 import { useActionState, useState, useTransition } from "react";
 import { ListenSuche, useListenParameter } from "@/components/app/listen-suche";
@@ -45,7 +46,7 @@ export function KundeLoeschen({ id, name }: { id: string; name: string }) {
         }
         knopf="Löschen"
         gefahr
-        ausfuehren={() => starten(async () => setFehler((await kundeLoeschen(id))?.fehler))}
+        ausfuehren={() => starten(async () => (verlaufVergessen(), setFehler((await kundeLoeschen(id))?.fehler)))}
       >
         <Button variant="danger" disabled={laeuft}>
           <Trash2 className="size-[15px]" />

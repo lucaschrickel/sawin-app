@@ -3,6 +3,7 @@ import { getCustomer } from "@/customers";
 import { INAKTIV_MINUTEN } from "@/lib/auth/konstanten";
 import { pruefeSitzung } from "@/lib/auth/sitzung";
 import { ladeZaehler } from "@/lib/zaehler";
+import { istFarbschema } from "@/lib/darstellung";
 import { AppShell } from "./app-shell";
 
 const initialen = (name: string) =>
@@ -21,7 +22,7 @@ export async function Shell(props: { active: string; crumbs: { label: string; hr
   const { Logo } = c;
   const [zaehler, { data: einstellung }] = await Promise.all([
     ladeZaehler(),
-    supabase.from("benutzer_einstellung").select("seitenleiste_eingeklappt").eq("benutzer_id", benutzer.id).maybeSingle(),
+    supabase.from("benutzer_einstellung").select("seitenleiste_eingeklappt, farbschema, seitenleiste_hell").eq("benutzer_id", benutzer.id).maybeSingle(),
   ]);
   return (
     <AppShell
@@ -30,6 +31,7 @@ export async function Shell(props: { active: string; crumbs: { label: string; hr
       user={{ initials: initialen(benutzer.name), name: benutzer.name, role: `${benutzer.admin ? "Admin" : "Benutzer"} · Büro` }}
       zaehler={zaehler}
       eingeklappt={einstellung?.seitenleiste_eingeklappt ?? false}
+      darstellung={{ farbschema: istFarbschema(einstellung?.farbschema) ? einstellung.farbschema : "hell", seitenleisteHell: einstellung?.seitenleiste_hell ?? false }}
       inaktivMinuten={INAKTIV_MINUTEN}
       lexware={!!process.env.LEXWARE_API_KEY?.trim()}
     />
