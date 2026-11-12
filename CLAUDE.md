@@ -524,6 +524,16 @@ Die Monteur-App kommt in Version 2.
 - Erwähnungen mit `@Kürzel` lösen eine Benachrichtigung aus. Fotos anhängen. Ungelesene Nachrichten werden an der
   Karte in der Pipeline und am Reiter gezählt.
 - In Version 1 schreiben nur Büro-Benutzer. Mit der Monteur-App kommen die Monteure in denselben Chat.
+- **Umsetzung (12.11.2026):** Reiter „Chat“ an Auftrag und Ticket (Reihenfolge Übersicht, Chat, Formulare & Protokolle,
+  Historie) mit Zahl der ungelesenen Nachrichten; dieselbe Zahl in Liste und Board der Aufträge und Tickets. Erwähnen
+  über „@ erwähnen“ oder `@Kürzel` im Text (Kürzel des mit dem Benutzer verknüpften Mitarbeiters); die Erwähnte bekommt
+  eine Benachrichtigung (Glocke „Erwähnung im Chat“), erledigt mit dem Öffnen des Chats. Fotos (JPEG, PNG, HEIC bis
+  15 MB) lädt der Browser über eine signierte Adresse in den privaten Speicher `chat-fotos` (ohne Benutzer-Policies);
+  der Server prüft Typ und Größe am Dateianfang, zeigt sie über kurzlebige signierte Adressen und legt eine Kopie in
+  OneDrive ab (`04 Auftrag` bzw. Ticket-Ordner, `Chat_<Datum_Zeit>_<Kürzel>`). Nachrichten sind nicht bearbeitbar;
+  eigene lassen sich löschen (Markierung). Neue Nachrichten erscheinen in Version 1 über eine Abfrage alle 10 Sekunden,
+  solange der Reiter sichtbar ist (kein Supabase-Client im Browser neben der Sitzung im Proxy); Supabase Realtime kommt
+  mit der Monteur-App. Logik `src/lib/chat-logik.ts` mit Unit-Tests (`tests/unit/chat.test.ts`).
 
 ### Formulare & Protokolle
 

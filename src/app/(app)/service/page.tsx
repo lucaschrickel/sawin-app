@@ -16,6 +16,8 @@ import { ABRECHNUNG_TEXT, TICKET_ART_TEXT, TICKET_ARTEN, TICKET_PRIO_TEXT, TICKE
 import { kurzTermin, tag } from "@/lib/zeit";
 import { AnsichtUmschalter } from "../anfragen/ui";
 import { TicketBoard, TicketDialog, type BoardKarte } from "./ui";
+import { ChatZahl } from "../chat/ui";
+import { ladeChatUngelesen } from "@/lib/chat";
 
 export const metadata: Metadata = { title: "Service-Tickets" };
 
@@ -39,7 +41,7 @@ export default async function ServicePage({ searchParams }: PageProps<"/service"
   const q = eins(sp.q);
   const [ansicht, benutzer] = await Promise.all([ladeAnsicht("service"), ladeBenutzerAuswahl()]);
   const board = ansicht === "board";
-  const { liste, anzahl } = await ladeTickets({ art, status: board ? "" : status, q, meine, erledigte: board || erledigte });
+  const [{ liste, anzahl }, ungelesen] = await Promise.all([ladeTickets({ art, status: board ? "" : status, q, meine, erledigte: board || erledigte }), ladeChatUngelesen()]);
   const c = getCustomer();
   const namen = new Map(benutzer.map((b) => [b.id, b.name]));
 
@@ -113,6 +115,7 @@ export default async function ServicePage({ searchParams }: PageProps<"/service"
             termin: termin(t),
             auftrag: t.auftrag?.nummer ?? null,
             abrechnung: t.abrechnung,
+            chat: ungelesen.ticket.get(t.id) ?? 0,
           }))}
         />
       ) : (
@@ -136,7 +139,7 @@ export default async function ServicePage({ searchParams }: PageProps<"/service"
                   <KlickZeile key={t.id} href={`/service/${t.id}`}>
                     <Td className="pl-4 whitespace-nowrap"><Link href={`/service/${t.id}`} className="font-mono font-medium hover:underline">{t.nummer}</Link></Td>
                     <Td>
-                      <b className="font-medium">{t.kunde?.name ?? "–"}</b>
+                      <b className="font-medium">{t.kunde?.name ?? "–"}</b> <ChatZahl n={ungelesen.ticket.get(t.id)} className="ml-1 align-text-bottom" />
                       <div className="text-sm text-muted">{t.thema}</div>
                     </Td>
                     <Td><Badge tone={TICKET_PRIO_TON[t.prioritaet]}>{TICKET_PRIO_TEXT[t.prioritaet]}</Badge></Td>

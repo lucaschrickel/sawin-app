@@ -102,6 +102,7 @@ APP_URL=http://localhost:3100 npm run test:plantafel  # Kolonnen, Ressourcen, Pi
 APP_URL=http://localhost:3100 npm run test:kopfzeile  # Globale Suche, Neu-Menü, Glocke, vorläufiger Versand (Download, mailto)
 APP_URL=http://localhost:3100 npm run test:onedrive   # OneDrive-Ablage gegen den nachgebauten Graph-Server (siehe „OneDrive“)
 APP_URL=http://localhost:3100 npm run test:formulare  # Aufmaßblatt, Protokolle, Scan; App ohne Microsoft-Zugang starten (MS_GRAPH_…= leer)
+APP_URL=http://localhost:3100 npm run test:chat       # Chat, Erwähnung, Foto, ungelesen; ebenfalls ohne Microsoft-Zugang
 APP_URL=http://localhost:3100 npm run test:mitarbeiter # Modul Mitarbeiter
 APP_URL=http://localhost:3100 npm run test:zeiten      # Modul Zeiterfassung
 APP_URL=http://localhost:3100 npm run test:abwesenheiten # Modul Abwesenheiten (Büro-Benutzer und Admin)

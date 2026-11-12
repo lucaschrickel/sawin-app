@@ -39,7 +39,8 @@
     "test:plantafel": "node tests/e2e/plantafel.e2e.mjs",
     "test:kopfzeile": "node tests/e2e/kopfzeile.e2e.mjs",
     "test:onedrive": "node tests/e2e/onedrive.e2e.mjs",
-    "test:formulare": "node tests/e2e/formulare.e2e.mjs"
+    "test:formulare": "node tests/e2e/formulare.e2e.mjs",
+    "test:chat": "node tests/e2e/chat.e2e.mjs"
   },
   "dependencies": {
     "@fontsource-variable/inter": "^5.3.0",

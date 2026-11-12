@@ -136,6 +136,7 @@ after(async () => {
         await db.query("delete from public.beleg_versand where beleg_id = $1", [id]);
         await db.query("update public.beleg set vorgaenger_id = null where vorgaenger_id = $1", [id]);
       }
+      if (tabelle === "chat_nachricht") await db.query("delete from public.chat_gelesen where nachricht_id = $1", [id]);
       if (tabelle === "formular") {
         await db.query("delete from public.aufmass_zeile where formular_id = $1", [id]);
         await db.query("delete from public.ablage_datei where formular_id = $1", [id]);
@@ -1400,6 +1401,69 @@ describe("Formulare & Protokolle", () => {
     angelegt.push(["formular", f.id]); // vor dem Auftrag entfernen
     const { data: neu } = await service.from("formular").select("anfrage_id, auftrag_id").eq("id", f.id).single();
     assert.deepEqual([neu.anfrage_id, neu.auftrag_id], [null, auftrag.id]);
+  });
+});
+
+describe("Chat", () => {
+  it("Nachrichten: nur als man selbst, nicht änderbar, löschen nur eigene (Markierung)", async () => {
+    const { data: n, error } = await buero.client.from("chat_nachricht").insert({ auftrag_id: daten.auftrag.id, text: `Hallo ${lauf}` }).select().single();
+    assert.ifError(error);
+    angelegt.push(["chat_nachricht", n.id]);
+    assert.equal(n.autor_id, buero.id);
+    const fremd = await buero.client.from("chat_nachricht").insert({ auftrag_id: daten.auftrag.id, text: "falscher Autor", autor_id: admin.id }).select();
+    assert.ok(fremd.error, "Nachricht im Namen eines anderen");
+    const leer = await buero.client.from("chat_nachricht").insert({ auftrag_id: daten.auftrag.id, text: "" }).select();
+    assert.ok(leer.error, "leere Nachricht ohne Foto");
+    const { data: aend } = await buero.client.from("chat_nachricht").update({ text: "geändert" }).eq("id", n.id).select("id");
+    assert.deepEqual(aend ?? [], [], "eigene Nachricht änderbar");
+    const { data: fremdAend } = await admin.client.from("chat_nachricht").update({ text: "fremd" }).eq("id", n.id).select("id");
+    assert.deepEqual(fremdAend ?? [], [], "fremde Nachricht änderbar");
+    assert.ok((await admin.client.rpc("loeschen", { p_tabelle: "chat_nachricht", p_id: n.id })).error, "fremde Nachricht löschbar");
+    const { data: sicht } = await admin.client.from("chat_nachricht").select("id, text").eq("id", n.id).single();
+    assert.equal(sicht.text, `Hallo ${lauf}`, "alle Benutzer lesen den Chat");
+  });
+
+  it("Ungelesen je Auftrag; eigene zählen nicht; gelesen setzen nur für sich", async () => {
+    const { data: n } = await buero.client.from("chat_nachricht").insert({ auftrag_id: daten.auftrag.id, text: `Frage an @${lauf}` }).select().single();
+    angelegt.push(["chat_nachricht", n.id]);
+    const zahl = async (wer) => ((await wer.client.rpc("chat_ungelesen")).data ?? []).find((z) => z.auftrag_id === daten.auftrag.id)?.anzahl ?? 0;
+    assert.equal(await zahl(buero), 0, "eigene Nachrichten als ungelesen gezählt");
+    const vorher = await zahl(admin);
+    assert.ok(vorher >= 1, "neue Nachricht nicht ungelesen");
+    const { data: gesetzt, error } = await admin.client.rpc("chat_gelesen_setzen", { p_auftrag: daten.auftrag.id, p_ticket: null });
+    assert.ifError(error);
+    assert.equal(gesetzt, vorher);
+    assert.equal(await zahl(admin), 0);
+    assert.equal((await admin.client.rpc("chat_gelesen_setzen", { p_auftrag: daten.auftrag.id, p_ticket: null })).data, 0, "doppelt gelesen");
+    const { data: gl } = await service.from("chat_gelesen").select("id, benutzer_id").eq("nachricht_id", n.id);
+    for (const g of gl ?? []) angelegt.push(["chat_gelesen", g.id]);
+    assert.deepEqual((gl ?? []).map((g) => g.benutzer_id), [admin.id]);
+    const { data: fremdeGelesen } = await buero.client.from("chat_gelesen").select("id").eq("nachricht_id", n.id);
+    assert.deepEqual(fremdeGelesen ?? [], [], "fremder Lesestand sichtbar");
+    assert.ok((await buero.client.from("chat_gelesen").insert({ nachricht_id: n.id, benutzer_id: admin.id })).error, "Lesestand für andere gesetzt");
+    assert.ok((await anon.rpc("chat_ungelesen")).error || !(await anon.rpc("chat_ungelesen")).data?.length, "nicht angemeldet");
+    assert.ok((await buero.client.rpc("chat_gelesen_setzen", { p_auftrag: daten.auftrag.id, p_ticket: daten.auftrag.id })).error, "zwei Bezüge");
+  });
+
+  it("Benachrichtigungen nur für den Empfänger lesbar; Fotos nur über den Server", async () => {
+    const { error } = await buero.client.from("benachrichtigung").insert({ benutzer_id: admin.id, art: "erwaehnung", text: `Test ${lauf}`, link: `/auftraege/${daten.auftrag.id}?reiter=chat` });
+    assert.ifError(error);
+    const { data: alle } = await service.from("benachrichtigung").select("id").eq("text", `Test ${lauf}`);
+    for (const x of alle ?? []) angelegt.push(["benachrichtigung", x.id]);
+    const { data: absender } = await buero.client.from("benachrichtigung").select("id").eq("text", `Test ${lauf}`);
+    assert.deepEqual(absender ?? [], [], "Absender sieht fremde Benachrichtigung");
+    const { data: eig } = await admin.client.from("benachrichtigung").select("id").eq("text", `Test ${lauf}`);
+    assert.equal(eig?.length, 1, "Empfänger sieht seine Benachrichtigung nicht");
+    // privater Speicher ohne Benutzer-Policies
+    const pfad = `${randomUUID()}/foto`;
+    const hoch = await buero.client.storage.from("chat-fotos").upload(pfad, Buffer.from([0xff, 0xd8, 0xff, 0xe0]), { contentType: "image/jpeg" });
+    assert.ok(hoch.error, "Benutzer lädt direkt in chat-fotos");
+    assert.ifError((await service.storage.from("chat-fotos").upload(pfad, Buffer.from([0xff, 0xd8, 0xff, 0xe0]), { contentType: "image/jpeg" })).error);
+    const lesen = await buero.client.storage.from("chat-fotos").download(pfad);
+    assert.ok(lesen.error, "Benutzer liest chat-fotos direkt");
+    const html = await service.storage.from("chat-fotos").upload(`${randomUUID()}/foto`, Buffer.from("<html>"), { contentType: "text/html" });
+    assert.ok(html.error, "Speicher nimmt HTML an");
+    await service.storage.from("chat-fotos").remove([pfad]);
   });
 });
 

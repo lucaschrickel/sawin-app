@@ -1,5 +1,6 @@
 "use client";
 
+import { ChatZahl } from "../chat/ui";
 import Link from "next/link";
 import { AlertTriangle, Check, Pencil, Plus, Trash2 } from "lucide-react";
 import { useActionState, useState, useTransition, type ReactNode } from "react";
@@ -195,7 +196,7 @@ function TicketFormular({ ticket: t, vorlage, benutzer, ichId, herkunftListe, s 
   );
 }
 
-export type BoardKarte = { id: string; nummer: string; thema: string; kunde: string; status: TicketStatus; art: string; prioritaet: TicketPrio; termin: string; auftrag: string | null; abrechnung: string };
+export type BoardKarte = { id: string; nummer: string; thema: string; kunde: string; status: TicketStatus; art: string; prioritaet: TicketPrio; termin: string; auftrag: string | null; abrechnung: string; chat: number };
 
 /** Board: Karten in eine andere Spalte ziehen ändert den Status (nicht nach „Abgerechnet“) */
 export function TicketBoard({ karten }: { karten: BoardKarte[] }) {
@@ -251,7 +252,10 @@ export function TicketBoard({ karten }: { karten: BoardKarte[] }) {
                 >
                   <span className="flex items-baseline justify-between gap-2">
                     <span className="font-mono text-xs text-muted">{k.nummer}</span>
-                    <Badge tone={k.abrechnung === "kostenpflichtig" ? "brand" : "gray"}>{ABRECHNUNG_TEXT[k.abrechnung as "garantie"]}</Badge>
+                    <span className="flex items-center gap-1.5">
+                      <Badge tone={k.abrechnung === "kostenpflichtig" ? "brand" : "gray"}>{ABRECHNUNG_TEXT[k.abrechnung as "garantie"]}</Badge>
+                      <ChatZahl n={k.chat} />
+                    </span>
                   </span>
                   <span className="text-[15px] leading-snug font-medium">{k.kunde}</span>
                   <span className="-mt-1 text-[13px] text-muted">{k.thema}</span>

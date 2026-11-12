@@ -326,6 +326,13 @@ export async function ladeGlocke(): Promise<Hinweis[]> {
   const z = zeit();
   const von = utc(z.heute);
   const bis = utc(plusTage(z.montag, 42));
-  const [einsaetze, konflikte] = await Promise.all([ladeEinsaetze(von, bis), konfliktIds(von, bis)]);
-  return ladeHinweise(z, einsaetze, konflikte);
+  const { supabase, benutzer } = await pruefeSitzung();
+  const [einsaetze, konflikte, erwaehnungen] = await Promise.all([
+    ladeEinsaetze(von, bis),
+    konfliktIds(von, bis),
+    // Erwähnungen im Chat: bis der Benutzer den Chat des Vorgangs öffnet
+    supabase.from("benachrichtigung").select("text, link, created_at").eq("benutzer_id", benutzer.id).eq("art", "erwaehnung").is("gelesen_am", null).order("created_at", { ascending: false }).limit(20),
+  ]);
+  const chat: Hinweis[] = (erwaehnungen.data ?? []).map((e) => ({ titel: "Erwähnung im Chat", info: e.text, href: e.link ?? "/", ton: "blue" }));
+  return [...chat, ...(await ladeHinweise(z, einsaetze, konflikte))];
 }

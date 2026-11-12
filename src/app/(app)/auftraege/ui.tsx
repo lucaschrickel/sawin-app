@@ -1,5 +1,6 @@
 "use client";
 
+import { ChatZahl } from "../chat/ui";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { Check, Pencil, Trash2 } from "lucide-react";
@@ -44,6 +45,8 @@ export type PipelineKarte = {
   warnung: string | null;
   zustaendig: string | null;
   bestellstatus: string | null;
+  /** ungelesene Chat-Nachrichten */
+  chat: number;
 };
 
 /** Pipeline (Kanban): Karten in eine andere Spalte ziehen ändert die Phase. */
@@ -98,7 +101,10 @@ export function AuftraegePipeline({ karten, phasen }: { karten: PipelineKarte[];
                 >
                   <span className="flex items-baseline justify-between gap-2">
                     <span className="font-mono text-xs text-muted">{k.nummer}</span>
-                    {k.zustaendig && <span className="text-xs text-muted-2">{k.zustaendig}</span>}
+                    <span className="flex items-center gap-1.5">
+                      {k.zustaendig && <span className="text-xs text-muted-2">{k.zustaendig}</span>}
+                      <ChatZahl n={k.chat} />
+                    </span>
                   </span>
                   <span className="text-[15px] leading-snug font-medium">{k.kunde}</span>
                   {k.titel && <span className="-mt-1 text-[13px] text-muted">{k.titel}</span>}

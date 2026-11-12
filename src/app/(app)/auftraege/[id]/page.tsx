@@ -39,6 +39,8 @@ import { ZeitDialog } from "../../zeiten/zeit-dialog";
 import { AuftragDialog, AuftragLoeschen, LieferungFormular, PhaseAuswahl, PhaseMontageSetzen, Phasenleiste, PruefhinweisEntfernen } from "../ui";
 
 import { FormulareKarte } from "../../formulare/karte";
+import { ladeChat, ladeChatPersonen, ladeChatStand, ladeChatUngelesen } from "@/lib/chat";
+import { ChatPanel, ChatZahl } from "../../chat/ui";
 export const metadata: Metadata = { title: "Auftrag" };
 
 const eins = (v: string | string[] | undefined) => (Array.isArray(v) ? v[0] : v) ?? "";
@@ -47,7 +49,12 @@ const uhrzeit = (iso: string) => kurzTermin(iso).split(" ").at(-1);
 export default async function AuftragPage({ params, searchParams }: PageProps<"/auftraege/[id]">) {
   const { id } = await params;
   const reiterWahl = eins((await searchParams).reiter);
-  const reiter = reiterWahl === "historie" || reiterWahl === "formulare" ? reiterWahl : "uebersicht";
+  const reiter = reiterWahl === "historie" || reiterWahl === "formulare" || reiterWahl === "chat" ? reiterWahl : "uebersicht";
+  const chatBezug = { auftrag_id: id };
+  const [ungelesen, chat] = await Promise.all([
+    ladeChatUngelesen(),
+    reiter === "chat" ? Promise.all([ladeChat(chatBezug), ladeChatPersonen(), ladeChatStand(chatBezug)]) : null,
+  ]);
   const [daten, benutzer, { benutzer: ich }, aufgaben, tickets, zeiten, zeitDialog, bestellzeilen, belege] = await Promise.all([
     ladeAuftrag(id),
     ladeBenutzerAuswahl(),
@@ -128,11 +135,16 @@ export default async function AuftragPage({ params, searchParams }: PageProps<"/
 
       <nav aria-label="Bereiche" className="mb-4 flex gap-6 border-b border-line-soft">
         <Link replace href={`/auftraege/${a.id}`} aria-current={reiter === "uebersicht" ? "page" : undefined} className={tab(reiter === "uebersicht")}>Übersicht</Link>
+        <Link replace href={`/auftraege/${a.id}?reiter=chat`} aria-current={reiter === "chat" ? "page" : undefined} className={cn(tab(reiter === "chat"), "inline-flex items-center gap-1.5")}>
+          Chat <ChatZahl n={ungelesen.auftrag.get(a.id)} />
+        </Link>
         <Link replace href={`/auftraege/${a.id}?reiter=formulare`} aria-current={reiter === "formulare" ? "page" : undefined} className={tab(reiter === "formulare")}>Formulare & Protokolle</Link>
         <Link replace href={`/auftraege/${a.id}?reiter=historie`} aria-current={reiter === "historie" ? "page" : undefined} className={tab(reiter === "historie")}>Historie</Link>
       </nav>
 
-      {reiter === "formulare" ? (
+      {reiter === "chat" && chat ? (
+        <ChatPanel bezug={chatBezug} nachrichten={chat[0]} personen={chat[1]} stand={chat[2]} />
+      ) : reiter === "formulare" ? (
         <FormulareKarte bezug={{ auftrag_id: a.id }} />
       ) : reiter === "historie" ? (
         <Karte titel="Historie" rechts={<span className="text-xs text-muted-2">Ereignisse, Telefonate, Notizen</span>}>

@@ -7,7 +7,9 @@ import { supabaseEnv } from "./env";
  * (Einladen, Sperren, 2FA zurücksetzen, nur nach pruefeAdmin()) und die Lexware-Anbindung (src/lib/lexware/, nur nach
  * pruefeSitzung(), schreibt ausschließlich über die Funktionen lexware_* mit Angabe des handelnden Benutzers) und die
  * OneDrive-Ablage (src/lib/onedrive/: Graph-Token, Zwischenspeicher ablage-puffer, schreibt nur über ablage_*_setzen
- * mit Angabe des handelnden Benutzers; Cron ohne Benutzer).
+ * mit Angabe des handelnden Benutzers; Cron ohne Benutzer), die Formular-PDFs (src/lib/formular-ablage.ts, nur lesen
+ * und über ablage_*_setzen ablegen) und die Chat-Fotos (Speicher chat-fotos ohne Benutzer-Policies: signierte Upload-
+ * und Anzeige-Adressen, Prüfung des Dateityps; die Nachricht selbst schreibt der Benutzer mit seinen Rechten).
  * Sonst werden Fachdaten nie hierüber geschrieben, damit das Audit-Log den handelnden Benutzer kennt.
  */
 export function createAdminClient() {

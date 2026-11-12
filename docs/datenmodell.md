@@ -138,8 +138,8 @@ Wahl der Rechnung). Höchstens eine Zahlungsbestätigung je Zahlung. Höchstens 
 | `termin_mitarbeiter` | Termin, Mitarbeiter |
 | `formular` | Typ (aufmass, montageprotokoll, servicebericht, uebergabeprotokoll), Anfrage (nur Aufmaß), Auftrag oder Ticket, Datum, Status (Aufmaß: entwurf/abgeschlossen; Protokolle: gedruckt/scan_abgelegt), Hinweise. Trigger `formular_pruefen`: Art und Bezug fest (außer Anfrage → Auftrag), abgeschlossenes Aufmaß gesperrt, Scan abgelegt nicht zurück. Trigger am Auftrag `formulare_zum_auftrag`: mit der AB wandert das Aufmaß der Anfrage in den Auftrag. PDF und Scans liegen in `ablage_datei` (`formular_id`). |
 | `aufmass_zeile` | Formular, Reihenfolge, Raum, Element, Breite/Höhe mm, Anzahl, Anschlag, Bemerkung. Gespeichert über `aufmass_speichern()` (SECURITY INVOKER, nur im Entwurf; Zeilen-IDs aus dem Browser, fehlende Zeilen als gelöscht markiert); Trigger `aufmass_zeile_pruefen` sperrt Zeilen abgeschlossener Aufmaße. |
-| `chat_nachricht` | Auftrag oder Ticket, Autor, Text, Foto-Pfad, erwähnte Benutzer |
-| `chat_gelesen` | Nachricht, Benutzer, gelesen am |
+| `chat_nachricht` | Auftrag oder Ticket, Autor (immer der angemeldete Benutzer), Text (höchstens 4000 Zeichen), Foto-Pfad im privaten Speicher `chat-fotos` (eindeutig), erwähnte Benutzer. Nicht änderbar (Policy), löschen nur eigene über `loeschen()` (Markierung). |
+| `chat_gelesen` | Nachricht, Benutzer, gelesen am; nur eigene sichtbar. `chat_ungelesen()` zählt ungelesene Nachrichten anderer je Auftrag/Ticket, `chat_gelesen_setzen()` markiert alle eines Vorgangs als gelesen (beide SECURITY INVOKER). |
 | `historie_notiz` | Telefonat oder Notiz von Hand zu Anfrage, Auftrag, Ticket oder Kunde (Ereignisse kommen aus dem Audit-Log) |
 | `benachrichtigung` | Glocke: Benutzer, Art, Text, Link, gelesen am (Erwähnungen, Genehmigungen; andere Hinweise werden berechnet) |
 | `bestellung` | Nummer `BE-JJ-NNN`, Lieferant, Bestelldatum, AB-Nummer des Lieferanten, Liefer-KW und -Jahr, Status (bestellt, bestaetigt), Notiz. Gespeichert über `bestellung_speichern(id, kopf, zeilen)` (mindestens eine Zeile); löschen über `bestellung_loeschen` nur ohne gelieferte Zeile (nur Markierung, Zeilen mit). „Teilweise geliefert“, „Geliefert“ und „Überfällig“ werden abgeleitet |
@@ -162,7 +162,8 @@ Wahl der Rechnung). Höchstens eine Zahlungsbestätigung je Zahlung. Höchstens 
    (Plantafel fertig: `20261114090200_plantafel.sql` mit Ressource und Farbe am Einsatz, Sammelfreigabe, Kolonnen,
    Reihenfolge der Gruppen; OneDrive-Ablage `20261116090000_onedrive.sql`, `…090100` Upload-Status, `…090200` Verwerfen;
    Versand `20261115090000_versand_vorlaeufig.sql`, Suche `20261115090100_suche.sql`; Formulare
-   `20261117090000_formulare.sql` mit `aufmass_speichern`, Sperren und `ablage_datei.formular_id`, `…090100` als INVOKER)
+   `20261117090000_formulare.sql` mit `aufmass_speichern`, Sperren und `ablage_datei.formular_id`, `…090100` als INVOKER;
+   Chat `20261117090200_chat.sql` mit Speicher `chat-fotos`, `chat_ungelesen`, `chat_gelesen_setzen`)
 7. `…_rls.sql`: RLS und Policies für alle Tabellen, Rechte für `anon` entzogen, Prüfung am Ende: bricht ab, wenn
    eine Tabelle in `public` ohne RLS ist
 

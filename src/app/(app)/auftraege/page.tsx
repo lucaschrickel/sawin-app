@@ -19,6 +19,8 @@ import { eur } from "@/lib/format";
 import { AnsichtUmschalter } from "../anfragen/ui";
 import { VorschauLeiste } from "../belege/liste";
 import { AuftraegePipeline, AuswahlZeile, type PipelineKarte } from "./ui";
+import { ChatZahl } from "../chat/ui";
+import { ladeChatUngelesen } from "@/lib/chat";
 
 export const metadata: Metadata = { title: "Aufträge" };
 
@@ -47,9 +49,10 @@ export default async function AuftraegePage({ searchParams }: PageProps<"/auftra
   const ansicht = await ladeAnsicht("auftraege");
   const board = ansicht === "board";
   // Die Pipeline zeigt immer alle Phasenspalten; der Phasenfilter gilt nur für die Liste
-  const [{ liste, anzahl }, benutzer] = await Promise.all([
+  const [{ liste, anzahl }, benutzer, ungelesen] = await Promise.all([
     ladeAuftraege({ phase: board ? "" : phase, q, meine, abgeschlossene, produkt }),
     ladeBenutzerAuswahl(),
+    ladeChatUngelesen(),
   ]);
   const namen = new Map(benutzer.map((b) => [b.id, b.name]));
   // Aufträge sind die führende Ansicht der Auftragsbestätigungen: Wert = AB, Vorschau rechts = AB
@@ -150,6 +153,7 @@ export default async function AuftraegePage({ searchParams }: PageProps<"/auftra
             warnung: warnung(a),
             bestellstatus: a.phase === "abgeschlossen" ? null : AUFTRAG_BESTELL_TEXT[auftragBestellstatus(a.bestellzeilen, a.noch_nicht_bestellt, a.phase)],
             zustaendig: a.zustaendig_id ? (namen.get(a.zustaendig_id) ?? null) : null,
+            chat: ungelesen.auftrag.get(a.id) ?? 0,
           }))}
         />
       ) : abEntwuerfeAnsicht ? (
@@ -208,7 +212,7 @@ export default async function AuftraegePage({ searchParams }: PageProps<"/auftra
                           {teilAbZahl.get(a.id) ? <div className="text-xs text-muted" data-teil-ab>+{teilAbZahl.get(a.id)} Teil-AB</div> : null}
                         </Td>
                         <Td>
-                          <b className="font-medium">{a.kunde?.name ?? "–"}</b>
+                          <b className="font-medium">{a.kunde?.name ?? "–"}</b> <ChatZahl n={ungelesen.auftrag.get(a.id)} className="ml-1 align-text-bottom" />
                           <div className="text-sm text-muted">{[a.titel, a.objekt].filter(Boolean).join(" · ")}</div>
                         </Td>
                         <Td>

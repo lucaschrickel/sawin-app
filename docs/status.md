@@ -1,6 +1,6 @@
 # Stand der App
 
-Stand: 12.11.2026, nach Formulare & Protokolle. Vergleich mit dem Klick-Prototyp
+Stand: 12.11.2026, nach Formulare & Protokolle und Chat. Vergleich mit dem Klick-Prototyp
 (`docs/demo/sawin-demo.html`) und `CLAUDE.md`. Wird nach jedem größeren Block aktualisiert.
 
 **Entscheidungen 11.11.2026:**
@@ -17,7 +17,7 @@ Stand: 12.11.2026, nach Formulare & Protokolle. Vergleich mit dem Klick-Prototyp
 | Rahmen | Zurück-Verlauf „← vorherige Maske“ | teilweise | Brotkrumen und Zurück im Editor; Verlauf je Tab mit Filter und Ansicht fehlt |
 | Rahmen | Globale Suche (Vorschläge je Bereich, Fundstelle, Pfeiltasten, Strg+K, Ergebnisseite) | fertig | Kunden, Anfragen, Aufträge, Belege (auch Positionen, Tags, Kommentar), Tickets; Datenbankfunktion mit RLS. Lieferanten, Bestellungen, Aufgaben, Termine aus der Demo noch nicht |
 | Rahmen | „Neu“-Menü | fertig | Kunde, Anfrage, Angebot, Auftrag, Ticket, Bestellung, Aufgabe; Dialoge öffnen direkt |
-| Rahmen | Glocke | fertig | Hinweise wie im Dashboard, dazu überfällige Rechnungen, „in Lexware noch buchen“, Angebote nachfassen, Aufträge ohne Rechnung; Chat-Erwähnungen folgen mit dem Chat |
+| Rahmen | Glocke | fertig | Hinweise wie im Dashboard, dazu überfällige Rechnungen, „in Lexware noch buchen“, Angebote nachfassen, Aufträge ohne Rechnung, Erwähnungen im Chat |
 | Rahmen | Lexware-Status und Benutzer im Fuß der Seitenleiste | fertig | |
 | Dashboard | Geschäftsführung, Montage, Einkauf | fertig | |
 | Aufgaben | Meine/Alle, Gruppen, Abhaken, Bezug | fertig | |
@@ -35,13 +35,12 @@ Stand: 12.11.2026, nach Formulare & Protokolle. Vergleich mit dem Klick-Prototyp
 | Aufträge | Liste mit AB-Vorschau, Board, Phasen, Prüfhinweis, Reklamation, Ware eingetroffen | fertig | |
 | Aufträge | Karte „OneDrive-Ordner“ (Link, Dateien, Upload) | fertig | |
 | Aufträge | Reiter Formulare & Protokolle | fertig | auch am Ticket |
-| Aufträge | Reiter Chat | fehlt | Tabellen vorhanden |
 | Service | Tickets, Board, Service-Plan „Terminierbar“, Rechnung am Ticket, OneDrive-Ordner | fertig | |
 | Montageplan | Plantafel komplett, Wochenplan-PDF | fertig | |
 | Team | Kalender, Mitarbeiter, Fahrzeuge, Zeiterfassung, Abwesenheiten | fertig | |
 | Einkauf | Lieferanten (Konditionen), Bestellungen | fertig | |
 | Ablage | OneDrive über Microsoft Graph: Ordner ab Angebot, Umbenennen mit der AB, Beleg-PDFs, Upload, Zwischenspeicher, Nachladen | fertig | mit Sawins Bibliothek „Kundenprojekte“ im Ordner `_App-Test` getestet (11.11.2026, localhost); auf Vercel mit dem Deployment |
-| Kommunikation | Chat je Auftrag und Ticket | fehlt | Tabellen vorhanden |
+| Kommunikation | Chat je Auftrag und Ticket (Erwähnungen, Fotos mit Kopie in OneDrive, ungelesen an Reiter, Liste und Board, löschen) | fertig | neue Nachrichten über Abfrage alle 10 s; Supabase Realtime mit der Monteur-App (V2) |
 | Formulare | Aufmaßblatt digital (automatisch speichern, Abschließen/Wieder öffnen, PDF nach „03 Aufmaß - Freigabe“, Nachtragsangebot am Auftrag), Montageprotokoll, Servicebericht, Übergabeprotokoll (Vorlage drucken, Scan hochladen) | fertig | Checklisten je Produkt aus der Konfiguration (Startwerte aus der Demo, mit Sawin abstimmen) |
 | Einstellungen | Firma, Benutzer, Montageplan, Belege & Artikel | fertig | |
 | Einstellungen | Verbindungen (Lexware, OneDrive, E-Mail mit BCC je Belegart) | fertig | |
@@ -95,8 +94,8 @@ Stand: 12.11.2026, nach Formulare & Protokolle. Vergleich mit dem Klick-Prototyp
 
 - `npm run lint`, `npx tsc --noEmit`, `npm run build`: ohne Fehler. `npm audit --omit=dev`: 0 Befunde.
 - Next.js-Fehlerliste des Dev-Servers: leer (geprüft nach Block 3).
-- Unit 96/96, RLS 89/89. Browser-Tests 12.11.2026: formulare 40/40, anfragen 28/28, auftraege 28/28, service 26/26,
-  belege 46/46, plantafel 39/39, onedrive 24/24.
+- Unit 102/102, RLS 92/92. Browser-Tests 12.11.2026: chat 26/26, formulare 40/40, anfragen 28/28, auftraege 28/28,
+  service 26/26, belege 46/46, plantafel 39/39, onedrive 24/24, kopfzeile 24/24, dashboard 23/23.
 - Bekannt: Beleg-PDFs zeigen keine Seitenzahl („Seite n von m“). react-pdf 4 rendert render-Texte nicht, solange die
   Seite eine lineHeight hat; Umbau (lineHeight je Block statt an der Seite) ändert das geprüfte Schriftbild, deshalb
   noch offen. Fußzeilen von Wochenplan und Formularen waren aus demselben Grund leer und sind behoben.
