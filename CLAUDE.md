@@ -110,8 +110,8 @@ Eine Codebasis, je Kunde eine eigene Instanz. Diese Datei gilt für jede Arbeit 
     nächstliegende Datum; ohne genaue Übereinstimmung (z. B. Skonto) bleibt „in Lexware noch buchen“ stehen. Eine eigene,
     noch nicht abgeglichene Zahlung ohne Bestätigung lässt sich entfernen (Markierung). Steht der Auftrag in „Abnahme“
     oder „Baustelle fertig“, ist die Schlussrechnung fertig und nichts mehr offen, wird er „Abgeschlossen“ (Historie:
-    System). Die Glocke („in Lexware noch buchen“) folgt mit der Glocke; die Pipeline-Zeilen des Montageplans
-    (Lieferung, Abschlag bezahlt, Warten auf Kunde) sind noch nicht gebaut.
+    System). Glocke („in Lexware noch buchen“) und die Pipeline-Zeilen des Montageplans (Lieferung, Abschlag bezahlt,
+    Warten auf Kunde) sind gebaut.
   - **Zahlungsbestätigung:** App-Beleg zu einer Rechnung oder Abschlagsrechnung, je Zahlung höchstens eine. Inhalt:
     Bezug auf die Rechnung (Nummer, Datum, Betrag), Zahlungseingang, Zahlungsart, gezahlter Betrag, Restbetrag und der
     Satz „Diese Zahlungsbestätigung ist keine Rechnung“. **Keine Positionen und keine ausgewiesene Umsatzsteuer**, damit
@@ -526,6 +526,11 @@ Die Monteur-App kommt in Version 2.
   auf jeder Seite, eine Position wird nicht über einen Seitenwechsel getrennt, Fußzeile mit Firmendaten und
   Wasserzeichen „Entwurf“ stehen auf jeder Seite. Formatierte Beschreibungen (Listen, Farbe, fett) erscheinen im
   PDF wie im Editor. Gilt auch für Formulare und den Wochenplan.
+  **Umsetzung (12.11.2026):** „Seite n von m“ unten rechts auf Belegen, Formularen und Wochenplan. In react-pdf 4 steht die
+  Zeilenhöhe deshalb an einem Block um den Inhalt (mit derselben Schriftgröße), nie an der Seite und nie an der
+  Seitenzahl selbst, sonst erscheint die Seitenzahl nicht; das Schriftbild bleibt gleich. Jedes PDF registriert Inter als
+  eigene Schriftfamilie und entfernt sie danach (`mitSchrift` in `src/lib/pdf/beleg-pdf.tsx`): Im Next-Server
+  übernahm ein PDF sonst Zustand aus einem vorherigen (z. B. fehlte nach einem Wochenplan das „A“ am Zeilenanfang).
 
 ### Chat
 

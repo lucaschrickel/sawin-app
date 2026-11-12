@@ -14,7 +14,12 @@ import { Table, Td, Th, Tr } from "@/components/ui/table";
 import { getCustomer, resolveSlot } from "@/customers";
 import { eur } from "@/lib/format";
 import { AUFTRAG_PHASE_TEXT, AUFTRAG_PHASE_TON, AUFTRAG_PHASEN, BELEG_STATUS_TONE } from "@/lib/status";
-import { BestaetigenDemo, DialogDemo, FormDemo, FormularDialogDemo, RichTextDemo } from "./demo-interactive";
+import { AblageUploadDemo, BestaetigenDemo, ChatDemo, DialogDemo, FarbWahlDemo, FormDemo, FormularDialogDemo, RichTextDemo } from "./demo-interactive";
+import { TrefferZeile } from "@/components/app/kopfzeile";
+import { Pfad, ZurueckKnopf } from "@/components/app/verlauf";
+import { FORMULAR_STATUS_TEXT, FORMULAR_STATUS_TON, type FormularStatus } from "@/lib/formular-logik";
+import type { Treffer } from "@/lib/such-typen";
+import { ChatZahl } from "../chat/ui";
 
 export const metadata: Metadata = { title: "Designsystem" };
 
@@ -37,6 +42,12 @@ const TYPE: { cls: string; label: string; sample: string }[] = [
   { cls: "text-sm text-muted", label: "Nebentext · 13 / 400", sample: "Grüner Weg 17, 38524 Sassenburg" },
   { cls: "text-xs font-medium text-muted-2", label: "Beschriftung · 12 / 500", sample: "Auftragswert (aus AB, brutto)" },
   { cls: "font-mono text-[13px] font-medium", label: "Mono · 13 / 500", sample: "AG1260385 · 26-0142 · 07:30" },
+];
+
+const TREFFER: Treffer[] = [
+  { bereich: "beleg", id: "t1", nummer: "AG1260432", titel: "Haustür RC2", details: "Angebot · Familie Weiß · Ringstraße 1", betrag: 4890, status: "Offen", fundstelle: "Position", fundtext: "Haustür Aluminium RC2, Sicherheitsbeschlag", href: "#" },
+  { bereich: "termin", id: "t2", nummer: null, titel: "Beratung Fenster", details: "Beratung · 12.11.2026 10:00–11:00 · Ausstellung", betrag: null, status: null, fundstelle: "Titel", fundtext: null, href: "#" },
+  { bereich: "lieferant", id: "t3", nummer: "K-4711", titel: "Fensterbau Nord", details: "Fenster, Haustür · 6 Wochen", betrag: null, status: null, fundstelle: "Ansprechpartner", fundtext: "Frau Kruse · Vertrieb · 0511 123456", href: "#" },
 ];
 
 const DEMO_CARDS: PipelineCardProps[] = [
@@ -285,7 +296,48 @@ export default function StyleguidePage() {
           </div>
         </Section>
 
-        <Section title="Dunkles Theme" description="Für die Anmeldeseite · data-theme=&quot;dark&quot; auf einem umschließenden Element">
+        <Section title="Zurück oben links" description="Verlauf je Browser-Tab (Komponente Verlauf): vorherige Maske als Knopf, nach der Seitenleiste nur der Name, direkt per Link geöffnet der fachliche Pfad">
+          <div className="flex flex-col gap-3">
+            <ZurueckKnopf href="/styleguide" titel="Aufträge" />
+            <Pfad crumbs={[{ label: "Belege" }, { label: "Aufträge" }]} nurName />
+            <Pfad crumbs={[{ label: "Belege" }, { label: "Aufträge", href: "/auftraege" }, { label: "AB2260227 · Familie Weiß" }]} />
+          </div>
+        </Section>
+
+        <Section title="Suche: Treffer" description="Vorschlag der globalen Suche mit Fundstelle und hervorgehobenem Begriff (TrefferZeile)">
+          <div className="flex max-w-xl flex-col gap-1 rounded-md border border-line-soft bg-surface p-1.5">
+            {TREFFER.map((t) => (
+              <TrefferZeile key={t.id} t={t} q="RC2" />
+            ))}
+          </div>
+        </Section>
+
+        <Section title="Farbwahl (Plantafel)" description="Standard nach Typ, Planungspalette oder frei gewählt; bei freier Farbe Schrift automatisch hell oder dunkel">
+          <FarbWahlDemo />
+        </Section>
+
+        <Section title="Ablage (OneDrive)" description="Upload in den Unterordner des Vorgangs (AblageUpload); große Dateien gehen direkt in den Zwischenspeicher">
+          <div className="max-w-xl">
+            <AblageUploadDemo />
+          </div>
+        </Section>
+
+        <Section title="Formulare & Chat" description="Status der Formulare (Aufmaß: Entwurf, Abgeschlossen; Protokolle: Gedruckt, Scan abgelegt) und Zahl ungelesener Nachrichten (ChatZahl)">
+          <div className="flex flex-wrap items-center gap-2">
+            {(Object.keys(FORMULAR_STATUS_TEXT) as FormularStatus[]).map((st) => (
+              <Badge key={st} tone={FORMULAR_STATUS_TON[st]}>{FORMULAR_STATUS_TEXT[st]}</Badge>
+            ))}
+            <span className="ml-4 inline-flex items-center gap-1.5 text-sm">Chat <ChatZahl n={3} /></span>
+          </div>
+        </Section>
+
+        <Section title="Chat" description="Nachrichten je Auftrag bzw. Ticket mit @Erwähnung und Foto (ChatPanel) · hier ohne echten Vorgang">
+          <div className="max-w-3xl">
+            <ChatDemo />
+          </div>
+        </Section>
+
+        <Section title="Dunkles Theme" description="Einstellungen › Darstellung setzt data-theme=&quot;dark&quot; auf &lt;html&gt; (Hell, Dunkel, wie das System); die Anmeldeseite setzt es auf einem umschließenden Element">
           <div data-theme="dark" className="rounded-lg bg-canvas p-6 text-ink">
             <div className="mx-auto flex max-w-sm flex-col gap-4 rounded-lg border border-line bg-surface p-6">
               <div>

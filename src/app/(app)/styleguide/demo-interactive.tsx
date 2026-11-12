@@ -1,6 +1,11 @@
 "use client";
 
 import { useState } from "react";
+import { AblageUpload } from "@/components/app/ablage-upload";
+import type { ChatNachricht } from "@/lib/chat";
+import { UNTERORDNER } from "@/lib/onedrive/schema";
+import { ChatPanel } from "../chat/ui";
+import { FarbWahl } from "../montageplan/tafel-dialoge";
 import { RichText } from "@/components/ui/rich-text";
 import { Bestaetigen } from "@/components/ui/bestaetigen";
 import { Button } from "@/components/ui/button";
@@ -116,4 +121,31 @@ export function RichTextDemo() {
       <code className="mt-1 block text-xs break-all text-muted-2">{html}</code>
     </div>
   );
+}
+
+/** Farbwahl eines Einsatzes (Plantafel): Standard, Planungspalette oder frei mit automatischer Schriftfarbe */
+export function FarbWahlDemo() {
+  const [farbe, setFarbe] = useState<string | null>("plan-3");
+  return (
+    <div className="flex flex-col gap-2">
+      <FarbWahl wert={farbe} onWahl={setFarbe} />
+      <span className="text-xs text-muted-2">Gewählt: {farbe ?? "Standard nach Typ"}</span>
+    </div>
+  );
+}
+
+const DEMO_ID = "00000000-0000-4000-8000-000000000000";
+
+/** Chat mit Beispielnachrichten (Senden scheitert hier bewusst: kein echter Vorgang) */
+export function ChatDemo() {
+  const nachrichten: ChatNachricht[] = [
+    { id: "n1", text: "@JM bitte das Maß der Haustür noch einmal prüfen, Laibung ist schief.", created_at: "2026-11-12T08:15:00.000Z", autor: { id: "a", name: "Anna Büro", kuerzel: "AB" }, eigene: false, foto: null },
+    { id: "n2", text: "Mache ich morgen früh vor der Montage.", created_at: "2026-11-12T08:42:00.000Z", autor: { id: "b", name: "Jonas Meyer", kuerzel: "JM" }, eigene: true, foto: null },
+  ];
+  return <ChatPanel bezug={{ auftrag_id: DEMO_ID }} nachrichten={nachrichten} personen={[{ id: "a", name: "Anna Büro", kuerzel: "AB" }, { id: "b", name: "Jonas Meyer", kuerzel: "JM" }]} stand="" />;
+}
+
+/** Upload in den OneDrive-Ordner mit Wahl des Unterordners (ohne echten Vorgang) */
+export function AblageUploadDemo() {
+  return <AblageUpload bezug={{ auftrag_id: DEMO_ID }} unterordner={[...UNTERORDNER]} />;
 }

@@ -1,9 +1,9 @@
 import "server-only";
-import { Document, Page, renderToBuffer, StyleSheet, Text, View } from "@react-pdf/renderer";
+import { Document, Page, StyleSheet, Text, View } from "@react-pdf/renderer";
 import type { LogoPfade } from "@/customers/types";
 import { kalenderwoche } from "@/lib/woche";
 import type { Wochenplan, WochenplanEinsatz } from "@/lib/wochenplan";
-import { F, Logo, schriften } from "./beleg-pdf";
+import { F, Logo, mitSchrift } from "./beleg-pdf";
 
 /*
   Wochenplan als PDF, A4 quer, zum Ausdrucken für die Monteure (CLAUDE.md „Wochenplan je Monteur“). Je Tag eine
@@ -19,7 +19,7 @@ const wochentag = (d: string) => WOCHENTAG[new Date(`${d}T12:00:00Z`).getUTCDay(
 const SP = { tag: 92, zeit: 78, kunde: 205, auftrag: 175, team: 135 } as const;
 
 const st = StyleSheet.create({
-  seite: { fontFamily: "Inter", fontSize: 9.4, lineHeight: 1.4, color: F.ink, paddingTop: 30, paddingBottom: 46, paddingHorizontal: 34 },
+  seite: { fontSize: 9.4, color: F.ink, paddingTop: 30, paddingBottom: 46, paddingHorizontal: 34 },
   kopf: { flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 14 },
   titel: { fontSize: 17, fontWeight: 700, textAlign: "right", lineHeight: 1.25, marginBottom: 4 },
   klein: { fontSize: 8.2, color: F.muted },
@@ -28,7 +28,7 @@ const st = StyleSheet.create({
   zeile: { flexDirection: "row", borderBottomWidth: 0.6, borderBottomColor: F.line },
   zelle: { paddingHorizontal: 5, paddingVertical: 6 },
   fett: { fontWeight: 600 },
-  fuss: { position: "absolute", bottom: 20, left: 34, right: 34, flexDirection: "row", justifyContent: "space-between", fontSize: 7.4, color: F.muted, borderTopWidth: 0.6, borderTopColor: F.line, paddingTop: 6 },
+  fuss: { position: "absolute", bottom: 20, left: 34, right: 34, flexDirection: "row", justifyContent: "space-between", fontSize: 7.4, lineHeight: 1.4, color: F.muted, borderTopWidth: 0.6, borderTopColor: F.line, paddingTop: 6 },
 });
 
 /** Zeit eines Einsatzes an einem Tag: über mehrere Tage „ab 07:00“, „ganztägig“, „bis 15:00“ */
@@ -56,11 +56,13 @@ function Spalten({ tag, zeit, kunde, auftrag, team, hinweis }: { tag: React.Reac
   );
 }
 
-function WochenplanDokument({ plan, logo, stand }: { plan: Wochenplan; logo: LogoPfade; stand: string }) {
+function WochenplanDokument({ plan, logo, stand, familie }: { plan: Wochenplan; logo: LogoPfade; stand: string; familie: string }) {
   const letzter = plan.tage.at(-1)!.datum;
   return (
     <Document title={`Wochenplan ${plan.titel} KW ${kalenderwoche(plan.montag)}`} author="Plantafel">
-      <Page size="A4" orientation="landscape" style={st.seite}>
+      <Page size="A4" orientation="landscape" style={[st.seite, { fontFamily: familie }]}>
+        {/* Zeilenhöhe am Inhalt statt an der Seite: mit lineHeight an der Seite oder am render-Text zeigt react-pdf 4 keine Seitenzahl */}
+        <View style={{ fontSize: 9.4, lineHeight: 1.4 }}>
         <View style={st.kopf} fixed>
           <View>
             <Logo l={logo} breite={150} />
@@ -151,16 +153,17 @@ function WochenplanDokument({ plan, logo, stand }: { plan: Wochenplan; logo: Log
             );
           });
         })}
+        </View>
 
         <View style={st.fuss} fixed>
           <Text>Stand {stand} · Änderungen meldet das Büro telefonisch.</Text>
         </View>
+        <Text fixed style={{ position: "absolute", bottom: 20, left: 34, right: 34, paddingTop: 6, textAlign: "right", fontSize: 7.4, color: F.muted }} render={({ pageNumber, totalPages }) => `Seite ${pageNumber} von ${totalPages}`} />
       </Page>
     </Document>
   );
 }
 
 export async function wochenplanPdf(plan: Wochenplan, logo: LogoPfade, stand: string): Promise<Buffer> {
-  schriften();
-  return renderToBuffer(<WochenplanDokument plan={plan} logo={logo} stand={stand} />);
+  return mitSchrift((familie) => <WochenplanDokument plan={plan} logo={logo} stand={stand} familie={familie} />);
 }

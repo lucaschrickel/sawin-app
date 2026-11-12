@@ -1,8 +1,9 @@
 "use client";
 
+import { verlaufVergessen } from "@/components/app/verlauf";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, BookOpen, Copy, Eye, FileText, GripVertical, Lock, Pencil, Plus, Save, Trash2, UserPlus, X } from "lucide-react";
+import { BookOpen, Copy, Eye, FileText, GripVertical, Lock, Pencil, Plus, Save, Trash2, UserPlus, X } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState, useTransition, type ReactNode } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Bestaetigen } from "@/components/ui/bestaetigen";
@@ -347,9 +348,6 @@ export function BelegEditor({ start, hinweis, modus, zahlungsbedingungen, kundeS
     <div className="flex flex-col gap-4" data-beleg-editor={art}>
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex min-w-0 items-center gap-3">
-          <Link href={zurueck.href} aria-label={`Zurück zu ${zurueck.text}`} className="inline-flex size-9 shrink-0 items-center justify-center rounded-full border border-line bg-surface hover:border-line-strong">
-            <ArrowLeft className="size-4" />
-          </Link>
           <div className="min-w-0">
             <h1 className="text-2xl font-bold tracking-[-0.02em]">
               {BELEGART_TEXT[art]} {k.nummer && <span className="font-mono text-xl">{k.nummer}</span>} {titelAktion}
@@ -939,6 +937,8 @@ export function BelegEditor({ start, hinweis, modus, zahlungsbedingungen, kundeS
                             if (r.fehler) return setFehler(r.fehler);
                             setGeaendert(false);
                             geaendertRef.current = false;
+                            // verworfener Entwurf: aus dem Zurück-Verlauf nehmen, dann zur Herkunft
+                            verlaufVergessen();
                             router.replace(zurueck.href);
                           })
                         }

@@ -1,24 +1,24 @@
 import "server-only";
-import { Document, Page, renderToBuffer, StyleSheet, Text, View } from "@react-pdf/renderer";
+import { Document, Page, StyleSheet, Text, View } from "@react-pdf/renderer";
 import type { LogoPfade } from "@/customers/types";
 import { FORMULAR_TEXT, mm } from "@/lib/formular-logik";
 import type { FormularDruck } from "@/lib/formulare";
 import { FORMULAR_UNTERORDNER } from "@/lib/onedrive/schema";
-import { F, Logo, schriften } from "./beleg-pdf";
+import { F, Logo, mitSchrift } from "./beleg-pdf";
 
 /*
   Formulare als PDF, A4 hoch (CLAUDE.md „Formulare & Protokolle“, „Druck und PDF“): Aufmaßblatt (Tabelle der Elemente)
   und die Vorlagen Montageprotokoll, Servicebericht, Übergabeprotokoll zum Ausfüllen von Hand (Kunde, Objekt, Leistungen
   aus der AB, Checkliste je Produkt, Unterschriftsfelder). Kopf, Tabellenkopf und Fuß auf jeder Seite, eine Zeile wird
-  nie getrennt. Papier bleibt immer hell. Keine Seitenzahl: react-pdf 4 zeigt render-Texte nicht, solange die Seite eine
-  lineHeight hat (geprüft 12.11.2026; betrifft auch die Seitenzahl der Beleg-PDFs).
+  nie getrennt. Papier bleibt immer hell. Die Zeilenhöhe steht am Inhalt, nicht an der Seite: sonst zeigt react-pdf 4
+  keine render-Texte (Seitenzahl).
 */
 
 const datum = (d: string) => `${d.slice(8, 10)}.${d.slice(5, 7)}.${d.slice(0, 4)}`;
 const SP = { pos: 26, raum: 88, element: 92, breite: 54, hoehe: 54, anzahl: 46, anschlag: 62 } as const;
 
 const st = StyleSheet.create({
-  seite: { fontFamily: "Inter", fontSize: 9.6, lineHeight: 1.45, color: F.ink, paddingTop: 34, paddingBottom: 62, paddingHorizontal: 46 },
+  seite: { fontSize: 9.6, color: F.ink, paddingTop: 34, paddingBottom: 62, paddingHorizontal: 46 },
   kopf: { flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start" },
   klein: { fontSize: 8, color: F.muted },
   titel: { fontSize: 19, fontWeight: 700, marginTop: 16 },
@@ -34,7 +34,7 @@ const st = StyleSheet.create({
   linie: { borderBottomWidth: 0.8, borderBottomColor: F.lineStrong, height: 22 },
   check: { flexDirection: "row", alignItems: "center", gap: 7, marginBottom: 3.5 },
   box: { width: 9, height: 9, borderWidth: 0.9, borderColor: F.ink3 },
-  fuss: { position: "absolute", bottom: 22, left: 46, right: 46, flexDirection: "row", justifyContent: "space-between", fontSize: 7.2, color: F.muted, borderTopWidth: 0.6, borderTopColor: F.line, paddingTop: 6 },
+  fuss: { position: "absolute", bottom: 22, left: 46, right: 46, flexDirection: "row", justifyContent: "space-between", fontSize: 7.2, lineHeight: 1.45, color: F.muted, borderTopWidth: 0.6, borderTopColor: F.line, paddingTop: 6 },
 });
 
 function Linie({ text }: { text?: string }) {
@@ -262,7 +262,7 @@ function Uebergabeprotokoll({ d }: { d: FormularDruck }) {
   );
 }
 
-function FormularDokument({ d, logo }: { d: FormularDruck; logo: LogoPfade }) {
+function FormularDokument({ d, logo, familie }: { d: FormularDruck; logo: LogoPfade; familie: string }) {
   const f = d.formular;
   const k = f.kunde;
   const firma = d.firma;
@@ -270,12 +270,14 @@ function FormularDokument({ d, logo }: { d: FormularDruck; logo: LogoPfade }) {
   const entwurf = f.typ === "aufmass" && f.status === "entwurf";
   return (
     <Document title={`${FORMULAR_TEXT[f.typ]} ${f.bezug.nummer}`} author={firma.firma_name ?? undefined} creator={firma.firma_name ?? undefined} producer="Sawin-App">
-      <Page size="A4" style={st.seite}>
+      <Page size="A4" style={[st.seite, { fontFamily: familie }]}>
         {entwurf && (
           <View fixed style={{ position: "absolute", top: 0, left: 0, right: 0, bottom: 0, alignItems: "center", justifyContent: "center" }}>
             <Text style={{ fontSize: 96, fontWeight: 700, color: F.wasser, opacity: 0.1, transform: "rotate(-28deg)" }}>ENTWURF</Text>
           </View>
         )}
+        {/* Zeilenhöhe am Inhalt statt an der Seite: mit lineHeight an der Seite oder am render-Text zeigt react-pdf 4 keine Seitenzahl */}
+        <View style={{ fontSize: 9.6, lineHeight: 1.45 }}>
         <View fixed={f.typ === "aufmass"}>
           <View style={st.kopf}>
             <View>
@@ -301,16 +303,17 @@ function FormularDokument({ d, logo }: { d: FormularDruck; logo: LogoPfade }) {
         </View>
 
         {f.typ === "aufmass" ? <Aufmass d={d} /> : f.typ === "montageprotokoll" ? <Montageprotokoll d={d} /> : f.typ === "servicebericht" ? <Servicebericht d={d} /> : <Uebergabeprotokoll d={d} />}
+        </View>
 
         <View style={st.fuss} fixed>
           <Text>{[firma.firma_name, firma.website, f.bezug.art !== "ticket" ? `Ablage: OneDrive › ${FORMULAR_UNTERORDNER[f.typ]}` : null].filter(Boolean).join(" · ")}</Text>
         </View>
+        <Text fixed style={{ position: "absolute", bottom: 22, left: 46, right: 46, paddingTop: 6, textAlign: "right", fontSize: 7.2, color: F.muted }} render={({ pageNumber, totalPages }) => `Seite ${pageNumber} von ${totalPages}`} />
       </Page>
     </Document>
   );
 }
 
 export async function formularPdf(d: FormularDruck, logo: LogoPfade): Promise<Buffer> {
-  schriften();
-  return renderToBuffer(<FormularDokument d={d} logo={logo} />);
+  return mitSchrift((familie) => <FormularDokument d={d} logo={logo} familie={familie} />);
 }

@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useState, type MouseEvent } from "react";
 import { anzeige, ohneMaske, verlaufWeiter, zurueckPerHistorie, type VerlaufEintrag } from "@/lib/verlauf";
 
 const SPEICHER = "sawin-verlauf";
@@ -90,22 +90,33 @@ export function Verlauf({ crumbs }: { crumbs: Krume[] }) {
   if (a.art === "pfad") return <Pfad crumbs={crumbs} />;
   if (a.art === "name") return <Pfad crumbs={crumbs} nurName />;
   return (
+    <ZurueckKnopf
+      href={a.pfad}
+      titel={a.titel}
+      onClick={(e) => {
+        if (e.defaultPrevented || e.metaKey || e.ctrlKey || e.shiftKey || e.button !== 0) return;
+        // Browser-Verlauf führt genau dorthin: echtes Zurück (Filter, Scrollstand und Browser-Zurück bleiben stimmig)
+        if (zurueckPerHistorie(verlauf, window.history.length)) {
+          e.preventDefault();
+          window.history.back();
+        }
+      }}
+    />
+  );
+}
+
+/** Knopf „← <vorherige Maske>“ oben links (auch im Styleguide) */
+export function ZurueckKnopf({ href, titel, onClick }: { href: string; titel: string; onClick?: (e: MouseEvent<HTMLAnchorElement>) => void }) {
+  return (
     <nav aria-label="Zurück" className="flex min-w-0 items-center gap-2 text-[13.5px]">
       <Link
-        href={a.pfad}
-        data-zurueck={a.pfad}
-        onClick={(e) => {
-          if (e.defaultPrevented || e.metaKey || e.ctrlKey || e.shiftKey || e.button !== 0) return;
-          // Browser-Verlauf führt genau dorthin: echtes Zurück (Filter, Scrollstand und Browser-Zurück bleiben stimmig)
-          if (zurueckPerHistorie(verlauf, window.history.length)) {
-            e.preventDefault();
-            window.history.back();
-          }
-        }}
+        href={href}
+        data-zurueck={href}
+        onClick={onClick}
         className="inline-flex min-w-0 items-center gap-1.5 rounded-full border border-line bg-surface px-3 py-1 font-medium text-ink hover:border-line-strong"
       >
         <span aria-hidden="true">←</span>
-        <span className="truncate">{a.titel}</span>
+        <span className="truncate">{titel}</span>
       </Link>
     </nav>
   );

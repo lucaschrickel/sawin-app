@@ -46,7 +46,7 @@ Stand: 12.11.2026, nach Formulare & Protokolle, Chat, erweiterter Suche, Zurück
 | Einstellungen | Verbindungen (Lexware, OneDrive, E-Mail mit BCC je Belegart) | fertig | |
 | Einstellungen | Versand (Standard-PDF-Gruppen) | verschoben auf V2 | hängt am Outlook-Versand |
 | Einstellungen | Darstellung (Hell, Dunkel, System; Seitenleiste hell oder dunkel) | fertig | je Benutzer; im Dunkelmodus Seitenleiste immer dunkel; Belege und Formulare bleiben hell (PDF) |
-| Designsystem | Styleguide | teilweise | Farbwahl der Plantafel, Kopfzeile und Ablage-Karte noch nicht unter `/styleguide` |
+| Designsystem | Styleguide | fertig | auch Zurück-Knopf, Suchtreffer, Farbwahl der Plantafel, Ablage-Upload, Formular-Status, Chat |
 | Übernahme | Datenübernahme aus Airtable | fehlt | |
 | Vercel | Projekt, Region `fra1`, Crons (Zahlungen, Ablage), Lexware-Webhook | teilweise | läuft unter https://sawin-bauelemente-app.vercel.app (Production und Preview bis zum Go-live auf Staging); beide Crons mit 200 geprüft; offen siehe „Vercel“ unten |
 | Version 2 | Monteur-App, Outlook-Versand, automatische Anfragen, KI-Agents | verschoben auf V2 | |
@@ -62,7 +62,7 @@ Stand: 12.11.2026, nach Formulare & Protokolle, Chat, erweiterter Suche, Zurück
 | Lexware-Testpunkte | erledigt bis auf `vatfree` und das Zahlungs-Event (Webhook gebaut) |
 | Belegerstellung gegen das Testkonto | erledigt bis auf eine echte Bankzahlung |
 | Nummernkreise mit Sawin | offen |
-| OneDrive mit Sawins Bibliothek | erledigt in `_App-Test` (App-Registrierung „Sawin App Ablage“, Freigabe nur „Kundenprojekte“); offen: Variablen in Vercel, Basisordner `2026` in Produktion |
+| OneDrive mit Sawins Bibliothek | erledigt in `_App-Test` (App-Registrierung „Sawin App Ablage“, Freigabe nur „Kundenprojekte“); Variablen in Vercel gesetzt, dort „verbunden“; offen: Basisordner `2026` in Produktion |
 | Vorläufiger Versand mit Sawins Outlook | offen (mailto mit BCC prüfen) |
 | Steuerberater | offen |
 | Airtable-Übernahme | offen |
@@ -98,9 +98,11 @@ Stand: 12.11.2026, nach Formulare & Protokolle, Chat, erweiterter Suche, Zurück
   kopfzeile 24/24, dashboard 23/23, seitenleiste 11/11, oberflaeche 14/14, kunden 28/28, anfragen 28/28, aufgaben 19/19,
   auftraege 28/28, service 26/26, belege 46/46, einkauf 30/30, team 26/26, plantafel 39/39, montageplan 33/33,
   katalog 14/14, chat 26/26, formulare 40/40, zahlungen 16/16, lexware 51/51, onedrive 24/24.
-- Bekannt: Beleg-PDFs zeigen keine Seitenzahl („Seite n von m“). react-pdf 4 rendert render-Texte nicht, solange die
-  Seite eine lineHeight hat; Umbau (lineHeight je Block statt an der Seite) ändert das geprüfte Schriftbild, deshalb
-  noch offen. Fußzeilen von Wochenplan und Formularen waren aus demselben Grund leer und sind behoben.
+- PDFs (12.11.2026): Seitenzahl „Seite n von m“ auf Belegen, Formularen und Wochenplan (Schriftbild unverändert,
+  Vorher/Nachher geprüft). Behoben: Im Server fehlten nach einem Wochenplan in folgenden PDFs Buchstaben (eigene
+  Schriftfamilie je PDF). Der Beleg-Editor hat keinen eigenen Zurück-Pfeil mehr (Zurück nur oben links).
+- Bekannt: Steht die Grußformel allein auf der letzten Seite, bekommt sie eine eigene Seite (Gruß und Firma bleiben
+  zusammen); kein Fehler, aber bei vielen Positionen möglich.
 - Ältere Läufe: Unit 86/86, RLS 85/85. Browser-Tests zuletzt grün: onedrive 24/24 (nachgebauter Graph-Server), kopfzeile 24/24,
   plantafel 39/39, montageplan 33/33, belege 46/46, lexware 51/51, zahlungen 16/16, katalog 14/14, kunden 28/28,
   anfragen 28/28, aufgaben 19/19, service 26/26, einkauf 30/30, dashboard 23/23, auftraege 28/28, team 26/26.

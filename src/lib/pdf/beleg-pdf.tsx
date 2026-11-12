@@ -15,11 +15,16 @@ import { eur } from "@/lib/format";
 */
 
 const SCHRIFT = path.join(process.cwd(), "node_modules/@fontsource/inter/files");
-let registriert = false;
-export function schriften() {
-  if (registriert) return;
+/**
+ * Ein PDF mit eigener, frisch geladener Schrift Inter erzeugen. react-pdf hält Schriften in einem gemeinsamen Speicher je
+ * Server; im Next-Server übernahm ein PDF dabei Zustand aus einem vorherigen (z. B. fehlte nach einem Wochenplan im
+ * Formular das „A“ am Zeilenanfang, 12.11.2026). Jede Erzeugung registriert deshalb eine eigene Schriftfamilie und
+ * entfernt sie danach wieder.
+ */
+export async function mitSchrift(dokument: (familie: string) => Parameters<typeof renderToBuffer>[0]): Promise<Buffer> {
+  const familie = `Inter-${crypto.randomUUID()}`;
   Font.register({
-    family: "Inter",
+    family: familie,
     fonts: [
       { src: path.join(SCHRIFT, "inter-latin-400-normal.woff") },
       { src: path.join(SCHRIFT, "inter-latin-600-normal.woff"), fontWeight: 600 },
@@ -30,14 +35,18 @@ export function schriften() {
     ],
   });
   Font.registerHyphenationCallback((w) => [w]);
-  registriert = true;
+  try {
+    return await renderToBuffer(dokument(familie));
+  } finally {
+    delete (Font.getRegisteredFonts() as Record<string, unknown>)[familie];
+  }
 }
 
 // Helle Werte wie in src/styles/tokens.css (Papier)
 export const F = { ink: "#171717", ink3: "#4b4f55", muted: "#5f646b", line: "#e9e6e1", lineStrong: "#d9d3ca", logoInk: "#2E2B28", sand: "#8a6140", wasser: "#A33A2E" };
 
 const st = StyleSheet.create({
-  seite: { fontFamily: "Inter", fontSize: 10, lineHeight: 1.5, color: F.ink, paddingTop: 42, paddingBottom: 78, paddingHorizontal: 54 },
+  seite: { fontSize: 10, color: F.ink, paddingTop: 42, paddingBottom: 78, paddingHorizontal: 54 },
   zeile: { flexDirection: "row", justifyContent: "space-between" },
   klein: { fontSize: 8.6, color: F.muted },
   absender: { fontSize: 7.4, color: F.muted, textDecoration: "underline", marginBottom: 6 },
@@ -160,7 +169,7 @@ function spalten(preise: boolean, rabatt: boolean, ust: boolean) {
   return { pos: 30, menge: 62, ep: preise ? 70 : 0, rabatt: preise && rabatt ? 40 : 0, ust: preise && ust ? 36 : 0, gesamt: preise ? 72 : 0 };
 }
 
-function BelegDokument({ b, positionen, firma, logo, entwurf }: { b: PdfBeleg; positionen: PdfPosition[]; firma: PdfFirma; logo: LogoPfade; entwurf: boolean }) {
+function BelegDokument({ b, positionen, firma, logo, entwurf, familie }: { b: PdfBeleg; positionen: PdfPosition[]; firma: PdfFirma; logo: LogoPfade; entwurf: boolean; familie: string }) {
   const zb = b.art === "zahlungsbestaetigung";
   const preise = b.art !== "lieferschein" && !zb;
   const s: Summen = belegSummen(positionen.map((p) => ({ ...p, abzug: !!p.abzug_beleg_id })), b);
@@ -185,13 +194,15 @@ function BelegDokument({ b, positionen, firma, logo, entwurf }: { b: PdfBeleg; p
 
   return (
     <Document title={`${BELEGART_TEXT[b.art]} ${b.nummer ?? "Entwurf"}`} author={firma.firma_name ?? undefined} creator={firma.firma_name ?? undefined} producer="Sawin-App">
-      <Page size="A4" style={st.seite}>
+      <Page size="A4" style={[st.seite, { fontFamily: familie }]}>
         {entwurf && (
           <View fixed style={{ position: "absolute", top: 0, left: 0, right: 0, bottom: 0, alignItems: "center", justifyContent: "center" }}>
             <Text style={{ fontSize: 96, fontWeight: 700, color: F.wasser, opacity: 0.1, transform: "rotate(-28deg)" }}>ENTWURF</Text>
           </View>
         )}
 
+        {/* Zeilenhöhe am Inhalt statt an der Seite: mit lineHeight an der Seite oder am render-Text zeigt react-pdf 4 keine Seitenzahl */}
+        <View style={{ fontSize: 10, lineHeight: 1.5 }}>
         {/* Kopf: Logo und Firmenzeile, rechts E-Mail und Website */}
         <View style={st.zeile}>
           <View>
@@ -360,6 +371,8 @@ function BelegDokument({ b, positionen, firma, logo, entwurf }: { b: PdfBeleg; p
           <Text style={{ marginTop: 2 }}>{firma.firma_name ?? ""}</Text>
         </View>
 
+        </View>
+
         {/* Fuß mit Firmendaten auf jeder Seite */}
         <View fixed style={st.fuss}>
           <View style={{ flex: 1 }}>
@@ -384,8 +397,7 @@ function BelegDokument({ b, positionen, firma, logo, entwurf }: { b: PdfBeleg; p
 }
 
 export async function belegPdf(daten: { b: PdfBeleg; positionen: PdfPosition[]; firma: PdfFirma; logo: LogoPfade; entwurf: boolean }): Promise<Buffer> {
-  schriften();
-  return renderToBuffer(<BelegDokument {...daten} />);
+  return mitSchrift((familie) => <BelegDokument {...daten} familie={familie} />);
 }
 
 /** Dateiname wie in CLAUDE.md: <Nummer>[_V<n>]_<Belegart>.pdf */
