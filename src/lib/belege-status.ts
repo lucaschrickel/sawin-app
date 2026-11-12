@@ -116,6 +116,9 @@ export type AnzeigeStatus = { key: string; text: string; ton: Tone };
 
 const S = (key: string, text: string, ton: Tone): AnzeigeStatus => ({ key, text, ton });
 
+/** Fertiger Beleg, der in Kette, Finanzen und Abzügen zählt (nicht Entwurf, nicht in Lexware storniert) */
+export const gilt = (b: { status: string }) => b.status !== "entwurf" && b.status !== "storniert";
+
 /**
  * Status zur Anzeige. Die AB ist aus der Kette berechnet: Bestätigt → In Abwicklung (Folgebeleg) → Abgerechnet
  * (Schluss- bzw. Rechnung fertig). „Abgelaufen“ ist kein gespeicherter Status: offenes Angebot nach „Gültig bis“.
@@ -129,7 +132,7 @@ export function anzeigeStatus(b: BelegKurz, kette: BelegKurz[], heute: string): 
       if (b.status === "abgelehnt") return S("abgelehnt", "Abgelehnt", "red");
       return S("nicht_beauftragt", "Nicht beauftragt", "gray");
     case "auftragsbestaetigung": {
-      const fertig = kette.filter((f) => f.id !== b.id && f.status !== "entwurf");
+      const fertig = kette.filter((f) => f.id !== b.id && gilt(f));
       if (fertig.some((f) => f.art === "rechnung" && !f.teil)) return S("abgerechnet", "Abgerechnet", "green");
       if (fertig.some((f) => ["teil_ab", "lieferschein", "abschlagsrechnung", "rechnung"].includes(f.art))) return S("in_abwicklung", "In Abwicklung", "amber");
       return S("bestaetigt", "Bestätigt", "blue");
@@ -141,17 +144,22 @@ export function anzeigeStatus(b: BelegKurz, kette: BelegKurz[], heute: string): 
       return S("erstellt", "Erstellt", "blue");
     default:
       if (b.status === "bezahlt") return S("bezahlt", "Bezahlt", "green");
+      if (b.status === "storniert") return S("storniert", "Storniert", "gray");
       if (b.art !== "gutschrift" && b.faellig_am && b.faellig_am < heute && (b.offen_betrag ?? 1) > 0) return S("ueberfaellig", "Überfällig", "red");
       return S("offen", "Offen", "blue");
   }
 }
 
-/** Angebot und AB bleiben nach dem Fertigstellen bearbeitbar, bis ein Folgebeleg existiert (wie app.beleg_bearbeitbar) */
-export function bearbeitbar(b: BelegKurz, kette: BelegKurz[]): boolean {
+/**
+ * Angebot und AB bleiben nach dem Fertigstellen bearbeitbar, bis ein Folgebeleg existiert (wie app.beleg_bearbeitbar).
+ * Ein Kopfbeleg (übernommen, ohne Positionen) ist nie bearbeitbar.
+ */
+export function bearbeitbar(b: BelegKurz, kette: BelegKurz[], kopfbeleg = false): boolean {
+  if (kopfbeleg) return false;
   if (b.status === "entwurf") return true;
   if (b.art === "angebot") return !kette.some((f) => f.vorgaenger_id === b.id && f.art === "auftragsbestaetigung");
   if (b.art === "auftragsbestaetigung")
-    return !kette.some((f) => f.id !== b.id && f.status !== "entwurf" && ["teil_ab", "lieferschein", "abschlagsrechnung", "rechnung"].includes(f.art));
+    return !kette.some((f) => f.id !== b.id && gilt(f) && ["teil_ab", "lieferschein", "abschlagsrechnung", "rechnung"].includes(f.art));
   return false;
 }
 
@@ -181,7 +189,7 @@ export function belegSchritte(b: BelegKurz, kette: BelegKurz[], zahlungen: { id:
 }
 
 function belegSchritteOhneZahlung(b: BelegKurz, kette: BelegKurz[]): Schritt[] {
-  if (b.status === "entwurf" || ["abgelehnt", "nicht_beauftragt"].includes(b.status)) return [];
+  if (b.status === "entwurf" || ["abgelehnt", "nicht_beauftragt", "storniert"].includes(b.status)) return [];
   const folgeEntwurf = kette.find((f) => f.vorgaenger_id === b.id && f.status === "entwurf");
   if (folgeEntwurf) return [weiter(folgeEntwurf)];
   if (b.art === "angebot") {
@@ -194,7 +202,7 @@ function belegSchritteOhneZahlung(b: BelegKurz, kette: BelegKurz[]): Schritt[] {
       return [{ text: "Auftragsbestätigung erstellen", href: neu("auftragsbestaetigung", b.id), ton: "primary" }];
     return [];
   }
-  const fertig = kette.filter((f) => f.status !== "entwurf");
+  const fertig = kette.filter(gilt);
   const schluss = fertig.find((f) => f.art === "rechnung" && !f.teil);
   const abzuege = fertig.filter((f) => f.art === "abschlagsrechnung" || (f.art === "rechnung" && f.teil));
   const rechnungText = abzuege.length ? "Schlussrechnung erstellen" : "Rechnung erstellen";
@@ -235,14 +243,14 @@ function teilrechnungZu(ids: string[], kette: BelegKurz[]): boolean {
  */
 export function auftragSchritte(auftragId: string, belege: BelegKurz[]): Schritt[] {
   const entwuerfe = belege.filter((b) => b.status === "entwurf");
-  const ab = belege.find((b) => b.art === "auftragsbestaetigung" && b.status !== "entwurf");
+  const ab = belege.find((b) => b.art === "auftragsbestaetigung" && gilt(b));
   const schritte: Schritt[] = entwuerfe.map(weiter);
   if (!ab) {
     if (!entwuerfe.some((b) => b.art === "auftragsbestaetigung"))
       schritte.push({ text: "Auftragsbestätigung erstellen", href: `/beleg/neu?art=auftragsbestaetigung&auftrag=${auftragId}`, ton: "primary" });
     return schritte;
   }
-  const fertig = belege.filter((b) => b.status !== "entwurf");
+  const fertig = belege.filter(gilt);
   const schluss = fertig.find((b) => b.art === "rechnung" && !b.teil);
   const ton = (): Schritt["ton"] => (schritte.length ? "secondary" : "primary");
   if (schluss) {
@@ -268,7 +276,7 @@ export function auftragSchritte(auftragId: string, belege: BelegKurz[]): Schritt
  * berechnet) = AB − Abschläge − Rechnungen + Gutschriften; offen = noch nicht bezahlte Abschläge und Rechnungen.
  */
 export function auftragFinanzen<T extends BelegKurz>(belege: T[]) {
-  const fertig = belege.filter((b) => b.status !== "entwurf");
+  const fertig = belege.filter(gilt);
   const ab = fertig.find((b) => b.art === "auftragsbestaetigung") ?? null;
   const abschlaege = fertig.filter((b) => b.art === "abschlagsrechnung").sort((a, b) => (a.abschlag_nr ?? 0) - (b.abschlag_nr ?? 0));
   const rechnungen = fertig.filter((b) => b.art === "rechnung");

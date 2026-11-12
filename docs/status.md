@@ -47,8 +47,8 @@ Stand: 12.11.2026, nach Formulare & Protokolle, Chat, erweiterter Suche, Zurück
 | Einstellungen | Versand (Standard-PDF-Gruppen) | verschoben auf V2 | hängt am Outlook-Versand |
 | Einstellungen | Darstellung (Hell, Dunkel, System; Seitenleiste hell oder dunkel) | fertig | je Benutzer; im Dunkelmodus Seitenleiste immer dunkel; Belege und Formulare bleiben hell (PDF) |
 | Designsystem | Styleguide | fertig | auch Zurück-Knopf, Suchtreffer, Farbwahl der Plantafel, Ablage-Upload, Formular-Status, Chat |
-| Übernahme | Datenübernahme aus Airtable | fehlt | |
-| Vercel | Projekt, Region `fra1`, Crons (Zahlungen, Ablage), Lexware-Webhook | teilweise | läuft unter https://sawin-bauelemente-app.vercel.app (Production und Preview bis zum Go-live auf Staging); beide Crons mit 200 geprüft; Lexware-Webhook im Testkonto registriert; Browser-Tests gegen Vercel grün; offen nur die Region des Proxys (siehe unten) |
+| Übernahme | Datenübernahme aus Airtable | teilweise | Skript, Zuordnung, Altbestand-Schalter, Kopfbeleg, Storno und Prüfbericht fertig (`docs/airtable-uebernahme.md`, `npm run test:altbestand` 17/17); offen: Staging leeren und Probelauf, Lieferantenkürzel von Sawin |
+| Vercel | Projekt, Region `fra1`, Crons (Zahlungen, Ablage), Lexware-Webhook | teilweise | läuft unter https://sawin-bauelemente-app.vercel.app (Production und Preview bis zum Go-live auf Staging); beide Crons mit 200 geprüft; Lexware-Webhook im Testkonto registriert; Browser-Tests gegen Vercel grün; Region des Proxys: Vercel › Logs › Seitenaufruf bzw. Header `x-vercel-id` |
 | Version 2 | Monteur-App, Outlook-Versand, automatische Anfragen, KI-Agents | verschoben auf V2 | |
 
 ## Go-live-Checkliste (offen)
@@ -65,7 +65,7 @@ Stand: 12.11.2026, nach Formulare & Protokolle, Chat, erweiterter Suche, Zurück
 | OneDrive mit Sawins Bibliothek | erledigt in `_App-Test` (App-Registrierung „Sawin App Ablage“, Freigabe nur „Kundenprojekte“); Variablen in Vercel gesetzt, dort „verbunden“; offen: Basisordner `2026` in Produktion |
 | Vorläufiger Versand mit Sawins Outlook | offen (mailto mit BCC prüfen) |
 | Steuerberater | offen |
-| Airtable-Übernahme | offen |
+| Airtable-Übernahme | Skript fertig; Probelauf auf Staging offen; Go-live-Schritte in `docs/uebergabe.md` |
 | ASVS Level 1, CSP mit Nonce | offen |
 | AVV | offen |
 | Übergabe-Anleitung | Vercel, Cron, Webhook, OneDrive (Entra) beschrieben |

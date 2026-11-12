@@ -1,5 +1,7 @@
 import { druckDaten, erzeugePdf, pdfAblegen, pdfLaden } from "@/lib/beleg-ablage";
-import { ladeBeleg } from "@/lib/belege";
+import { heuteBerlin, istKopfbeleg, ladeBeleg } from "@/lib/belege";
+import { anzeigeStatus } from "@/lib/belege-status";
+import { kopfbelegPdf } from "@/lib/pdf/kopfbeleg-pdf";
 import { LEXWARE_BELEGARTEN } from "@/lib/belege-status";
 import { lexwarePdfNachladen } from "@/lib/lexware/uebertragung";
 import { pruefeSitzung } from "@/lib/auth/sitzung";
@@ -41,7 +43,11 @@ export async function GET(request: Request, ctx: RouteContext<"/pdf/beleg/[id]">
     }
     // Versendet und heruntergeladen wird nur das Original von Lexware, nie die Vorschau
     if (!pdf && herunterladen) return new Response("Das Original-PDF von Lexware liegt noch nicht vor.", { status: 409 });
-    if (!pdf) pdf = await erzeugePdf(druckDaten(d), true);
+    if (!pdf) pdf = istKopfbeleg(d) ? await kopfbelegPdf(d, anzeigeStatus(d.beleg, d.kette, heuteBerlin()).text) : await erzeugePdf(druckDaten(d), true);
+  } else if (istKopfbeleg(d) && !d.beleg.pdf_pfad) {
+    // Übernommen ohne Positionen: Kopfdaten mit Verweis auf Lexware, nie als Datei
+    if (herunterladen) return new Response("Das Original liegt in Lexware.", { status: 409 });
+    pdf = await kopfbelegPdf(d, anzeigeStatus(d.beleg, d.kette, heuteBerlin()).text);
   } else {
     if (d.beleg.pdf_pfad) pdf = await pdfLaden(d.beleg.pdf_pfad);
     if (!pdf) {

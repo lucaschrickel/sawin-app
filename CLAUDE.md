@@ -172,6 +172,17 @@ Eine Codebasis, je Kunde eine eigene Instanz. Diese Datei gilt für jede Arbeit 
   Positionen und Artikeln; reiner Text älterer Belege wird dabei in Absätze umgewandelt. Ausgegeben wird HTML nie direkt:
   der Editor liest es über TipTap, das PDF über einen eigenen Umsetzer (`src/lib/pdf/rich-text.tsx`, Inter auch
   kursiv), Listen und Lexware über `htmlZuText` (Aufzählung „• “, Nummerierung „1. “).
+- **Datenübernahme aus Airtable (12.11.2026):** Plan, Zuordnung und Ablauf in `docs/airtable-uebernahme.md`
+  (`npm run import:airtable`, wiederholbar über `airtable_id`/`import_stand`, Prüfbericht in `berichte/`).
+  - **Altbestand:** Übernommene Kunden, Belege und OneDrive-Ordner tragen `altbestand`. Ihre Lexware-IDs und Ordner
+    nutzt die App nur mit `LEXWARE_ALTBESTAND=aktiv` bzw. `ONEDRIVE_ALTBESTAND=aktiv` (nur Produktion,
+    `src/lib/altbestand.ts`). In Staging gehen sie nie an Lexware bzw. in Sawins Ordner.
+  - **Kopfbeleg:** Ein fertiger Altbeleg ohne Positionen (Airtable kannte nur Beträge) zeigt die Kopfdaten mit Link zum
+    Lexware-Original und ist weder bearbeitbar noch herunterladbar.
+  - **Altbeleg nur am Kunden:** Ein Altbeleg darf ohne Anfrage, Auftrag oder Ticket nur am Kunden hängen (Rechnungen
+    aus der Zeit vor Airtable).
+  - **Storniert:** Übernommene Rechnungen und Abschläge können „Storniert“ sein. Sie zählen nirgends als Forderung,
+    Abzug, Folgebeleg oder Schlussrechnung.
 - **KI-Agents (Version 2)** laufen als eigener Hintergrunddienst an einer Warteschlange in Supabase, nicht im Frontend.
 
 ## Anforderungen Version 1
@@ -286,6 +297,8 @@ Die Monteur-App kommt in Version 2.
 - **Konditionen:** Freitextfeld je Kunde (z. B. aktuelle Rabatte). Sehen und ändern dürfen es nur Benutzer mit dem
   Recht „Konditionen sehen“. Die Konditionen liegen in einer eigenen Tabelle mit eigener RLS-Policy, nicht als Spalte
   der Kundentabelle. Sie gehen nicht an Lexware und erscheinen auf keinem Beleg.
+- **Anrede** bei Privatkunden (Herr, Frau, Familie, Eheleute, Dr.; aus Airtable übernommen), an Lexware als Anrede des
+  Personenkontakts.
 - Steuer-Vorbelegung je Kunde: Typ Privat oder Firma, bei Firmen zusätzlich Kennzeichen „Bauleister (§ 13b UStG)“.
   Daraus wird die Steuerart neuer Belege vorbelegt (siehe Belege).
 
@@ -389,7 +402,8 @@ Die Monteur-App kommt in Version 2.
     bearbeitbar) → In Abwicklung (Teil-AB, Lieferschein oder Abschlag vorhanden, gesperrt) → Abgerechnet
     (Schluss- bzw. Rechnung fertiggestellt; Teilrechnungen zählen nicht).
   - Teil-AB: Bestätigt. Lieferschein: Erstellt.
-  - Rechnung, Abschlag, Gutschrift: Offen → Bezahlt bzw. Überfällig (Zahlungen aus Lexware).
+  - Rechnung, Abschlag, Gutschrift: Offen → Bezahlt bzw. Überfällig (Zahlungen aus Lexware); „Storniert“ nur bei
+    aus Airtable übernommenen Belegen.
 - **Felder wie in Lexware, für alle Belegarten:** Empfängeradresse (aus dem Kunden vorbelegt, je Beleg änderbar:
   Name, Adresszusatz, Straße, PLZ, Ort, Land), Kundennummer, Belegnummer, Belegdatum, Belegtitel, **Bauvorhaben** und
   **Objekt / Lieferanschrift** (beide immer als Feld im Editor, vorbelegt aus Anfrage bzw. Auftrag oder aus der ersten
@@ -919,7 +933,8 @@ Maßstab ist OWASP ASVS Level 1. Vor dem Start mit Echtdaten müssen alle Mindes
 - [ ] Vorläufiger Versand (Download, `mailto` mit BCC an angebot@/auftrag@) mit Sawins Outlook geprüft; Versand über Microsoft Graph folgt in Version 2
 - [ ] Steuerarten (Standard, § 13b, steuerfrei), Pflichtangaben auf Rechnungen und das Muster der
       Zahlungsbestätigung (ohne Umsatzsteuer) mit Sawins Steuerberater abgestimmt
-- [ ] Datenübernahme aus Airtable als Probelauf auf Staging durchgeführt und geprüft
+- [ ] Datenübernahme aus Airtable als Probelauf auf Staging durchgeführt und geprüft (Skript und Plan fertig,
+      `docs/airtable-uebernahme.md`; offen: Probelauf, Lieferantenkürzel von Sawin)
 - [ ] ASVS-Level-1-Checkliste abgehakt
 - [ ] AVV mit Sawin angepasst (Supabase direkt mit Sawin, Vercel bis zur Übergabe als Unterauftragsverarbeiter von Luca)
 - [ ] Übergabe-Anleitung vollständig: alle Umgebungsvariablen, Dienste und manuellen Schritte beschrieben

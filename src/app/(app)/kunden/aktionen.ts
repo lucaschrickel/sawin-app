@@ -6,6 +6,8 @@ import { getCustomer } from "@/customers";
 import { kontaktAktualisieren } from "@/lib/lexware/uebertragung";
 import { pruefeSitzung } from "@/lib/auth/sitzung";
 
+const ANREDEN = ["Herr", "Frau", "Familie", "Eheleute", "Dr."];
+
 export type Ergebnis = { fehler?: string; ok?: boolean; felder?: Record<string, string>; id?: string; name?: string; hinweis?: string };
 
 const text = (fd: FormData, n: string) => String(fd.get(n) ?? "").trim();
@@ -18,6 +20,7 @@ export async function kundeSpeichern(_: Ergebnis, fd: FormData): Promise<Ergebni
   const kunde = {
     name: text(fd, "name"),
     typ: text(fd, "typ") === "firma" ? "firma" : "privat",
+    anrede: ANREDEN.includes(text(fd, "anrede")) && text(fd, "typ") !== "firma" ? text(fd, "anrede") : "",
     bauleister_13b: fd.get("bauleister_13b") === "on",
     ansprechpartner: text(fd, "ansprechpartner"),
     herkunft: text(fd, "herkunft"),

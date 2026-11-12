@@ -13,6 +13,7 @@ export type KundeZeile = {
 };
 
 export type Kunde = KundeZeile & {
+  anrede: string | null;
   bauleister_13b: boolean;
   strasse: string | null;
   plz: string | null;
@@ -76,7 +77,7 @@ export async function ladeKunde(id: string) {
   const [k, la, kond] = await Promise.all([
     supabase
       .from("kunde")
-      .select("id, nummer, name, typ, bauleister_13b, ansprechpartner, herkunft, strasse, plz, ort, land, telefon, email, notiz, lexware_kontakt_id, lexware_seit")
+      .select("id, nummer, name, typ, anrede, bauleister_13b, ansprechpartner, herkunft, strasse, plz, ort, land, telefon, email, notiz, lexware_kontakt_id, lexware_seit")
       .eq("id", id)
       .maybeSingle<Kunde>(),
     supabase

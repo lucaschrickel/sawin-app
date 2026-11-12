@@ -1,6 +1,7 @@
 import "server-only";
 import { after } from "next/server";
 import { BELEGART_TEXT, type Belegart } from "@/lib/belege-status";
+import { onedriveAltbestandAktiv } from "@/lib/altbestand";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { versandDateiname } from "@/lib/versand";
 import { graph, graphEingerichtet, GraphFehler, type DriveItem } from "./graph";
@@ -32,6 +33,8 @@ export type OrdnerZeile = {
   unterordner: Record<string, string>;
   status: "wartet" | "angelegt" | "fehler";
   fehler: string | null;
+  /** Aus Airtable übernommen (Sawins bestehender Kundenordner) */
+  altbestand: boolean;
 };
 export type DateiZeile = {
   id: string;
@@ -54,7 +57,10 @@ export type DateiZeile = {
   created_at: string;
 };
 
-const ORDNER_FELDER = "id, anfrage_id, auftrag_id, ticket_id, name, drive_id, item_id, web_url, unterordner, status, fehler";
+const ORDNER_FELDER = "id, anfrage_id, auftrag_id, ticket_id, name, drive_id, item_id, web_url, unterordner, status, fehler, altbestand";
+const GESPERRT = "Übernommener Ordner: In dieser Umgebung schreibt die App nicht hinein (ONEDRIVE_ALTBESTAND nicht aktiv).";
+/** Übernommener Ordner, in den diese Umgebung nicht schreiben darf (Staging: Sawins echte Kundenordner) */
+const gesperrt = (o: Pick<OrdnerZeile, "altbestand">) => o.altbestand && !onedriveAltbestandAktiv();
 const DATEI_FELDER = "id, ordner_id, unterordner, name, quelle, beleg_id, version, formular_id, mime, groesse, item_id, web_url, status, puffer_pfad, versuche, fehler, abgelegt_am, created_at";
 const fehlerText = (e: unknown) => (e instanceof Error ? e.message : String(e)).slice(0, 500);
 
@@ -126,6 +132,8 @@ async function ordnerNameFuer(b: Bezug): Promise<{ name: string; ticketAuftrag: 
 
 /** In Graph anlegen (Ordner und Unterordner); bei Fehlern bleibt der Ordner „wartet“ bzw. „fehler“ */
 async function ordnerAnlegen(o: OrdnerZeile, v: Verbindung, benutzer: string | null): Promise<OrdnerZeile> {
+  if (gesperrt(o)) return o;
+  if (o.altbestand && !o.item_id) return altenOrdnerSuchen(o, v, benutzer);
   try {
     let elternId = v.basis_id;
     if (o.ticket_id) {
@@ -149,8 +157,30 @@ async function ordnerAnlegen(o: OrdnerZeile, v: Verbindung, benutzer: string | n
   }
 }
 
+/**
+ * Übernommener Ordner ohne ID (nur Link aus Airtable): nur lesend über den Pfad im Link suchen, nie neu anlegen.
+ * Der Link zeigt in dieselbe Bibliothek (Drive) wie die Verbindung.
+ */
+async function altenOrdnerSuchen(o: OrdnerZeile, v: Verbindung, benutzer: string | null): Promise<OrdnerZeile> {
+  try {
+    if (!o.web_url) throw new Error("Weder ID noch Link aus der Übernahme.");
+    const drive = await graph<{ webUrl: string }>("GET", `/drives/${v.drive_id}`);
+    const basis = decodeURIComponent(new URL(drive.webUrl).pathname).replace(/\/$/, "");
+    const pfad = decodeURIComponent(new URL(o.web_url).pathname);
+    if (!pfad.startsWith(`${basis}/`)) throw new Error("Der Link zeigt nicht in die verbundene Bibliothek.");
+    const item = await graph<DriveItem>("GET", `/drives/${v.drive_id}/root:/${pfadKodieren(pfad.slice(basis.length + 1))}`);
+    await ordnerSetzen(benutzer, o.id, { drive_id: v.drive_id, item_id: item.id, web_url: item.webUrl ?? o.web_url, status: "angelegt", fehler: null });
+    return { ...o, drive_id: v.drive_id, item_id: item.id, web_url: item.webUrl ?? o.web_url, status: "angelegt", fehler: null };
+  } catch (e) {
+    const meldung = `Übernommener Ordner nicht gefunden: ${fehlerText(e)}`;
+    await ordnerSetzen(benutzer, o.id, { status: "fehler", fehler: meldung });
+    return { ...o, status: "fehler", fehler: meldung };
+  }
+}
+
 /** Item-ID eines Unterordners (wird bei Bedarf angelegt und gemerkt) */
 async function unterordnerId(o: OrdnerZeile, name: string, benutzer: string | null): Promise<string> {
+  if (gesperrt(o)) throw new Error(GESPERRT);
   if (o.unterordner[name]) return o.unterordner[name];
   const item = await ordnerItem(o.drive_id!, o.item_id!, name);
   o.unterordner = { ...o.unterordner, [name]: item.id };
@@ -186,9 +216,9 @@ export async function ordnerFuer(b: Bezug, benutzer: string | null): Promise<Ord
       if (!da) throw e;
       return da.status === "angelegt" ? da : ordnerFuer(b, benutzer);
     }
-    o = { id, anfrage_id: b.anfrage_id ?? null, auftrag_id: b.auftrag_id ?? null, ticket_id: b.ticket_id ?? null, name, drive_id: null, item_id: null, web_url: null, unterordner: {}, status: "wartet", fehler: null };
+    o = { id, anfrage_id: b.anfrage_id ?? null, auftrag_id: b.auftrag_id ?? null, ticket_id: b.ticket_id ?? null, name, drive_id: null, item_id: null, web_url: null, unterordner: {}, status: "wartet", fehler: null, altbestand: false };
   }
-  if (o.status !== "angelegt") {
+  if (o.status !== "angelegt" && !gesperrt(o)) {
     const v = await verbindungLaden();
     if (v) o = await ordnerAnlegen(o, v, benutzer);
   }
@@ -200,7 +230,7 @@ async function auftragUebernehmen(o: OrdnerZeile, auftragId: string, benutzer: s
   const { name } = await ordnerNameFuer({ auftrag_id: auftragId });
   let neu: OrdnerZeile = { ...o, auftrag_id: auftragId };
   await ordnerSetzen(benutzer, o.id, { auftrag_id: auftragId });
-  if (name !== o.name) {
+  if (name !== o.name && !gesperrt(o)) {
     if (o.status === "angelegt" && o.item_id && o.drive_id) {
       try {
         const item = await graph<DriveItem>("PATCH", `/drives/${o.drive_id}/items/${o.item_id}`, { body: { name } });
@@ -270,6 +300,7 @@ export async function dateiAblegen(a: Ablegen, benutzer: string | null): Promise
   }
   const basis = { ordner_id: ordner.id, unterordner: a.unterordner, name, quelle: a.quelle, beleg_id: a.beleg_id ?? null, version: a.version ?? null, formular_id: a.formular_id ?? null, mime: a.mime, groesse: a.inhalt.length };
   const id = vorhanden?.id ?? (await dateiSetzen(benutzer, null, { ...basis, status: "wartet" }));
+  if (gesperrt(ordner)) return zwischenspeichern(id, basis, a.inhalt, a.mime, GESPERRT, benutzer);
   if (ordner.status === "angelegt") {
     try {
       const eltern = a.unterordner ? await unterordnerId(ordner, a.unterordner, benutzer) : ordner.item_id!;
@@ -328,7 +359,7 @@ export async function nachladen(max = 25, benutzer: string | null = null) {
   const admin = createAdminClient();
   const { data: ordner } = await admin.from("ablage_ordner").select(ORDNER_FELDER).in("status", ["wartet", "fehler"]).is("deleted_at", null).limit(20).returns<OrdnerZeile[]>();
   let o = 0;
-  for (const x of ordner ?? []) if ((await ordnerAnlegen(x, v, benutzer)).status === "angelegt") o++;
+  for (const x of ordner ?? []) if (!gesperrt(x) && (await ordnerAnlegen(x, v, benutzer)).status === "angelegt") o++;
   const { data: dateien } = await admin.from("ablage_datei").select(DATEI_FELDER).in("status", ["wartet", "fehler"]).lt("versuche", 20).not("puffer_pfad", "is", null).is("deleted_at", null).order("created_at").limit(max).returns<DateiZeile[]>();
   let d = 0;
   for (const x of dateien ?? []) if (await dateiUebertragen(x, v, benutzer)) d++;
@@ -338,6 +369,9 @@ export async function nachladen(max = 25, benutzer: string | null = null) {
 /** Eine zwischengespeicherte Datei nach OneDrive übertragen; true bei Erfolg */
 async function dateiUebertragen(x: DateiZeile, v: Verbindung, benutzer: string | null, inhalt?: Buffer): Promise<boolean> {
   const admin = createAdminClient();
+  const { data: oz } = await admin.from("ablage_ordner").select(ORDNER_FELDER).eq("id", x.ordner_id).single<OrdnerZeile>();
+  // Übernommener Ordner in einer Umgebung ohne Schreibrecht: Datei bleibt im Zwischenspeicher, kein Fehlversuch
+  if (oz && gesperrt(oz)) return false;
   try {
     let daten = inhalt;
     if (!daten) {
@@ -345,7 +379,6 @@ async function dateiUebertragen(x: DateiZeile, v: Verbindung, benutzer: string |
       if (error || !blob) throw new Error(`Zwischenspeicher: ${error?.message ?? "Datei fehlt"}`);
       daten = Buffer.from(await blob.arrayBuffer());
     }
-    const { data: oz } = await admin.from("ablage_ordner").select(ORDNER_FELDER).eq("id", x.ordner_id).single<OrdnerZeile>();
     const ordnerZeile = oz!.status === "angelegt" ? oz! : await ordnerAnlegen(oz!, v, benutzer);
     if (ordnerZeile.status !== "angelegt") throw new Error(ordnerZeile.fehler ?? "Ordner nicht angelegt");
     const eltern = x.unterordner ? await unterordnerId(ordnerZeile, x.unterordner, benutzer) : ordnerZeile.item_id!;

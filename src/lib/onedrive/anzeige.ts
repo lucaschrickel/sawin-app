@@ -9,7 +9,7 @@ export async function ladeAblage(bezug: { anfrage_id?: string; auftrag_id?: stri
   const spalte = bezug.auftrag_id ? "auftrag_id" : bezug.ticket_id ? "ticket_id" : "anfrage_id";
   const wert = (bezug.auftrag_id ?? bezug.ticket_id ?? bezug.anfrage_id)!;
   const [{ data: ordner }, { data: einstellung }] = await Promise.all([
-    supabase.from("ablage_ordner").select("id, anfrage_id, auftrag_id, ticket_id, name, drive_id, item_id, web_url, unterordner, status, fehler").eq(spalte, wert).maybeSingle<OrdnerZeile>(),
+    supabase.from("ablage_ordner").select("id, anfrage_id, auftrag_id, ticket_id, name, drive_id, item_id, web_url, unterordner, status, fehler, altbestand").eq(spalte, wert).maybeSingle<OrdnerZeile>(),
     supabase.from("einstellung").select("onedrive_basis_id").maybeSingle(),
   ]);
   const { data: dateien } = ordner

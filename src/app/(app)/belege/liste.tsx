@@ -5,7 +5,7 @@ import { ListenSuche } from "@/components/app/listen-suche";
 import { PageHeader } from "@/components/app/page-header";
 import { Shell } from "@/components/app/shell";
 import { Badge } from "@/components/ui/badge";
-import { belegeMitAppBuchung, heuteBerlin, ladeBeleg, ladeBelegListe, ladeBelegTags, zaehleBelegarten, type BelegZeile } from "@/lib/belege";
+import { belegeMitAppBuchung, heuteBerlin, istKopfbeleg, ladeBeleg, ladeBelegListe, ladeBelegTags, zaehleBelegarten, type BelegZeile } from "@/lib/belege";
 import { anzeigeStatus, BELEGART_LISTE, BELEGART_TEXT, BELEGARTEN, bearbeitbar, type Belegart } from "@/lib/belege-status";
 import { eur } from "@/lib/format";
 import { zahlungenImHintergrund } from "@/lib/lexware/zahlungen";
@@ -65,7 +65,7 @@ export async function BelegListe({ liste, searchParams }: { liste: string; searc
   for (const b of alle) ketten.set(b.kette_id, [...(ketten.get(b.kette_id) ?? []), b]);
   const mitStatus = alle.map((b) => ({ b, s: anzeigeStatus(b, ketten.get(b.kette_id) ?? [b], heute) }));
   const zeilen = mitStatus.filter(({ b, s }) => {
-    if (def.key === "forderungen" && (b.status === "entwurf" || b.status === "bezahlt" || (b.offen_betrag ?? b.summe_brutto) <= 0)) return false;
+    if (def.key === "forderungen" && (b.status === "entwurf" || b.status === "bezahlt" || b.status === "storniert" || (b.offen_betrag ?? b.summe_brutto) <= 0)) return false;
     if (status === "entwurf" && b.status !== "entwurf") return false;
     if (status === "fertig" && b.status === "entwurf") return false;
     if (["offen", "abgelaufen", "angenommen", "abgelehnt", "ueberfaellig", "bezahlt"].includes(status) && s.key !== status) return false;
@@ -138,7 +138,7 @@ export async function VorschauLeiste({ detail: d, vorschlaege }: { detail: NonNu
   const heute = heuteBerlin();
   const status = anzeigeStatus(b, d.kette, heute);
   const andere = d.kette.filter((x) => x.id !== b.id);
-  const aenderbar = b.status !== "entwurf" && bearbeitbar(b, d.kette);
+  const aenderbar = b.status !== "entwurf" && bearbeitbar(b, d.kette, istKopfbeleg(d));
   return (
     <aside className="flex flex-col gap-3 rounded-lg border border-line-soft bg-surface p-4 min-[1100px]:sticky min-[1100px]:top-[84px] min-[1100px]:max-h-[calc(100vh-100px)] min-[1100px]:overflow-y-auto" aria-label="Vorschau" data-vorschau={b.id}>
       <div className="flex items-center gap-1 border-b border-line-soft pb-2">

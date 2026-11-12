@@ -3,6 +3,7 @@ import { after } from "next/server";
 import { pruefeSitzung } from "@/lib/auth/sitzung";
 import { rund } from "@/lib/beleg-summen";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { lexwareAltbestandAktiv } from "@/lib/altbestand";
 import { lexware } from "./client";
 import { geldeingaenge, type LexPosten } from "./zahlung-posten";
 
@@ -65,12 +66,14 @@ export async function zahlungenAbgleichen(benutzerId: string | null, erzwingen =
   // Offene Lexware-Belege und solche mit App-Buchungen, die Lexware noch nicht gemeldet hat
   const { data: appOffen } = await admin.from("zahlung").select("beleg_id").eq("quelle", "app").eq("lex_abgleich", "offen").is("deleted_at", null);
   const mitAppBuchung = [...new Set((appOffen ?? []).map((z) => z.beleg_id as string))];
-  const spalten = "id, art, datum, lexware_id, lexware_offen, status";
+  const spalten = "id, art, datum, lexware_id, lexware_offen, status, altbestand";
   const [{ data: offen }, { data: gebucht }] = await Promise.all([
     admin.from("beleg").select(spalten).in("art", ["rechnung", "abschlagsrechnung", "gutschrift"]).eq("status", "offen").not("lexware_id", "is", null).is("deleted_at", null),
     mitAppBuchung.length ? admin.from("beleg").select(spalten).in("id", mitAppBuchung).not("lexware_id", "is", null) : Promise.resolve({ data: [] }),
   ]);
-  const belege = [...new Map([...(offen ?? []), ...(gebucht ?? [])].map((b) => [b.id, b])).values()];
+  // Übernommene Belege nur, wenn ihre Lexware-IDs zu diesem Konto gehören (LEXWARE_ALTBESTAND=aktiv)
+  const altbestand = lexwareAltbestandAktiv();
+  const belege = [...new Map([...(offen ?? []), ...(gebucht ?? [])].map((b) => [b.id, b])).values()].filter((b) => altbestand || !b.altbestand);
   if (!belege.length) return { geprueft: 0, geaendert: 0, fehler: 0 };
   const ab = belege.reduce((m, b) => (b.datum < m ? b.datum : m), belege[0].datum);
 
@@ -78,7 +81,7 @@ export async function zahlungenAbgleichen(benutzerId: string | null, erzwingen =
   for (let seite = 0; seite < 20; seite++) {
     const r = await lexware<{ content: ListenEintrag[]; last: boolean }>(
       "GET",
-      `/v1/voucherlist?voucherType=invoice,creditnote&voucherStatus=any&voucherDateFrom=${ab}&size=250&page=${seite}`,
+      `/v1/voucherlist?voucherType=invoice,downpaymentinvoice,creditnote&voucherStatus=any&voucherDateFrom=${ab}&size=250&page=${seite}`,
     );
     for (const v of r.content) liste.set(v.id, v);
     if (r.last || !r.content.length) break;

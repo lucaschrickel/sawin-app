@@ -2,6 +2,7 @@ import "server-only";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { LexwareFehler } from "./client";
 import { ereignisSchluessel, ZAHLUNGS_EREIGNISSE, type LexwareEreignis } from "./webhook-pruefung";
+import { lexwareAltbestandAktiv } from "@/lib/altbestand";
 import { zahlstandHolen } from "./zahlungen";
 
 /*
@@ -37,13 +38,17 @@ export async function ereignisVerarbeiten(e: LexwareEreignis): Promise<WebhookEr
     }
     const { data: beleg } = await admin
       .from("beleg")
-      .select("id, lexware_id, art")
+      .select("id, lexware_id, art, altbestand")
       .eq("lexware_id", e.resourceId)
       .in("art", ["rechnung", "abschlagsrechnung", "gutschrift"])
       .is("deleted_at", null)
       .maybeSingle();
     if (!beleg?.lexware_id) {
       await ende("ignoriert", "Kein Beleg der App zu dieser Lexware-ID");
+      return { status: "ignoriert" };
+    }
+    if (beleg.altbestand && !lexwareAltbestandAktiv()) {
+      await ende("ignoriert", "Übernommener Beleg, LEXWARE_ALTBESTAND nicht aktiv");
       return { status: "ignoriert" };
     }
     try {

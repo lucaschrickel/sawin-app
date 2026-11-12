@@ -42,3 +42,6 @@ next-env.d.ts
 
 # Vorlage ohne Geheimnisse darf ins Repository
 !.env.example
+
+# Prüfberichte der Datenübernahme (enthalten Belegnummern und Beträge)
+/berichte/

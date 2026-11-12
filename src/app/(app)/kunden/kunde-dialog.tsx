@@ -183,6 +183,21 @@ function KundeFormular({
           )}
         </Field>
       </Zeile>
+      {typ === "privat" && (
+        <Zeile>
+          <Field label="Anrede">
+            {(a) => (
+              <Select name="anrede" defaultValue={kunde?.anrede ?? undefined} onValueChange={onAenderung}>
+                <SelectTrigger id={a.id}><SelectValue placeholder="Keine" /></SelectTrigger>
+                <SelectContent>
+                  {["Herr", "Frau", "Familie", "Eheleute", "Dr."].map((x) => <SelectItem key={x} value={x}>{x}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            )}
+          </Field>
+          <span />
+        </Zeile>
+      )}
       <Zeile>
         <Field label="Ansprechpartner">{(a) => <Input {...a} name="ansprechpartner" defaultValue={kunde?.ansprechpartner ?? ""} />}</Field>
         <Field label="Herkunft" error={f.herkunft}>

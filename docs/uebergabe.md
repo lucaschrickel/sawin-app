@@ -31,6 +31,9 @@ Vorlage: `.env.example`. Lokal in `.env.local` (nie einchecken), auf Vercel in d
 | `CRON_SECRET` | nur Server (Vercel: Production und Preview) | Zufällige Zeichenkette, mindestens 16 Zeichen (z. B. `openssl rand -hex 32`). Vercel schickt sie beim Cron als `Authorization: Bearer …`; ohne sie antwortet `/api/cron/zahlungsabgleich` immer 401. Je Umgebung ein eigener Wert. |
 | `MS_GRAPH_TENANT_ID`, `MS_GRAPH_CLIENT_ID`, `MS_GRAPH_CLIENT_SECRET` | nur Server (Vercel: Production und Preview, „Sensitive“) | App-Registrierung in Microsoft Entra für die OneDrive-Ablage (siehe „OneDrive“): Verzeichnis-ID, Anwendungs-ID, geheimer Clientschlüssel. Keine Mailrechte. |
 | `MS_TOKEN_SCHLUESSEL` | nur Server (je Umgebung eigener Wert) | 32 Byte base64 (`openssl rand -base64 32`); verschlüsselt das Graph-Zugriffstoken in `public.ms_token`. Wechsel unkritisch: das Token wird dann neu geholt. |
+| `LEXWARE_ALTBESTAND` | nur Server, **nur Produktion** | `aktiv`, sobald Sawins Lexware-Schlüssel gesetzt ist: Die App gleicht dann Zahlungen der aus Airtable übernommenen Rechnungen ab, holt deren PDFs und nutzt die übernommenen Kontakte. In Staging nicht setzen (die IDs gehören nicht zum Testkonto). Siehe `docs/airtable-uebernahme.md`. |
+| `ONEDRIVE_ALTBESTAND` | nur Server, **nur Produktion** | `aktiv`: Die App schreibt in die übernommenen Kundenordner. In Staging nicht setzen (Staging hängt an Sawins echter Bibliothek). |
+| `AIRTABLE_TOKEN`, `AIRTABLE_BASE_ID` | nur lokal (Datenübernahme) | Persönliches Airtable-Token nur mit Leserechten (`data.records:read`, `schema.bases:read`) und die ID der Base „Sawin Bauelemente“ (`app…`). Nach dem Go-live löschen. Nicht auf Vercel. |
 | `MS_GRAPH_BASIS`, `MS_LOGIN_BASIS` | nur Tests | Lenken Graph und Anmeldung auf den nachgebauten Test-Server (`npm run test:onedrive`). **Nie** auf Vercel setzen. |
 
 ## Datenbank
@@ -265,3 +268,26 @@ APP_URL=http://localhost:3100 CRON_SECRET=<geheim> npm run test:onedrive
 - **Beim Go-live in Sawins Lexware prüfen:** ob `vatfree` (steuerfreie Rechnung) für das Konto erlaubt ist, ob die
   Kontakte mit § 13b („Steuerfreie Rechnungen erlauben“) passen, und welche Nummernkreise Lexware für Rechnungen und
   Gutschriften verwendet. Die Kundennummer auf dem Lexware-PDF vergibt Lexware selbst.
+
+## Datenübernahme aus Airtable (Go-live)
+
+Plan, Zuordnung und Regeln: `docs/airtable-uebernahme.md`. Am Go-live-Tag, nachdem Airtable eingefroren ist:
+
+1. Eigene Umgebungsdatei für Produktion anlegen (z. B. `.env.produktion`, nie einchecken) mit
+   `NEXT_PUBLIC_SUPABASE_URL`, `SUPABASE_DB_URL`, `AIRTABLE_TOKEN`, `AIRTABLE_BASE_ID`, Sawins `LEXWARE_API_KEY` und
+   `LEXWARE_ALTBESTAND=aktiv`.
+2. Lieferantenkürzel in `scripts/airtable/lieferanten.json` den Lieferanten der App zuordnen (Lieferanten vorher anlegen).
+3. Probelauf: `npm run import:airtable -- --env=.env.produktion`. Den Bericht in `berichte/` prüfen, vor allem
+   Nummernkreise, Fehler und Datensätze ohne Zuordnung.
+4. Schreiben: `npm run import:airtable -- --env=.env.produktion --schreiben --projekt=<produktion-ref> --lexware-lesen`.
+   Bericht prüfen (Summen, Stichproben, Positionen aus Lexware).
+5. In Vercel (Production) `LEXWARE_ALTBESTAND=aktiv` und `ONEDRIVE_ALTBESTAND=aktiv` setzen und neu bereitstellen.
+6. Lexware-Webhook für die Produktionsadresse registrieren (`node scripts/lexware-webhook.mjs`, siehe „Lexware“).
+
+Der Lauf ist wiederholbar: Ein zweiter Lauf legt nichts doppelt an und überschreibt nichts, was inzwischen in der App
+geändert wurde.
+
+Staging vor einem Probelauf leeren: `npm run staging:leeren -- --projekt=<staging-ref>` (Vorschau), dann mit `--ja`.
+Das Skript löscht die Geschäftsdaten endgültig und leert die Storage-Buckets und den OneDrive-Ordner `_App-Test`.
+Benutzer, Einstellungen und Stammdaten bleiben. In einer Umgebung mit aktivem Altbestand-Schalter bricht es ab.
+

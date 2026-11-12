@@ -111,6 +111,9 @@ export type Beleg = BelegZeile & {
   pdf_pfad: string | null;
   lexware_id: string | null;
   lexware_status: string | null;
+  /** Aus Airtable übernommen (Lexware-Link zum Original; ohne Positionen nur Kopfdaten) */
+  altbestand: boolean;
+  lexware_link: string | null;
   created_at: string;
 };
 
@@ -137,6 +140,10 @@ export type Zahlung = {
 };
 
 export const ZAHLUNGSART_TEXT: Record<Zahlung["zahlungsart"], string> = { ueberweisung: "Überweisung", bar: "Bar", karte: "Karte", sonstiges: "Sonstiges" };
+
+/** Übernommener, fertiger Beleg ohne Positionen: nur Kopfdaten, das Original liegt in Lexware */
+export const istKopfbeleg = (d: { beleg: { altbestand: boolean; status: string }; positionen: unknown[] }) =>
+  d.beleg.altbestand && d.beleg.status !== "entwurf" && d.positionen.length === 0;
 
 export const positionZahlen = (p: Position): Position => ({
   ...p,
@@ -400,7 +407,7 @@ export async function ladeAbrechnung(auftragId: string): Promise<AbrechnungKonte
   const { supabase } = await pruefeSitzung();
   const [{ data: ab }, { data: rest }] = await Promise.all([
     supabase.from("beleg").select("id, nummer, datum, summe_netto, summe_brutto, steuerart, preise_brutto, gesamtrabatt_prozent").eq("auftrag_id", auftragId).eq("art", "auftragsbestaetigung").neq("status", "entwurf").maybeSingle(),
-    supabase.from("beleg").select("id, art, nummer, datum, status, teil, abschlag_nr, summe_netto, summe_brutto, steuern").eq("auftrag_id", auftragId).in("art", ["abschlagsrechnung", "rechnung"]).neq("status", "entwurf"),
+    supabase.from("beleg").select("id, art, nummer, datum, status, teil, abschlag_nr, summe_netto, summe_brutto, steuern").eq("auftrag_id", auftragId).in("art", ["abschlagsrechnung", "rechnung"]).not("status", "in", "(entwurf,storniert)"),
   ]);
   if (!ab?.nummer) return null;
   const { data: pos } = await supabase.from("beleg_position").select(POSITION).eq("beleg_id", ab.id);

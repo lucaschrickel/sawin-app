@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button";
 import { getCustomer } from "@/customers";
 import { STEUERART_TEXT } from "@/lib/beleg-typen";
 import { pruefeSitzung } from "@/lib/auth/sitzung";
-import { belegZuEingabe, heuteBerlin, ladeAbrechnung, ladeArtikel, ladeBeleg, ladeBelegTags, ladeFirma, ladeKundeFuerBeleg, ladeTextvorlagen, ladeZahlungsbedingungen } from "@/lib/belege";
+import { belegZuEingabe, heuteBerlin, istKopfbeleg, ladeAbrechnung, ladeArtikel, ladeBeleg, ladeBelegTags, ladeFirma, ladeKundeFuerBeleg, ladeTextvorlagen, ladeZahlungsbedingungen } from "@/lib/belege";
 import { versandDateiname, versandVorlage } from "@/lib/versand";
 import { anzeigeStatus, bearbeitbar, BELEGART_TEXT, belegSchritte, LEXWARE_BELEGARTEN } from "@/lib/belege-status";
 import { eur } from "@/lib/format";
@@ -66,7 +66,7 @@ export default async function BelegPage({ params }: PageProps<"/beleg/[id]">) {
   const heute = heuteBerlin();
   const status = anzeigeStatus(b, d.kette, heute);
   const schritte = belegSchritte(b, d.kette, d.zahlungen);
-  const aenderbar = bearbeitbar(b, d.kette);
+  const aenderbar = bearbeitbar(b, d.kette, istKopfbeleg(d));
   const { supabase } = await pruefeSitzung();
   const [tags, firma, { data: kundeMail }, { data: kopie }] = await Promise.all([
     ladeBelegTags(),

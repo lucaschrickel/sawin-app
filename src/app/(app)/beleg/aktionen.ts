@@ -12,6 +12,7 @@ import { zahlstandHolen } from "@/lib/lexware/zahlungen";
 import { imHintergrund, ordnerFuer, ordnerZumAuftrag } from "@/lib/onedrive/ablage";
 import { aufmasseNachziehen } from "@/lib/formular-ablage";
 import type { EditorZustand } from "@/lib/beleg-typen";
+import { lexwareAltbestandAktiv } from "@/lib/altbestand";
 import { ladeBeleg, ladeKundeFuerBeleg, kundeVorbelegung, type KundeFuerBeleg } from "@/lib/belege";
 
 export type Ergebnis = { fehler?: string; ok?: boolean; hinweis?: string; id?: string; nummer?: string | null; auftragId?: string | null; frage?: "anfrage_verloren"; anfrageId?: string };
@@ -166,6 +167,7 @@ export async function lexwarePdfHolen(id: string): Promise<Ergebnis> {
   if (!UUID.test(id)) return { fehler: "Beleg nicht gefunden." };
   const d = await ladeBeleg(id);
   if (!d?.beleg.lexware_id) return { fehler: "Der Beleg liegt nicht in Lexware." };
+  if (d.beleg.altbestand && !lexwareAltbestandAktiv()) return { fehler: "Übernommener Beleg: Er liegt nicht in diesem Lexware-Konto (LEXWARE_ALTBESTAND nicht aktiv)." };
   try {
     await lexwarePdfNachladen(d);
   } catch (e) {
@@ -232,6 +234,7 @@ export async function zahlungsstandAbrufen(id: string): Promise<Ergebnis> {
   const { benutzer } = await pruefeSitzung();
   const d = await ladeBeleg(id);
   if (!d?.beleg.lexware_id) return { fehler: "Der Beleg liegt nicht in Lexware." };
+  if (d.beleg.altbestand && !lexwareAltbestandAktiv()) return { fehler: "Übernommener Beleg: Er liegt nicht in diesem Lexware-Konto (LEXWARE_ALTBESTAND nicht aktiv)." };
   try {
     await zahlstandHolen({ id, lexware_id: d.beleg.lexware_id, art: d.beleg.art }, benutzer.id);
   } catch (e) {

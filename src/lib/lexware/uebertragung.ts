@@ -1,6 +1,5 @@
 import "server-only";
 import { belegPdfAblegen, imHintergrund } from "@/lib/onedrive/ablage";
-import { createHash } from "node:crypto";
 import { pruefeSitzung } from "@/lib/auth/sitzung";
 import { BUCKET } from "@/lib/beleg-ablage";
 import { belegSummen, rund } from "@/lib/beleg-summen";
@@ -10,6 +9,10 @@ import { BELEGART_TEXT } from "@/lib/belege-status";
 import { pdfDateiname } from "@/lib/pdf/beleg-pdf";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { lexware, LexwareFehler } from "./client";
+import { kontaktDaten, kontaktHash, landCode, type KundeLex } from "./kontakt-daten";
+import { lexwareAltbestandAktiv } from "@/lib/altbestand";
+
+export { landCode };
 
 /*
   Übertragung von Rechnung, Abschlagsrechnung und Gutschrift an Lexware (CLAUDE.md „Lexware-Regeln“).
@@ -25,17 +28,6 @@ import { lexware, LexwareFehler } from "./client";
   Einleitung und Nachbemerkung je 2000, Einzelpreis 4 Nachkommastellen, Einheit Pflicht, Gesamtbetrag nicht negativ.
 */
 
-const LAENDER: Record<string, string> = {
-  deutschland: "DE", germany: "DE", österreich: "AT", oesterreich: "AT", austria: "AT", schweiz: "CH", niederlande: "NL",
-  belgien: "BE", luxemburg: "LU", frankreich: "FR", dänemark: "DK", daenemark: "DK", polen: "PL", tschechien: "CZ",
-  italien: "IT", spanien: "ES",
-};
-export function landCode(land: string | null | undefined): string {
-  const l = (land ?? "").trim();
-  if (/^[A-Za-z]{2}$/.test(l)) return l.toUpperCase();
-  return LAENDER[l.toLowerCase()] ?? "DE";
-}
-
 /** Datum für Lexware: Tagesbeginn in Berlin mit Zeitzone (z. B. 2026-11-10T00:00:00.000+01:00) */
 export function lexDatum(iso: string): string {
   const teil = new Intl.DateTimeFormat("en-US", { timeZone: "Europe/Berlin", timeZoneName: "longOffset" })
@@ -46,49 +38,13 @@ export function lexDatum(iso: string): string {
 }
 
 const plusTage = (iso: string, n: number) => new Date(Date.parse(`${iso}T12:00:00Z`) + n * 864e5).toISOString().slice(0, 10);
-const pfadArt = (art: string) => (art === "gutschrift" ? "credit-notes" : "invoices");
+const pfadArt = (art: string, link?: string | null) =>
+  art === "gutschrift" ? "credit-notes" : link?.includes("/down-payment-invoices/") ? "down-payment-invoices" : "invoices";
 const voucherTyp = (art: string) => (art === "gutschrift" ? "creditnote" : "invoice");
 
 // ---------------------------------------------------------------------------------------------------------------------
 // Kontakt
 // ---------------------------------------------------------------------------------------------------------------------
-
-type KundeLex = {
-  id: string;
-  nummer: string;
-  name: string;
-  typ: "privat" | "firma";
-  bauleister_13b: boolean;
-  ansprechpartner: string | null;
-  strasse: string | null;
-  plz: string | null;
-  ort: string | null;
-  land: string;
-  telefon: string | null;
-  email: string | null;
-  lexware_kontakt_id: string | null;
-  lexware_hash: string | null;
-};
-
-function kontaktDaten(k: KundeLex) {
-  return {
-    roles: { customer: {} },
-    ...(k.typ === "firma"
-      ? {
-          company: {
-            name: k.name,
-            // § 13b: Lexware nimmt Bauleistungs-Rechnungen nur für Firmenkontakte mit dieser Freigabe an
-            allowTaxFreeInvoices: k.bauleister_13b,
-            contactPersons: k.ansprechpartner?.trim() ? [{ lastName: k.ansprechpartner.trim().slice(0, 255), primary: true }] : [],
-          },
-        }
-      : { person: { lastName: k.name.slice(0, 255) } }),
-    addresses: { billing: [{ street: k.strasse ?? "", zip: k.plz ?? "", city: k.ort ?? "", countryCode: landCode(k.land) }] },
-    ...(k.email?.trim() ? { emailAddresses: { business: [k.email.trim()] } } : {}),
-    ...(k.telefon?.trim() ? { phoneNumbers: { business: [k.telefon.trim()] } } : {}),
-    note: `Kunde ${k.nummer} aus der Sawin-App`,
-  };
-}
 
 type Kontakt = { id: string; version: number; roles?: unknown; company?: Record<string, unknown>; person?: Record<string, unknown> } & Record<string, unknown>;
 
@@ -100,19 +56,31 @@ export async function kontaktSichern(kundeId: string, benutzerId: string): Promi
   const admin = createAdminClient();
   const { data: k, error } = await admin
     .from("kunde")
-    .select("id, nummer, name, typ, bauleister_13b, ansprechpartner, strasse, plz, ort, land, telefon, email, lexware_kontakt_id, lexware_hash")
+    .select("id, nummer, name, typ, anrede, bauleister_13b, ansprechpartner, strasse, plz, ort, land, telefon, email, lexware_kontakt_id, lexware_hash, altbestand")
     .eq("id", kundeId)
     .maybeSingle<KundeLex>();
   if (error || !k) throw new LexwareFehler("Der Kunde wurde nicht gefunden.", 0);
   const daten = kontaktDaten(k);
-  const hash = createHash("sha256").update(JSON.stringify(daten)).digest("hex");
-  let id = k.lexware_kontakt_id;
+  const hash = kontaktHash(k);
+  // Übernommener Kunde, dessen Kontakt in diesem Lexware-Konto nicht genutzt wird (Staging): eigener Kontakt
+  const ersetzen = k.altbestand && !lexwareAltbestandAktiv();
+  let id = ersetzen ? null : k.lexware_kontakt_id;
   if (!id) {
     const r = await lexware<{ id: string }>("POST", "/v1/contacts", { body: { version: 0, ...daten } });
     id = r.id;
   } else if (k.lexware_hash !== hash) {
     const alt = await lexware<Kontakt>("GET", `/v1/contacts/${id}`);
     const neu: Record<string, unknown> = { ...alt, ...daten, roles: alt.roles ?? daten.roles, version: alt.version };
+    if (k.altbestand) {
+      // Aus Lexware übernommen: Vor- und Nachname, Ansprechpartner und Notiz in Lexware nicht durch die einfachere
+      // Darstellung der App ersetzen, solange sie dasselbe meinen
+      const p = alt.person as { firstName?: string; lastName?: string } | undefined;
+      if (p && [p.firstName, p.lastName].filter(Boolean).join(" ").trim() === k.name.trim())
+        neu.person = { ...p, ...(k.anrede ? { salutation: k.anrede } : {}) };
+      const personen = (alt.company as { contactPersons?: unknown[] } | undefined)?.contactPersons;
+      if ("company" in daten && personen?.length) (daten.company as Record<string, unknown>).contactPersons = personen;
+      if (alt.note) neu.note = alt.note;
+    }
     if (!daten.emailAddresses) delete neu.emailAddresses;
     if (!daten.phoneNumbers) delete neu.phoneNumbers;
     if ("company" in daten) neu.company = { ...(alt.company ?? {}), ...daten.company };
@@ -120,7 +88,7 @@ export async function kontaktSichern(kundeId: string, benutzerId: string): Promi
   } else {
     return id;
   }
-  const { error: e2 } = await admin.rpc("lexware_kunde", { p_kunde: k.id, p_benutzer: benutzerId, p_kontakt_id: id, p_hash: hash });
+  const { error: e2 } = await admin.rpc("lexware_kunde", { p_kunde: k.id, p_benutzer: benutzerId, p_kontakt_id: id, p_hash: hash, p_ersetzen: ersetzen });
   if (e2) throw new LexwareFehler("Die Lexware-Kontakt-ID konnte nicht gespeichert werden.", 0);
   return id;
 }
@@ -282,9 +250,9 @@ async function vorhandenSuchen(d: BelegDetail, kontaktId: string, seit: string):
 }
 
 /** Original-PDF von Lexware holen und im Speicher „belege“ ablegen; gibt den Pfad zurück */
-async function pdfHolen(b: { id: string; art: BelegDetail["beleg"]["art"]; lexware_id: string; nummer: string }): Promise<string> {
+async function pdfHolen(b: { id: string; art: BelegDetail["beleg"]["art"]; lexware_id: string; nummer: string; lexware_link?: string | null }): Promise<string> {
   const { supabase, benutzer } = await pruefeSitzung();
-  const pdf = await lexware<Buffer>("GET", `/v1/${pfadArt(b.art)}/${b.lexware_id}/file`, { accept: "application/pdf" });
+  const pdf = await lexware<Buffer>("GET", `/v1/${pfadArt(b.art, b.lexware_link)}/${b.lexware_id}/file`, { accept: "application/pdf" });
   const pfad = `${b.id}/${pdfDateiname({ art: b.art, nummer: b.nummer, version: 1 })}`;
   const { error } = await supabase.storage.from(BUCKET).upload(pfad, pdf, { contentType: "application/pdf", upsert: true });
   if (error) throw new Error("Das PDF konnte nicht abgelegt werden.");
@@ -297,8 +265,9 @@ async function pdfHolen(b: { id: string; art: BelegDetail["beleg"]["art"]; lexwa
 export async function lexwarePdfNachladen(d: BelegDetail): Promise<string | null> {
   const b = d.beleg;
   if (!b.lexware_id || !b.nummer || b.status === "entwurf") return null;
+  if (b.altbestand && !lexwareAltbestandAktiv()) return null;
   const { benutzer } = await pruefeSitzung();
-  const pfad = await pdfHolen({ id: b.id, art: b.art, lexware_id: b.lexware_id, nummer: b.nummer });
+  const pfad = await pdfHolen({ id: b.id, art: b.art, lexware_id: b.lexware_id, nummer: b.nummer, lexware_link: b.lexware_link });
   await createAdminClient().rpc("lexware_pdf", { p_id: b.id, p_benutzer: benutzer.id, p_pfad: pfad });
   return pfad;
 }
@@ -323,14 +292,17 @@ export async function anLexwareUebertragen(id: string): Promise<Uebertragung> {
   try {
     d = (await ladeBeleg(id))!;
     const b = d.beleg;
-    const kontaktId = await kontaktSichern(b.kunde_id!, benutzer.id);
+    // Vorgänger zuerst prüfen: Scheitert die Gutschrift daran, entsteht auch kein Kontakt in Lexware
     const vorgaenger = d.kette.find((x) => x.id === b.vorgaenger_id);
     let vorgaengerLex: string | null = null;
     if (b.art === "gutschrift") {
-      const { data } = await admin.from("beleg").select("lexware_id").eq("id", b.vorgaenger_id!).maybeSingle();
+      const { data } = await admin.from("beleg").select("lexware_id, altbestand").eq("id", b.vorgaenger_id!).maybeSingle();
+      if (data?.altbestand && !lexwareAltbestandAktiv())
+        throw new LexwareFehler("Der Vorgänger ist ein übernommener Beleg und liegt nicht in diesem Lexware-Konto (LEXWARE_ALTBESTAND nicht aktiv).", 0);
       vorgaengerLex = data?.lexware_id ?? null;
       if (!vorgaengerLex) throw new LexwareFehler(`${vorgaenger ? BELEGART_TEXT[vorgaenger.art] : "Der Vorgänger"} liegt nicht in Lexware.`, 0);
     }
+    const kontaktId = await kontaktSichern(b.kunde_id!, benutzer.id);
     const seit = (versuchVorher ?? new Date().toISOString()).slice(0, 10);
     let lexId = frueher ? await vorhandenSuchen(d, kontaktId, seit) : null;
     if (!lexId) {
