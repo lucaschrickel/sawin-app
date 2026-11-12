@@ -40,6 +40,11 @@ export type CustomerConfig = {
    * Namen (sonst Element als Titel ohne Preis) und hängt die Zusatzartikel an (z. B. Montage), wenn es sie im Katalog gibt.
    */
   aufmass: { elemente: string[]; anschlag: string[]; artikel: Record<string, string>; zusatz: string[] };
+  /**
+   * Briefkopf der App-Belege (Angebot, AB, Lieferschein …): Produktzeile unter dem Logo, genau so breit wie das Logo.
+   * Text und Reihenfolge sind Daten der Instanz; farbe ist die Textfarbe auf Papier (heller Wert aus dem Kunden-Theme).
+   */
+  briefkopf: { produkte: string[]; farbe: string };
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   overrides: Partial<Record<SlotName, ComponentType<any>>>;
 };

@@ -5,7 +5,7 @@ import { redirect } from "next/navigation";
 import { pruefeSitzung } from "@/lib/auth/sitzung";
 import { ohneBestellte } from "@/lib/einkauf-status";
 
-export type Ergebnis = { fehler?: string; ok?: boolean; hinweis?: string; felder?: Record<string, string> };
+export type Ergebnis = { fehler?: string; ok?: boolean; hinweis?: string; felder?: Record<string, string>; id?: string };
 
 const text = (fd: FormData, n: string) => String(fd.get(n) ?? "").trim();
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -55,10 +55,10 @@ export async function bestellungSpeichern(_: Ergebnis, fd: FormData): Promise<Er
       const rest = ohneBestellte(a.noch_nicht_bestellt, zeilen.filter((z) => z.auftrag_id === auftragId).map((z) => z.artikeltext));
       if (rest !== a.noch_nicht_bestellt.trim()) await supabase.from("auftrag").update({ noch_nicht_bestellt: rest || null }).eq("id", auftragId);
     }
-    redirect(`/bestellungen/${data}`);
   }
   refresh();
-  return { ok: true };
+  // Kein Weiterleiten: die Maske springt selbst zur neuen Bestellung bzw. nach „Speichern“ im Verlassen-Dialog zum Ziel
+  return { ok: true, id: data as string };
 }
 
 /** Zeile geliefert bzw. nicht geliefert */

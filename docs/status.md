@@ -24,12 +24,12 @@ Stand: 12.11.2026, nach Formulare & Protokolle, Chat, erweiterter Suche, Zurück
 | Kunden | Stammdaten, Lieferadressen (Alt), Konditionen, § 13b | fertig | |
 | Anfragen | Liste/Board, Varianten, Archiv, Verloren, Nachtrag, Termine, OneDrive-Ordner | fertig | |
 | Anfragen | Aufmaßblatt | fertig | Karte mit Aufmaßen, „In Angebot übernehmen“; nach der AB Verweis auf den Auftrag |
-| Belege | Editor, Nummernkreise, Ketten, Versionen, „Als übergeben markieren“, Duplizieren | fertig | |
+| Belege | Editor, Nummernkreise, Ketten, Versionen, „Als übergeben markieren“, Duplizieren | fertig | Spaltenbreiten der Positionstabelle ziehbar (Maus, Doppelklick, Tastatur), je Benutzer gespeichert, „Spalten zurücksetzen“ (12.11.2026) |
 | Belege | Lexware: Rechnung, Abschläge, Schlussrechnung (centgenau), Gutschrift, Ticket-Rechnung | fertig | |
 | Belege | Teil-AB, Lieferschein, Teilrechnung | fertig | |
 | Belege | Zahlungen, „Als bezahlt markieren“, Zahlungsbestätigung | fertig | Cron und Webhook aktiv erst mit Vercel |
 | Belege | Artikelkatalog, Textvorlagen, formatierte Beschreibungen | fertig | |
-| Belege | Belegübersichten mit Vorschau-Leiste, Offene Forderungen | fertig | |
+| Belege | Belegübersichten mit Vorschau-Leiste, Offene Forderungen | fertig | Klick auf die PDF-Kachel öffnet die Bearbeitung, wenn bearbeitbar, sonst Hinweis „Nicht mehr bearbeitbar“ (12.11.2026) |
 | Belege | Vorläufiger Versand: Download `<Nummer>_<Belegart>_<Kunde>.pdf`, „Versenden“ per `mailto` mit BCC | fertig | Angebot/AB eingefroren, Protokoll; Lexware-Belege nur mit Original |
 | Belege | Versand per Outlook aus der App, PDF-Gruppen, Versandprotokoll mit Anhängen | verschoben auf V2 | Entscheidung 11.11.2026 |
 | Aufträge | Liste mit AB-Vorschau, Board, Phasen, Prüfhinweis, Reklamation, Ware eingetroffen | fertig | |
@@ -38,7 +38,7 @@ Stand: 12.11.2026, nach Formulare & Protokolle, Chat, erweiterter Suche, Zurück
 | Service | Tickets, Board, Service-Plan „Terminierbar“, Rechnung am Ticket, OneDrive-Ordner | fertig | |
 | Montageplan | Plantafel komplett, Wochenplan-PDF | fertig | |
 | Team | Kalender, Mitarbeiter, Fahrzeuge, Zeiterfassung, Abwesenheiten | fertig | |
-| Einkauf | Lieferanten (Konditionen), Bestellungen | fertig | |
+| Einkauf | Lieferanten (Konditionen), Bestellungen | fertig | Bestellung direkt in der Maske bearbeitbar (kein Dialog), Neue Bestellung unter /bestellungen/neu, Abfrage beim Verlassen (12.11.2026) |
 | Ablage | OneDrive über Microsoft Graph: Ordner ab Angebot, Umbenennen mit der AB, Beleg-PDFs, Upload, Zwischenspeicher, Nachladen | fertig | mit Sawins Bibliothek „Kundenprojekte“ im Ordner `_App-Test` getestet (11.11.2026, localhost); auf Vercel mit dem Deployment |
 | Kommunikation | Chat je Auftrag und Ticket (Erwähnungen, Fotos mit Kopie in OneDrive, ungelesen an Reiter, Liste und Board, löschen) | fertig | neue Nachrichten über Abfrage alle 10 s; Supabase Realtime mit der Monteur-App (V2) |
 | Formulare | Aufmaßblatt digital (automatisch speichern, Abschließen/Wieder öffnen, PDF nach „03 Aufmaß - Freigabe“, Nachtragsangebot am Auftrag), Montageprotokoll, Servicebericht, Übergabeprotokoll (Vorlage drucken, Scan hochladen) | fertig | Checklisten je Produkt aus der Konfiguration (Startwerte aus der Demo, mit Sawin abstimmen) |
@@ -110,6 +110,11 @@ Stand: 12.11.2026, nach Formulare & Protokolle, Chat, erweiterter Suche, Zurück
   kopfzeile 24/24, dashboard 23/23, seitenleiste 11/11, oberflaeche 14/14, kunden 28/28, anfragen 28/28, aufgaben 19/19,
   auftraege 28/28, service 26/26, belege 46/46, einkauf 30/30, team 26/26, plantafel 39/39, montageplan 33/33,
   katalog 14/14, chat 26/26, formulare 40/40, zahlungen 16/16, lexware 51/51, onedrive 24/24.
+- Briefkopf der App-Belege (12.11.2026): DIN 5008 Form B (Anschrift ab 62,7 mm im Fenster, Belegdaten ab 50 mm, Text ab
+  100 mm, Ränder 25/20 mm), keine Absenderzeile, Telefon nur oben rechts, Produktzeile unter dem Logo aus der
+  Kundenkonfiguration (Schrift 5,9 pt, logobreit). Vorher/Nachher-Muster von Angebot, AB und Lieferschein geprüft.
+- Staging: Die Firmendaten in Einstellungen › Firma sind Testwerte ("Testfirma …", Bank 999999) aus einem Browser-Test;
+  vor dem Probelauf mit Sawin echte Firmendaten eintragen.
 - PDFs (12.11.2026): Seitenzahl „Seite n von m“ auf Belegen, Formularen und Wochenplan (Schriftbild unverändert,
   Vorher/Nachher geprüft). Behoben: Im Server fehlten nach einem Wochenplan in folgenden PDFs Buchstaben (eigene
   Schriftfamilie je PDF). Der Beleg-Editor hat keinen eigenen Zurück-Pfeil mehr (Zurück nur oben links).

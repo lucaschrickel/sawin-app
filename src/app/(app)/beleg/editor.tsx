@@ -1,10 +1,14 @@
 "use client";
 
 import { verlaufVergessen } from "@/components/app/verlauf";
+import { useVerlassenSchutz, VerlassenDialog } from "@/components/app/verlassen-schutz";
+import { inhaltsBreiten, SpaltenGriff } from "@/components/ui/spalten-griff";
+import { spaltenbreitenSetzen } from "@/lib/ansicht-aktion";
+import { breitenAus, geaendertGegenStandard, passendeBreite, type SpaltenDef } from "@/lib/spalten";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { BookOpen, Copy, Eye, FileText, GripVertical, Lock, Pencil, Plus, Save, Trash2, UserPlus, X } from "lucide-react";
-import { useCallback, useEffect, useMemo, useRef, useState, useTransition, type ReactNode } from "react";
+import { BookOpen, Copy, Eye, FileText, GripVertical, Lock, Pencil, Plus, Save, Trash2, UserPlus, X, RotateCcw } from "lucide-react";
+import { useCallback, useMemo, useRef, useState, useTransition, type ReactNode } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Bestaetigen } from "@/components/ui/bestaetigen";
 import { Button } from "@/components/ui/button";
@@ -36,6 +40,8 @@ import { kundenSuchen, type KundeTreffer } from "../anfragen/aktionen";
 import { belegFertigstellen, belegSpeichern, belegVerwerfen, kundeFuerEditor } from "./aktionen";
 
 type Props = {
+  /** gezogene Spaltenbreiten der Positionstabelle (je Benutzer) */
+  spaltenStart?: Record<string, number>;
   start: EditorZustand;
   hinweis?: string;
   /** neu: noch nie gespeichert; entwurf: gespeicherter Entwurf; bearbeiten: fertiggestelltes Angebot / AB */
@@ -107,7 +113,18 @@ function Karte({ titel, rechts, children }: { titel?: string; rechts?: ReactNode
   );
 }
 
-export function BelegEditor({ start, hinweis, modus, zahlungsbedingungen, kundeStart, tagVorschlaege, herkunftListe, zurueck, abrechnung, lexware, artikel = [], vorlagen = [] }: Props) {
+/** Ziehbare Spalten der Positionstabelle (Breiten in px; Titel nimmt den Rest, mindestens TITEL_MIN) */
+const SPALTEN: SpaltenDef[] = [
+  { schluessel: "menge", titel: "Menge", standard: 64, min: 48, max: 200 },
+  { schluessel: "einheit", titel: "Einheit", standard: 84, min: 56, max: 220 },
+  { schluessel: "preis", titel: "Einzelpreis", standard: 96, min: 72, max: 240 },
+  { schluessel: "rabatt", titel: "Rabatt", standard: 58, min: 44, max: 160 },
+  { schluessel: "ust", titel: "USt", standard: 68, min: 56, max: 160 },
+  { schluessel: "gesamt", titel: "Gesamt", standard: 92, min: 72, max: 240 },
+];
+const TITEL_MIN = 160;
+
+export function BelegEditor({ start, hinweis, modus, zahlungsbedingungen, kundeStart, tagVorschlaege, herkunftListe, zurueck, abrechnung, lexware, artikel = [], vorlagen = [] , spaltenStart }: Props) {
   const router = useRouter();
   const [z, setZ] = useState<EditorZustand>(() =>
     start.kopf.art === "abschlagsrechnung" ? { ...start, positionen: abschlagZeilen(start.kopf, abrechnung, start.positionen) } : start,
@@ -118,7 +135,6 @@ export function BelegEditor({ start, hinweis, modus, zahlungsbedingungen, kundeS
   const [laeuft, starte] = useTransition();
   const [kunde, setKunde] = useState<KundeFuerBeleg | null>(kundeStart);
   const [vorschau, setVorschau] = useState<string | null>(null);
-  const [verlassen, setVerlassen] = useState<null | { weiter: () => void }>(null);
   const k = z.kopf;
   const art = k.art;
   const ls = art === "lieferschein";
@@ -175,40 +191,30 @@ export function BelegEditor({ start, hinweis, modus, zahlungsbedingungen, kundeS
   }, [hatAbzug, abrechnung, z.positionen, k.steuerart, k.preise_brutto, k.gesamtrabatt_prozent, summen.steuern]);
 
   // ---------- Verlassen mit ungespeicherten Änderungen: Speichern | Verwerfen | Abbrechen ----------
-  const geaendertRef = useRef(geaendert);
-  useEffect(() => {
-    geaendertRef.current = geaendert;
-  }, [geaendert]);
-  useEffect(() => {
-    if (!geaendert) return;
-    const vorEntladen = (e: BeforeUnloadEvent) => {
-      e.preventDefault();
-    };
-    const klick = (e: MouseEvent) => {
-      const a = (e.target as HTMLElement).closest("a[href]") as HTMLAnchorElement | null;
-      if (!a || a.target === "_blank" || e.metaKey || e.ctrlKey || e.shiftKey || a.hasAttribute("download")) return;
-      const ziel = new URL(a.href, location.href);
-      if (ziel.origin !== location.origin || (ziel.pathname === location.pathname && ziel.search === location.search)) return;
-      e.preventDefault();
-      e.stopPropagation();
-      setVerlassen({ weiter: () => router.push(ziel.pathname + ziel.search) });
-    };
-    // Browser-Zurück: Wächter-Eintrag im Verlauf (gleicher Zustand wie die aktuelle Seite)
-    history.pushState(history.state, "", location.href);
-    const zurueckTaste = () => {
-      if (!geaendertRef.current) return;
-      history.pushState(history.state, "", location.href);
-      setVerlassen({ weiter: () => history.go(-2) });
-    };
-    window.addEventListener("beforeunload", vorEntladen);
-    document.addEventListener("click", klick, true);
-    window.addEventListener("popstate", zurueckTaste);
-    return () => {
-      window.removeEventListener("beforeunload", vorEntladen);
-      document.removeEventListener("click", klick, true);
-      window.removeEventListener("popstate", zurueckTaste);
-    };
-  }, [geaendert, router]);
+  const { verlassen, setVerlassen, geaendertRef } = useVerlassenSchutz(geaendert);
+
+  // ---------- Spaltenbreiten der Positionstabelle (je Benutzer gespeichert) ----------
+  const tabelleRef = useRef<HTMLTableElement>(null);
+  const [breiten, setBreiten] = useState(() => breitenAus(spaltenStart, SPALTEN));
+  const breitenRef = useRef(breiten);
+  const breiteSetzen = (schluessel: string, b: number) =>
+    setBreiten((alt) => {
+      const neu = { ...alt, [schluessel]: b };
+      breitenRef.current = neu;
+      return neu;
+    });
+  const breitenMerken = () => void spaltenbreitenSetzen("beleg_positionen", breitenRef.current);
+  const passend = (d: SpaltenDef) => {
+    if (!tabelleRef.current) return;
+    breiteSetzen(d.schluessel, passendeBreite(inhaltsBreiten(tabelleRef.current, d.schluessel), 4, d.min, d.max));
+    setTimeout(breitenMerken, 0);
+  };
+  const spaltenZuruecksetzen = () => {
+    const standard = breitenAus(undefined, SPALTEN);
+    breitenRef.current = standard;
+    setBreiten(standard);
+    void spaltenbreitenSetzen("beleg_positionen", null);
+  };
 
   const nachSpeichern = (id: string, wohin?: string) => {
     setGeaendert(false);
@@ -571,36 +577,43 @@ export function BelegEditor({ start, hinweis, modus, zahlungsbedingungen, kundeS
               </div>
             )}
             <div className="-mx-1 overflow-x-auto">
-              <table className="w-full min-w-[640px] table-fixed border-collapse text-[14px]" data-positionen>
+              {(() => {
+                const sichtbar = SPALTEN.filter((d) => preisSpalten || d.schluessel === "menge" || d.schluessel === "einheit");
+                const kopfText: Record<string, string> = { menge: "Menge", einheit: "Einheit", preis: k.preise_brutto ? "VK brutto" : "VK netto", rabatt: "Rab. %", ust: "USt", gesamt: "Gesamt" };
+                const rechts = new Set(["menge", "preis", "rabatt", "gesamt"]);
+                return (
+              <table
+                ref={tabelleRef}
+                className="w-full table-fixed border-collapse text-[14px]"
+                style={{ minWidth: 40 + TITEL_MIN + 36 + sichtbar.reduce((summe, d) => summe + breiten[d.schluessel], 0) }}
+                data-positionen
+              >
                 <colgroup>
                   <col style={{ width: 40 }} />
                   <col />
-                  <col style={{ width: 64 }} />
-                  <col style={{ width: 84 }} />
-                  {preisSpalten && (
-                    <>
-                      <col style={{ width: 96 }} />
-                      <col style={{ width: 58 }} />
-                      <col style={{ width: 68 }} />
-                      <col style={{ width: 92 }} />
-                    </>
-                  )}
+                  {sichtbar.map((d) => (
+                    <col key={d.schluessel} style={{ width: breiten[d.schluessel] }} />
+                  ))}
                   <col style={{ width: 36 }} />
                 </colgroup>
                 <thead>
                   <tr className="text-left text-[11px] font-semibold tracking-[0.06em] text-muted-2 uppercase">
                     <th className="px-1 pb-2">#</th>
                     <th className="px-1 pb-2">Titel und Beschreibung</th>
-                    <th className="px-1 pb-2 text-right">Menge</th>
-                    <th className="px-1 pb-2">Einheit</th>
-                    {preisSpalten && (
-                      <>
-                        <th className="px-1 pb-2 text-right">{k.preise_brutto ? "VK brutto" : "VK netto"}</th>
-                        <th className="px-1 pb-2 text-right">Rab. %</th>
-                        <th className="px-1 pb-2">USt</th>
-                        <th className="px-1 pb-2 text-right">Gesamt</th>
-                      </>
-                    )}
+                    {sichtbar.map((d) => (
+                      <th key={d.schluessel} className={cn("relative px-1 pb-2", rechts.has(d.schluessel) && "text-right")} data-spalte={d.schluessel}>
+                        {kopfText[d.schluessel]}
+                        <SpaltenGriff
+                          titel={d.titel}
+                          breite={breiten[d.schluessel]}
+                          min={d.min}
+                          max={d.max}
+                          onBreite={(b) => breiteSetzen(d.schluessel, b)}
+                          onEnde={breitenMerken}
+                          onPassend={() => passend(d)}
+                        />
+                      </th>
+                    ))}
                     <th />
                   </tr>
                 </thead>
@@ -661,28 +674,28 @@ export function BelegEditor({ start, hinweis, modus, zahlungsbedingungen, kundeS
                           </td>
                           {p.typ === "artikel" && (
                             <>
-                              <td className="px-1 pt-1.5">
+                              <td className="px-1 pt-1.5" data-spalte="menge">
                                 <input aria-label="Menge" data-feld="menge" inputMode="decimal" className={cn(eingabe, "text-right")} value={p.menge} onChange={(e) => setPos(p.key, { menge: e.target.value })} />
                               </td>
-                              <td className="px-1 pt-1.5">
+                              <td className="px-1 pt-1.5" data-spalte="einheit">
                                 <input aria-label="Einheit" list="beleg-einheiten" className={eingabe} value={p.einheit} onChange={(e) => setPos(p.key, { einheit: e.target.value })} />
                               </td>
                               {preisSpalten && (
                                 <>
-                                  <td className="px-1 pt-1.5">
+                                  <td className="px-1 pt-1.5" data-spalte="preis">
                                     <input aria-label="Einzelpreis" data-feld="preis" inputMode="decimal" className={cn(eingabe, "text-right")} value={p.einzelpreis} placeholder="0,00" onChange={(e) => setPos(p.key, { einzelpreis: e.target.value })} />
                                   </td>
-                                  <td className="px-1 pt-1.5">
+                                  <td className="px-1 pt-1.5" data-spalte="rabatt">
                                     <input aria-label="Rabatt in Prozent" inputMode="decimal" className={cn(eingabe, "text-right")} value={p.rabatt_prozent} onChange={(e) => setPos(p.key, { rabatt_prozent: e.target.value })} />
                                   </td>
-                                  <td className="px-1 pt-1.5">
+                                  <td className="px-1 pt-1.5" data-spalte="ust">
                                     <select aria-label="Steuersatz" className={cn(eingabe, "px-1.5")} disabled={frei} value={frei ? "0" : p.steuersatz} onChange={(e) => setPos(p.key, { steuersatz: e.target.value })}>
                                       {STEUERSAETZE.map((s) => (
                                         <option key={s} value={String(s)}>{s} %</option>
                                       ))}
                                     </select>
                                   </td>
-                                  <td className="px-1 pt-3 text-right tabular" data-zeilenbetrag>
+                                  <td className="px-1 pt-3 text-right tabular" data-zeilenbetrag data-spalte="gesamt">
                                     {betrag == null ? "" : optional ? `(${eur(betrag)})` : eur(betrag)}
                                   </td>
                                 </>
@@ -718,6 +731,8 @@ export function BelegEditor({ start, hinweis, modus, zahlungsbedingungen, kundeS
                   });
                 })()}
               </table>
+                );
+              })()}
               <datalist id="beleg-einheiten">
                 {EINHEITEN.map((e) => (
                   <option key={e} value={e} />
@@ -749,6 +764,11 @@ export function BelegEditor({ start, hinweis, modus, zahlungsbedingungen, kundeS
               <Button size="sm" onClick={() => setPositionen((ps) => [...ps, leerePosition("text")])}>
                 <Plus className="size-4" /> Freitext
               </Button>
+              {geaendertGegenStandard(breiten, SPALTEN) && (
+                <Button size="sm" variant="ghost" onClick={spaltenZuruecksetzen} data-spalten-zuruecksetzen>
+                  <RotateCcw className="size-4" /> Spalten zurücksetzen
+                </Button>
+              )}
               {!ls && (
                 <label className="ml-auto inline-flex items-center gap-2 text-sm text-muted">
                   % Gesamtrabatt
@@ -1001,36 +1021,21 @@ export function BelegEditor({ start, hinweis, modus, zahlungsbedingungen, kundeS
         </DialogContent>
       </Dialog>
 
-      <Dialog open={!!verlassen} onOpenChange={(o) => !o && setVerlassen(null)}>
-        <DialogContent title="Ungespeicherte Änderungen">
-          <p className="text-base text-ink-3">Der Beleg hat ungespeicherte Änderungen. Was soll mit ihnen passieren?</p>
-          <div className="flex flex-wrap justify-end gap-2.5 pt-5">
-            <Button onClick={() => setVerlassen(null)}>Abbrechen</Button>
-            <Button
-              variant="danger"
-              onClick={() => {
-                const w = verlassen!.weiter;
-                setGeaendert(false);
-                geaendertRef.current = false;
-                setVerlassen(null);
-                setTimeout(w, 0);
-              }}
-            >
-              Verwerfen
-            </Button>
-            <Button
-              variant="primary"
-              onClick={() => {
-                const w = verlassen!.weiter;
-                setVerlassen(null);
-                speichern(() => setTimeout(w, 0));
-              }}
-            >
-              Speichern
-            </Button>
-          </div>
-        </DialogContent>
-      </Dialog>
+      <VerlassenDialog
+        verlassen={verlassen}
+        text="Der Beleg hat ungespeicherte Änderungen. Was soll mit ihnen passieren?"
+        onAbbrechen={() => setVerlassen(null)}
+        onVerwerfen={(weiter) => {
+          setGeaendert(false);
+          geaendertRef.current = false;
+          setVerlassen(null);
+          setTimeout(weiter, 0);
+        }}
+        onSpeichern={(weiter) => {
+          setVerlassen(null);
+          speichern(() => setTimeout(weiter, 0));
+        }}
+      />
     </div>
   );
 }

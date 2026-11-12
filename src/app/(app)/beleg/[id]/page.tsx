@@ -20,6 +20,7 @@ import { ZAHLUNGSART_TEXT } from "@/lib/belege";
 import { AKTIV, LISTE } from "../navigation";
 import { ZahlungenKarte } from "../zahlungen";
 import { AngebotZuruecksetzen, KettenLeiste, LexwarePdfKnopf, SchrittKnoepfe, TagsKommentar, UebergebenKnopf } from "../ui";
+import { ladeSpaltenbreiten } from "@/lib/ansicht";
 import { VersendenDialog } from "../versand";
 
 export const metadata: Metadata = { title: "Beleg" };
@@ -46,6 +47,7 @@ export default async function BelegPage({ params }: PageProps<"/beleg/[id]">) {
     return (
       <Shell active={AKTIV[b.art]} crumbs={crumbs}>
         <BelegEditor
+          spaltenStart={await ladeSpaltenbreiten("beleg_positionen")}
           key={`${b.id}-${b.updated_at}`}
           start={belegZuEingabe(d)}
           modus="entwurf"

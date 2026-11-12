@@ -29,12 +29,14 @@ export type Bestellung = {
   liefer_jahr: number | null;
   status: "bestellt" | "bestaetigt";
   notiz: string | null;
+  /** Stand der Bestellung (die Bestellmaske lädt nach dem Speichern neu) */
+  updated_at: string;
   lieferant: { id: string; name: string } | null;
   zeilen: BestellZeile[];
   abgeleitet: BestellStatus;
 };
 const BESTELLUNG =
-  "id, nummer, bestelldatum, lieferanten_ab_nummer, liefer_kw, liefer_jahr, status, notiz, lieferant:lieferant_id(id, name), zeilen:bestellzeile(id, artikeltext, menge, geliefert, reihenfolge, auftrag:auftrag_id(id, nummer, titel, kunde:kunde_id(name)))";
+  "id, nummer, bestelldatum, lieferanten_ab_nummer, liefer_kw, liefer_jahr, status, notiz, updated_at, lieferant:lieferant_id(id, name), zeilen:bestellzeile(id, artikeltext, menge, geliefert, reihenfolge, auftrag:auftrag_id(id, nummer, titel, kunde:kunde_id(name)))";
 
 type RohZeile = Omit<BestellZeile, "auftrag"> & { reihenfolge: number; auftrag: { id: string; nummer: string; titel: string; kunde: { name: string } | null } | null };
 type RohBestellung = Omit<Bestellung, "zeilen" | "abgeleitet"> & { zeilen: RohZeile[] };

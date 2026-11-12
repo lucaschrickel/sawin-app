@@ -90,13 +90,16 @@ try {
   pruefe("Erneut aus dem Menü: Dialog öffnet wieder", await b.warte("!!document.querySelector('[role=dialog]')"));
   await b.taste("Escape", "Escape", 27);
   await b.warte("!document.querySelector('[role=dialog]')");
-  for (const [eintrag, pfad] of [["Anfrage", "/anfragen"], ["Service-Ticket", "/service"], ["Aufgabe", "/aufgaben"], ["Bestellung", "/bestellungen"]]) {
+  for (const [eintrag, pfad] of [["Anfrage", "/anfragen"], ["Service-Ticket", "/service"], ["Aufgabe", "/aufgaben"]]) {
     await b.klick("[data-neu-menue]");
     await b.klick(`[data-neu='${eintrag}']`);
     pruefe(`Neu: ${eintrag} öffnet den Dialog`, await b.warte(`location.pathname === "${pfad}" && !!document.querySelector("[role=dialog]")`));
     await b.taste("Escape", "Escape", 27);
     await b.warte("!document.querySelector('[role=dialog]')");
   }
+  await b.klick("[data-neu-menue]");
+  await b.klick("[data-neu='Bestellung']");
+  pruefe("Neu: Bestellung öffnet die Bestellmaske (kein Dialog)", await b.warte(`location.pathname === "/bestellungen/neu" && !!document.querySelector("[data-bestellung-editor]")`));
   await b.klick("[data-neu-menue]");
   await b.klick("[data-neu='Angebot']");
   pruefe("Neu: Angebot öffnet direkt den Editor", await b.warte("location.pathname === '/beleg/neu' && !!document.querySelector('[data-beleg-editor=angebot]')"));

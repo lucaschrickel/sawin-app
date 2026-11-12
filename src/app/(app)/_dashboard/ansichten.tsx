@@ -296,7 +296,7 @@ export function Einkauf({ d }: { d: Awaited<ReturnType<typeof ladeEinkauf>> }) {
                     {a.kunde?.name ?? "–"}
                     <span className="block text-xs whitespace-pre-line text-muted-2">{a.noch_nicht_bestellt}</span>
                   </span>
-                  <NeueBestellung auftragId={a.id} ausloeser={<button type="button" className={knopf}><ShoppingCart className="size-3.5" />Bestellen</button>} />
+                  <NeueBestellung auftragId={a.id} className={knopf} inhalt={<><ShoppingCart className="size-3.5" />Bestellen</>} />
                 </li>
               ))}
             </ul>

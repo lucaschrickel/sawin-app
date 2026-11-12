@@ -14,7 +14,7 @@ import { Table, Td, Th, Tr } from "@/components/ui/table";
 import { getCustomer, resolveSlot } from "@/customers";
 import { eur } from "@/lib/format";
 import { AUFTRAG_PHASE_TEXT, AUFTRAG_PHASE_TON, AUFTRAG_PHASEN, BELEG_STATUS_TONE } from "@/lib/status";
-import { AblageUploadDemo, BestaetigenDemo, ChatDemo, DialogDemo, FarbWahlDemo, FormDemo, FormularDialogDemo, RichTextDemo } from "./demo-interactive";
+import { AblageUploadDemo, BestaetigenDemo, ChatDemo, DialogDemo, FarbWahlDemo, FormDemo, FormularDialogDemo, PdfKachelDemo, RichTextDemo, SpaltenGriffDemo, VerlassenDemo } from "./demo-interactive";
 import { TrefferZeile } from "@/components/app/kopfzeile";
 import { Pfad, ZurueckKnopf } from "@/components/app/verlauf";
 import { FORMULAR_STATUS_TEXT, FORMULAR_STATUS_TON, type FormularStatus } from "@/lib/formular-logik";
@@ -106,7 +106,8 @@ function Section({ title, description, children }: { title: string; description?
 export default function StyleguidePage() {
   // Kunden können die Pipeline-Karte per Slot ersetzen, ohne den Basiscode zu ändern.
   const Card_ = resolveSlot("PipelineCard", PipelineCard);
-  const { Logo } = getCustomer();
+  const c = getCustomer();
+  const { Logo } = c;
 
   return (
     <Shell active="styleguide" crumbs={[{ label: "System" }, { label: "Designsystem" }]}>
@@ -334,6 +335,31 @@ export default function StyleguidePage() {
         <Section title="Chat" description="Nachrichten je Auftrag bzw. Ticket mit @Erwähnung und Foto (ChatPanel) · hier ohne echten Vorgang">
           <div className="max-w-3xl">
             <ChatDemo />
+          </div>
+        </Section>
+
+        <Section title="Spaltenbreiten" description="Positionstabelle im Beleg-Editor (SpaltenGriff): am rechten Rand ziehen, Doppelklick passt an, Tastatur: Pfeile (mit Umschalt größer), Pos1/Ende, Enter · je Benutzer gespeichert">
+          <SpaltenGriffDemo />
+        </Section>
+
+        <Section title="PDF-Kachel" description="Vorschau-Leiste der Belegübersichten (PdfKachel): Klick öffnet die Bearbeitung, solange der Beleg bearbeitbar ist · Vergrößern über das Symbol oben rechts">
+          <PdfKachelDemo />
+        </Section>
+
+        <Section title="Verlassen mit Änderungen" description="Beleg-Editor und Bestellung (useVerlassenSchutz, VerlassenDialog): Links, Browser-Zurück und Schließen des Tabs">
+          <VerlassenDemo />
+        </Section>
+
+        <Section title="Briefkopf der Belege (PDF)" description="Logo, darunter die Produktzeile genau so breit wie das Logo · Text, Reihenfolge und Farbe aus der Kundenkonfiguration (briefkopf); im PDF immer auf hellem Papier">
+          <div className="inline-block rounded-md border border-line-soft bg-surface p-5">
+            <div style={{ width: 280 }}>
+              <c.Logo variante="voll" className="h-auto w-full" />
+              <div className="mt-1.5 flex justify-between text-[8.2px] leading-none" style={{ color: c.briefkopf.farbe }}>
+                {c.briefkopf.produkte.flatMap((p, i) => (i ? ["·", p] : [p])).map((x, i) => (
+                  <span key={i}>{x}</span>
+                ))}
+              </div>
+            </div>
           </div>
         </Section>
 

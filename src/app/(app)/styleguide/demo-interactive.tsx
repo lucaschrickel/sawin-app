@@ -1,6 +1,10 @@
 "use client";
 
+import { RotateCcw } from "lucide-react";
 import { useState } from "react";
+import { VerlassenDialog } from "@/components/app/verlassen-schutz";
+import { SpaltenGriff } from "@/components/ui/spalten-griff";
+import { PdfKachel } from "../beleg/ui";
 import { AblageUpload } from "@/components/app/ablage-upload";
 import type { ChatNachricht } from "@/lib/chat";
 import { UNTERORDNER } from "@/lib/onedrive/schema";
@@ -148,4 +152,76 @@ export function ChatDemo() {
 /** Upload in den OneDrive-Ordner mit Wahl des Unterordners (ohne echten Vorgang) */
 export function AblageUploadDemo() {
   return <AblageUpload bezug={{ auftrag_id: DEMO_ID }} unterordner={[...UNTERORDNER]} />;
+}
+
+/** Spaltenbreiten wie in der Positionstabelle: Griff ziehen, Doppelklick „passend“, Tastatur, Zurücksetzen */
+export function SpaltenGriffDemo() {
+  const spalten = [
+    { schluessel: "menge", titel: "Menge", standard: 72, min: 48, max: 200 },
+    { schluessel: "preis", titel: "Einzelpreis", standard: 110, min: 72, max: 240 },
+  ];
+  const standard = Object.fromEntries(spalten.map((s) => [s.schluessel, s.standard]));
+  const [b, setB] = useState<Record<string, number>>(standard);
+  const geaendert = spalten.some((s) => b[s.schluessel] !== s.standard);
+  return (
+    <div className="flex flex-col gap-3">
+      <table className="w-full max-w-xl table-fixed border-collapse text-sm">
+        <colgroup>
+          <col />
+          {spalten.map((s) => <col key={s.schluessel} style={{ width: b[s.schluessel] }} />)}
+        </colgroup>
+        <thead>
+          <tr className="text-left text-[11px] font-semibold tracking-[0.06em] text-muted-2 uppercase">
+            <th className="px-1 pb-2">Titel</th>
+            {spalten.map((s) => (
+              <th key={s.schluessel} className="relative px-1 pb-2 text-right">
+                {s.titel}
+                <SpaltenGriff titel={s.titel} breite={b[s.schluessel]} min={s.min} max={s.max} onBreite={(w) => setB((x) => ({ ...x, [s.schluessel]: w }))} onEnde={() => {}} onPassend={() => setB((x) => ({ ...x, [s.schluessel]: s.min + 20 }))} />
+              </th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          <tr className="border-t border-line-soft">
+            <td className="px-1 py-2">Kunststofffenster 3-fach</td>
+            <td className="px-1 py-2 text-right tabular">4</td>
+            <td className="px-1 py-2 text-right tabular">480,00 €</td>
+          </tr>
+        </tbody>
+      </table>
+      <div className="flex items-center gap-2">
+        <Button size="sm" variant="ghost" disabled={!geaendert} onClick={() => setB(standard)}>
+          <RotateCcw className="size-4" /> Spalten zurücksetzen
+        </Button>
+        <span className="text-xs text-muted-2">Breiten: {spalten.map((s) => `${s.titel} ${b[s.schluessel]} px`).join(" · ")}</span>
+      </div>
+    </div>
+  );
+}
+
+/** PDF-Kachel der Vorschau-Leiste: bearbeitbar (Hand, „Bearbeiten“) und gesperrt (Sperrzeichen, Hinweis) */
+export function PdfKachelDemo() {
+  return (
+    <div className="grid max-w-xl grid-cols-2 gap-4">
+      <div>
+        <PdfKachel src="about:blank" titel="Angebot (Entwurf)" hoehe={180} bearbeiten="/styleguide" />
+        <p className="mt-1.5 text-xs text-muted-2">bearbeitbar: Klick öffnet die Bearbeitung</p>
+      </div>
+      <div>
+        <PdfKachel src="about:blank" titel="Lieferschein LS1000" hoehe={180} bearbeiten={null} />
+        <p className="mt-1.5 text-xs text-muted-2">gesperrt: Klick zeigt „Nicht mehr bearbeitbar“</p>
+      </div>
+    </div>
+  );
+}
+
+/** Abfrage beim Verlassen mit ungespeicherten Änderungen (Beleg-Editor, Bestellung) */
+export function VerlassenDemo() {
+  const [v, setV] = useState<null | { weiter: () => void }>(null);
+  return (
+    <>
+      <Button onClick={() => setV({ weiter: () => {} })}>Seite verlassen …</Button>
+      <VerlassenDialog verlassen={v} text="Die Bestellung hat ungespeicherte Änderungen. Was soll mit ihnen passieren?" onAbbrechen={() => setV(null)} onVerwerfen={() => setV(null)} onSpeichern={() => setV(null)} />
+    </>
+  );
 }

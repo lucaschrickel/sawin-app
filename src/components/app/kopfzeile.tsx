@@ -232,7 +232,7 @@ const NEU: { text: string; sub: string; ziel: string; icon: ReactNode; dialog?: 
   { text: "Angebot", sub: "öffnet den Beleg-Editor", ziel: "/beleg/neu?art=angebot", icon: <FileText className="size-4" /> },
   { text: "Auftrag", sub: "über die Auftragsbestätigung", ziel: "/beleg/neu?art=auftragsbestaetigung", icon: <Briefcase className="size-4" /> },
   { text: "Service-Ticket", sub: "Reklamation, Wartung, Reparatur", ziel: "/service", icon: <Wrench className="size-4" />, dialog: true },
-  { text: "Bestellung", sub: "beim Lieferanten", ziel: "/bestellungen", icon: <Package className="size-4" />, dialog: true },
+  { text: "Bestellung", sub: "beim Lieferanten", ziel: "/bestellungen/neu", icon: <Package className="size-4" /> },
   { text: "Aufgabe", sub: "für mich oder andere", ziel: "/aufgaben", icon: <ListChecks className="size-4" />, dialog: true },
 ];
 

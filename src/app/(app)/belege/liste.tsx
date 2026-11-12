@@ -160,7 +160,11 @@ export async function VorschauLeiste({ detail: d, vorschlaege }: { detail: NonNu
           <ExternalLink className="size-4" />
         </Link>
       </div>
-      <PdfKachel src={`/pdf/beleg/${b.id}`} titel={`${BELEGART_TEXT[b.art]} ${b.nummer ?? "Entwurf"}`} />
+      <PdfKachel
+        src={`/pdf/beleg/${b.id}`}
+        titel={`${BELEGART_TEXT[b.art]} ${b.nummer ?? "Entwurf"}`}
+        bearbeiten={b.status === "entwurf" ? `/beleg/${b.id}` : aenderbar ? `/beleg/${b.id}/bearbeiten` : null}
+      />
       <p className="text-xs text-muted-2">{b.status === "entwurf" ? `Entwurf, zuletzt geändert ${zeitpunkt(b.updated_at)}` : `erstellt am ${tag(b.fertiggestellt_am ?? b.datum)}`}</p>
       <div className="text-[11px] font-semibold tracking-[0.08em] text-muted-2 uppercase">{BELEGART_TEXT[b.art]}</div>
       <dl className="grid grid-cols-[max-content_1fr] gap-x-3 gap-y-1.5 text-sm">

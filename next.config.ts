@@ -32,6 +32,8 @@ const nextConfig: NextConfig = {
       },
     },
   },
+  // fontkit misst Textbreiten im PDF-Briefkopf (Produktzeile); als Node-Paket laden, nicht bündeln
+  serverExternalPackages: ["fontkit"],
   // Schriften für die serverseitig erzeugten PDFs (werden per Dateipfad gelesen, nicht importiert)
   outputFileTracingIncludes: {
     "/pdf/**": ["./node_modules/@fontsource/inter/files/inter-latin-{400,600,700}-{normal,italic}.woff"],

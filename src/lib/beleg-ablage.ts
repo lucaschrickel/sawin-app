@@ -57,7 +57,8 @@ export function druckDaten(d: BelegDetail): { b: PdfBeleg; positionen: PdfPositi
 
 export async function erzeugePdf(daten: { b: PdfBeleg; positionen: PdfPosition[] }, entwurf: boolean): Promise<Buffer> {
   const firma = await ladeFirma();
-  return belegPdf({ ...daten, firma, logo: getCustomer().logoPfade, entwurf });
+  const kunde = getCustomer();
+  return belegPdf({ ...daten, firma, logo: kunde.logoPfade, briefkopf: kunde.briefkopf, entwurf });
 }
 
 /** Original-PDF eines fertiggestellten App-Belegs erzeugen und ablegen; setzt beleg.pdf_pfad */

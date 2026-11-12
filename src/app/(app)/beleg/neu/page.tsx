@@ -5,6 +5,7 @@ import { getCustomer } from "@/customers";
 import { ladeAbrechnung, ladeArtikel, ladeBelegTags, ladeKundeFuerBeleg, ladeTextvorlagen, ladeZahlungsbedingungen, neuerBelegZustand } from "@/lib/belege";
 import { BELEGART_TEXT, EDITOR_BELEGARTEN, type Belegart } from "@/lib/belege-status";
 import { BelegEditor } from "../editor";
+import { ladeSpaltenbreiten } from "@/lib/ansicht";
 import { AKTIV, LISTE } from "../navigation";
 
 export const metadata: Metadata = { title: "Neuer Beleg" };
@@ -45,6 +46,7 @@ export default async function NeuerBelegPage({ searchParams }: PageProps<"/beleg
   return (
     <Shell active={AKTIV[start.zustand.kopf.art]} crumbs={crumbs}>
       <BelegEditor
+          spaltenStart={await ladeSpaltenbreiten("beleg_positionen")}
         key={JSON.stringify(p)}
         start={start.zustand}
         hinweis={start.hinweis}

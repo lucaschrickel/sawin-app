@@ -237,7 +237,8 @@ Die Monteur-App kommt in Version 2.
   Tag-Filter, Suche. Dazu die Liste **„Offene Forderungen“** (Rechnungen und Abschläge mit offenem Betrag) ohne
   eigenen Menüpunkt, Ziel der Verweise aus Dashboard und Glocke. Liste links, rechts eine
   **Vorschau-Leiste** wie in Lexware: Symbole (Bearbeiten bzw. Senden, Drucken, Duplizieren, Verwerfen, Öffnen),
-  verkleinerte PDF-Vorschau (Klick vergrößert), Belegdaten (Nummer, Datum, Kontakt, Gültig bis bzw. Fällig,
+  verkleinerte PDF-Vorschau (Klick öffnet die Bearbeitung, solange der Beleg bearbeitbar ist, sonst kurz „Nicht mehr
+  bearbeitbar“; Mauszeiger und Tooltip zeigen das vorher an; Vergrößern über das Symbol in der Kachel), Belegdaten (Nummer, Datum, Kontakt, Gültig bis bzw. Fällig,
   Betrag, Bezug, Status), **Zugehörige Belege** (Belegkette), Tags und interner Kommentar. Klick auf eine Zeile
   wählt den Beleg, Doppelklick öffnet ihn. Die Liste passt ohne waagerechtes Scrollen neben die Vorschau
   (bei schmalen Fenstern entfällt die Datumsspalte).
@@ -345,7 +346,8 @@ Die Monteur-App kommt in Version 2.
   Belegdaten, Zugehörige Belege, Tags, Kommentar). Spalten: Auftrag, Kunde (mit Titel), **Status** (Phase, darunter
   der Bestellstatus), Produkte (entfällt unter 1380 px), Termin (Montage oder Lieferung), Wert (darunter offen).
   Bedienung wie bei allen Belegübersichten: **Klick auf eine Zeile wählt sie und zeigt ihre Auftragsbestätigung in der
-  Vorschau, Doppelklick öffnet die Auftragsdetails; ein Klick auf die Vorschau öffnet die Auftragsbestätigung.** Teil-ABs stehen als Hinweis
+  Vorschau, Doppelklick öffnet die Auftragsdetails; ein Klick auf die Vorschau öffnet die Auftragsbestätigung zum Bearbeiten,
+  solange sie bearbeitbar ist (sonst Hinweis „Nicht mehr bearbeitbar“).** Teil-ABs stehen als Hinweis
   „+n Teil-AB“ in der Zeile, am Auftrag und in „Alle Belege“. AB-Entwürfe (noch ohne Auftrag) zeigt der Umschalter
   „AB-Entwürfe“ mit Anzahl. Das Board bleibt ohne Vorschau.
 - Phasen: Bestellung, Montage, Abnahme, Baustelle fertig, Reklamation, Abgeschlossen. Pipeline als Liste (Standard)
@@ -459,6 +461,12 @@ Die Monteur-App kommt in Version 2.
   - **Reihenfolge per Drag & Drop** am Griff links; Löschen über das Symbol rechts.
   - Die Positionstabelle passt ab 1280 px Fensterbreite ohne waagerechtes Scrollen in die Editor-Spalte (feste
     Spaltenbreiten, Titel nimmt den Rest); die Aktionen je Zeile liegen nie unter der rechten Seitenleiste.
+  - **Spaltenbreiten wie in Excel (12.11.2026):** Menge, Einheit, VK, Rabatt, USt und Gesamt lassen sich am rechten
+    Rand des Spaltenkopfs ziehen; Doppelklick passt die Breite an den Inhalt an. Mindestbreiten je Spalte, der Titel
+    behält mindestens 160 px (sonst scrollt die Tabelle waagerecht). Tastatur: Fokus auf den Griff, Pfeil links/rechts
+    (mit Umschalt größere Schritte), Pos1/Ende, Enter für „passend“. Gespeichert je Benutzer
+    (`benutzer_einstellung.spaltenbreiten`), Knopf „Spalten zurücksetzen“ (nur sichtbar, wenn geändert). Baustein
+    `SpaltenGriff` (`src/components/ui/spalten-griff.tsx`), Logik `src/lib/spalten.ts`.
 - **Brutto/Netto:** Eingabe und Anzeige der Preise je Beleg umschaltbar, Brutto nur bei Steuerart Standard
   (§ 13b und steuerfrei immer netto).
 - **Steuerart** je Beleg: Standard (mit Umsatzsteuer), § 13b UStG (Bauleistung an einen Bauleister,
@@ -548,6 +556,13 @@ Die Monteur-App kommt in Version 2.
   auf jeder Seite, eine Position wird nicht über einen Seitenwechsel getrennt, Fußzeile mit Firmendaten und
   Wasserzeichen „Entwurf“ stehen auf jeder Seite. Formatierte Beschreibungen (Listen, Farbe, fett) erscheinen im
   PDF wie im Editor. Gilt auch für Formulare und den Wochenplan.
+  **Briefkopf der App-Belege (12.11.2026):** Seite 1 nach DIN 5008 Form B für das Fensterkuvert (DIN lang, C6/5):
+  Briefkopf bis 45 mm, Anschrift in der Anschriftzone ab 62,7 mm bei 25 mm vom linken Rand, Belegdaten rechts ab
+  50 mm, Text ab 100 mm; Ränder 25 mm links, 20 mm rechts. Keine Absenderzeile über der Anschrift. Oben rechts
+  E-Mail, Website und darunter die Telefonnummer (sonst nirgends; die Anschrift des Betriebs steht im Fuß). Unter dem
+  Logo die Produktpalette in einer Zeile, genau so breit wie das Logo, gleichmäßig verteilt (Schriftgröße aus der
+  gemessenen Textbreite); Text, Reihenfolge und Farbe in der Kundenkonfiguration (`briefkopf`). Gilt für Angebot,
+  AB, Teil-AB, Lieferschein, Zahlungsbestätigung und die Entwurfsvorschau; Lexware-Originale bleiben unverändert.
   **Umsetzung (12.11.2026):** „Seite n von m“ unten rechts auf Belegen, Formularen und Wochenplan. In react-pdf 4 steht die
   Zeilenhöhe deshalb an einem Block um den Inhalt (mit derselben Schriftgröße), nie an der Seite und nie an der
   Seitenzahl selbst, sonst erscheint die Seitenzahl nicht; das Schriftbild bleibt gleich. Jedes PDF registriert Inter als
@@ -745,6 +760,11 @@ Die Monteur-App kommt in Version 2.
 - **Bestellungen:** Kopf mit Lieferant, Bestelldatum, AB-Nummer des Lieferanten, Liefer-KW, Status (Bestellt,
   Bestätigt) und Zeilen. **Eine Bestellung kann mehrere Aufträge abdecken** (Sammelbestellung): jede Zeile hat
   Auftrag, Artikeltext, Menge und „geliefert“. Kein Bestell-PDF und kein Versand an Lieferanten in Version 1.
+  **Bearbeitet wird direkt in der Maske** (wie der Beleg-Editor, kein Dialog; 12.11.2026): Kopf, Positionen und Notiz
+  sind Felder der Bestellseite, gespeichert wird per Knopf („ungespeicherte Änderungen“ in der Seitenleiste), beim
+  Verlassen fragt die App Speichern | Verwerfen | Abbrechen. „Neue Bestellung“ öffnet `/bestellungen/neu` (aus dem
+  Auftrag mit Positionen aus „Noch nicht bestellt“, von der Lieferantenseite mit dem Lieferanten vorbelegt).
+  „Geliefert“ je Zeile und „Alles geliefert“ wirken sofort.
 - Abgeleitete Status: Bestellung „Teilweise geliefert“/„Geliefert“/„Überfällig“ (Liefer-KW überschritten).
   Auftrag „Offen“, „Teilweise bestellt“, „Bestellt“, „Teilweise geliefert“, „Abgeschlossen“ aus seinen Zeilen und
   dem Feld „Noch nicht bestellt“. Liefer-KW des Auftrags = früheste offene Zeile.

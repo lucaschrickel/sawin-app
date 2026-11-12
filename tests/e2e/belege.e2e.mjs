@@ -208,6 +208,14 @@ try {
   await b.klick(`[data-beleg-zeile="${abId}"]`);
   pruefe("Klick wählt: Vorschau-Leiste der AB mit Zugehörigen Belegen", await b.warte(`!!document.querySelector('[data-vorschau="${abId}"] [data-zugehoerig]') && document.querySelector('[data-vorschau="${abId}"] [data-zugehoerig]').innerText.includes('${ls.nummer}')`));
   pruefe("verkleinerte PDF-Vorschau", await b.js("!!document.querySelector('[data-pdf-kachel] iframe')"));
+  // AB mit Lieferschein ist gesperrt: Kachel zeigt das an, Klick nur mit Hinweis
+  const kachel = `[data-vorschau="${abId}"] [data-pdf-kachel]`;
+  pruefe(
+    "Kachel gesperrt: Sperr-Mauszeiger und Tooltip „Nicht mehr bearbeitbar“",
+    await b.js(`(() => { const k = document.querySelector('${kachel}'); return k.dataset.bearbeitbar === 'nein' && k.title === 'Nicht mehr bearbeitbar' && getComputedStyle(k).cursor === 'not-allowed'; })()`),
+  );
+  await b.klick(kachel);
+  pruefe("Klick auf gesperrte Kachel: Hinweis, keine Bearbeitung", await b.warte("document.querySelector('[data-kachel-hinweis]')?.innerText === 'Nicht mehr bearbeitbar'") && (await b.js("location.pathname")) === "/belege");
   await foto("belege-liste");
   await b.js(`document.querySelector('[data-beleg-zeile="${lsId}"]').dispatchEvent(new MouseEvent('dblclick', { bubbles: true }))`);
   pruefe("Doppelklick öffnet den Beleg", await b.warte(`location.pathname === '/beleg/${lsId}'`));
@@ -220,6 +228,41 @@ try {
   await b.warte("/^\\/beleg\\/[0-9a-f-]{36}$/.test(location.pathname)");
   const entwurfId = await belegId();
   merken("beleg", entwurfId);
+
+  // Spaltenbreiten der Positionstabelle: per Tastatur ändern, je Benutzer gespeichert, nach dem Neuladen erhalten, zurücksetzen
+  const griff = "[data-spalten-griff='Menge']";
+  pruefe("Spaltengriff: Trenner mit Wert 64", (await b.js(`document.querySelector("${griff}").getAttribute('aria-valuenow')`)) === "64");
+  await b.js(`document.querySelector("${griff}").focus()`);
+  for (let i = 0; i < 3; i++) await b.taste("ArrowRight", "ArrowRight", 39);
+  pruefe("Pfeil rechts: Menge 88 px", (await b.js(`document.querySelector("${griff}").getAttribute('aria-valuenow')`)) === "88");
+  const spalten = async () => (await dbAbfrage("select spaltenbreiten from public.benutzer_einstellung where benutzer_id = $1", [admin.id]))[0]?.spaltenbreiten?.beleg_positionen;
+  let gemerkt = null;
+  for (let i = 0; i < 40 && gemerkt?.menge !== 88; i++) {
+    gemerkt = await spalten();
+    if (gemerkt?.menge !== 88) await sleep(250);
+  }
+  pruefe("Breite je Benutzer gespeichert", gemerkt?.menge === 88, JSON.stringify(gemerkt));
+  await b.js(`document.querySelector("[data-spalten-griff='Einheit']").dispatchEvent(new MouseEvent('dblclick', { bubbles: true }))`);
+  pruefe("Doppelklick: Einheit passend (innerhalb der Grenzen)", await b.warte(`(() => { const v = Number(document.querySelector("[data-spalten-griff='Einheit']").getAttribute('aria-valuenow')); return v >= 56 && v <= 220 && v !== 84; })()`));
+  await b.gehe(`/beleg/${entwurfId}`);
+  await b.da("[data-beleg-editor=angebot]");
+  pruefe("nach dem Neuladen: Menge weiter 88 px", (await b.js(`document.querySelector("${griff}").getAttribute('aria-valuenow')`)) === "88");
+  await b.klick("[data-spalten-zuruecksetzen]");
+  pruefe("Spalten zurücksetzen: Standard, Eintrag entfernt", await b.warte(`document.querySelector("${griff}").getAttribute('aria-valuenow') === '64' && !document.querySelector('[data-spalten-zuruecksetzen]')`));
+  gemerkt = 1;
+  for (let i = 0; i < 40 && gemerkt; i++) {
+    gemerkt = await spalten();
+    if (gemerkt) await sleep(250);
+  }
+  pruefe("gespeicherte Breiten entfernt", !gemerkt, JSON.stringify(gemerkt));
+
+  // Kachel des Entwurfs in der Liste: Klick öffnet die Bearbeitung
+  await b.gehe(`/belege/angebote?q=${encodeURIComponent(kundeName)}&id=${entwurfId}`);
+  const kachelEntwurf = `[data-vorschau="${entwurfId}"] [data-pdf-kachel]`;
+  await b.da(kachelEntwurf);
+  pruefe("Kachel bearbeitbar: Hand-Mauszeiger und Tooltip", await b.js(`(() => { const k = document.querySelector('${kachelEntwurf}'); return k.dataset.bearbeitbar === 'ja' && k.title === 'Klicken zum Bearbeiten' && getComputedStyle(k).cursor === 'pointer'; })()`));
+  await b.klick(kachelEntwurf);
+  pruefe("Klick auf die Kachel öffnet die Bearbeitung", await b.warte(`location.pathname === '/beleg/${entwurfId}' && !!document.querySelector('[data-beleg-editor=angebot]')`));
   await b.da("[data-aktion=verwerfen]");
   await b.klick("[data-aktion=verwerfen]");
   await b.warte("document.querySelector('[role=dialog]')?.innerText.includes('nicht wiederverwendet')");

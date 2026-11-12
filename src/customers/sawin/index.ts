@@ -30,6 +30,11 @@ export const sawin: CustomerConfig = {
     },
     zusatz: ["Montage pauschal"],
   },
+  // Briefkopf der Belege: Produktpalette unter dem Logo; Farbe = --accent-text (hell) aus theme.css
+  briefkopf: {
+    produkte: ["Fenster", "Rollläden", "Haustüren", "Innentüren", "Garagentore", "Bodenbeläge"],
+    farbe: "#8a6140",
+  },
   herkunft: ["Website", "Google", "Empfehlung", "Instagram", "Persönliches Netzwerk", "Direktansprache", "Sonstiges"],
   herkunftOnline: ["Website", "Google", "Instagram"],
   // Sonderkomponenten: hier Basis-Bausteine gezielt ersetzen, z. B.

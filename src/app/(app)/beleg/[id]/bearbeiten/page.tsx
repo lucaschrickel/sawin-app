@@ -5,6 +5,7 @@ import { getCustomer } from "@/customers";
 import { belegZuEingabe, istKopfbeleg, ladeArtikel, ladeBeleg, ladeBelegTags, ladeKundeFuerBeleg, ladeTextvorlagen, ladeZahlungsbedingungen } from "@/lib/belege";
 import { bearbeitbar, BELEGART_TEXT } from "@/lib/belege-status";
 import { BelegEditor } from "../../editor";
+import { ladeSpaltenbreiten } from "@/lib/ansicht";
 import { AKTIV, LISTE } from "../../navigation";
 
 export const metadata: Metadata = { title: "Beleg bearbeiten" };
@@ -25,6 +26,7 @@ export default async function BelegBearbeitenPage({ params }: PageProps<"/beleg/
   return (
     <Shell active={AKTIV[b.art]} crumbs={[{ label: "Belege" }, { label: liste.text, href: liste.href }, { label: `${BELEGART_TEXT[b.art]} ${b.nummer}`, href: `/beleg/${id}` }, { label: "Bearbeiten" }]}>
       <BelegEditor
+          spaltenStart={await ladeSpaltenbreiten("beleg_positionen")}
         key={`${b.id}-${b.updated_at}`}
         start={belegZuEingabe(d)}
         hinweis={hinweis}

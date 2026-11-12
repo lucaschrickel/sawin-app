@@ -1,7 +1,8 @@
 import "server-only";
 import path from "node:path";
 import { Document, Font, G, Page, Path, renderToBuffer, StyleSheet, Svg, Text, View } from "@react-pdf/renderer";
-import type { LogoPfade } from "@/customers/types";
+import { openSync, type Font as FontkitFont } from "fontkit";
+import type { CustomerConfig, LogoPfade } from "@/customers/types";
 import { belegSummen, type Summen } from "@/lib/beleg-summen";
 import { RichPdf } from "./rich-text";
 import { HINWEIS_13B, HINWEIS_STEUERFREI, htmlZuText, zahlungsbedingungFuellen } from "@/lib/beleg-typen";
@@ -9,10 +10,20 @@ import { BELEGART_TEXT, NUMMER_LABEL, type Belegart } from "@/lib/belege-status"
 import { eur } from "@/lib/format";
 
 /*
-  Beleg-PDF im Design der Demo (docHtml): Logo und Firmenzeile, Empfänger, Belegdaten, Titel, Positionen,
-  Summen, Steuerhinweis, Texte, Fuß mit Firmendaten auf jeder Seite. A4, Tabellenkopf auf jeder Seite, eine Position
-  wird nie getrennt, „ENTWURF“ auf jeder Seite. Papier bleibt immer hell: feste helle Farben (wie die hellen Tokens).
+  Beleg-PDF im Design der Demo (docHtml): Logo mit Produktzeile, rechts E-Mail, Website und Telefon, Empfänger,
+  Belegdaten, Titel, Positionen, Summen, Steuerhinweis, Texte, Fuß mit Firmendaten auf jeder Seite. A4, Tabellenkopf auf
+  jeder Seite, eine Position wird nie getrennt, „ENTWURF“ auf jeder Seite. Papier bleibt immer hell: feste helle Farben
+  (wie die hellen Tokens).
+  Seite 1 nach DIN 5008 Form B (Fensterkuvert DIN lang bzw. C6/5): Briefkopf bis 45 mm, Anschriftfeld 45–90 mm ab 25 mm
+  vom linken Rand (Anschrift in der Anschriftzone ab 62,7 mm), Informationsblock rechts ab 50 mm, Text ab 100 mm.
+  Seitenränder 25 mm links und 20 mm rechts. Kopf, Anschrift und Belegdaten stehen fest (nur Seite 1).
 */
+
+const MM = 72 / 25.4;
+const RAND_L = 25 * MM;
+const RAND_R = 20 * MM;
+const OBEN = 42;
+const LOGO_BREITE = 200;
 
 const SCHRIFT = path.join(process.cwd(), "node_modules/@fontsource/inter/files");
 /**
@@ -46,19 +57,18 @@ export async function mitSchrift(dokument: (familie: string) => Parameters<typeo
 export const F = { ink: "#171717", ink3: "#4b4f55", muted: "#5f646b", line: "#e9e6e1", lineStrong: "#d9d3ca", logoInk: "#2E2B28", sand: "#8a6140", wasser: "#A33A2E" };
 
 const st = StyleSheet.create({
-  seite: { fontSize: 10, color: F.ink, paddingTop: 42, paddingBottom: 78, paddingHorizontal: 54 },
+  seite: { fontSize: 10, color: F.ink, paddingTop: OBEN, paddingBottom: 78, paddingLeft: RAND_L, paddingRight: RAND_R },
   zeile: { flexDirection: "row", justifyContent: "space-between" },
   klein: { fontSize: 8.6, color: F.muted },
-  absender: { fontSize: 7.4, color: F.muted, textDecoration: "underline", marginBottom: 6 },
   datenZeile: { flexDirection: "row", justifyContent: "flex-end", gap: 8 },
   datenName: { color: F.muted, width: 92, textAlign: "right" },
   datenWert: { width: 92 },
-  titel: { fontSize: 15, fontWeight: 700, marginTop: 30 },
+  titel: { fontSize: 15, fontWeight: 700 },
   th: { fontSize: 7, fontWeight: 600, letterSpacing: 0.6, textTransform: "uppercase", paddingHorizontal: 5, paddingBottom: 6 },
   td: { paddingHorizontal: 5, paddingVertical: 7 },
   posZeile: { flexDirection: "row", borderBottomWidth: 0.6, borderBottomColor: F.line },
   summenZeile: { flexDirection: "row", justifyContent: "space-between", paddingVertical: 2.5 },
-  fuss: { position: "absolute", bottom: 28, left: 54, right: 54, flexDirection: "row", gap: 18, borderTopWidth: 0.6, borderTopColor: F.line, paddingTop: 8, fontSize: 7, color: F.muted, lineHeight: 1.45 },
+  fuss: { position: "absolute", bottom: 28, left: RAND_L, right: RAND_R, flexDirection: "row", gap: 18, borderTopWidth: 0.6, borderTopColor: F.line, paddingTop: 8, fontSize: 7, color: F.muted, lineHeight: 1.45 },
 });
 
 export type PdfFirma = {
@@ -150,6 +160,33 @@ export function Logo({ l, breite }: { l: LogoPfade; breite: number }) {
   );
 }
 
+/** Breite eines Textes in Inter (normal) bei Schriftgröße 1, aus den Glyphenbreiten der Schriftdatei */
+let inter: FontkitFont | null = null;
+function textBreite(text: string): number {
+  inter ??= openSync(path.join(SCHRIFT, "inter-latin-400-normal.woff"));
+  return inter.layout(text).advanceWidth / inter.unitsPerEm;
+}
+
+/**
+ * Produktzeile unter dem Logo: genau so breit wie das Logo, Wörter und Trennpunkte gleichmäßig verteilt. Die
+ * Schriftgröße folgt aus der gemessenen Textbreite (höchstens 7 pt), damit auch ein anderer Text in die Breite passt.
+ */
+function Produktzeile({ produkte, farbe, breite }: { produkte: string[]; farbe: string; breite: number }) {
+  if (!produkte.length) return null;
+  const teile = produkte.flatMap((p, i) => (i ? ["·", p] : [p]));
+  const luft = 0.25 * (teile.length - 1);
+  const groesse = Math.min(7, breite / (teile.reduce((summe, t) => summe + textBreite(t), 0) + luft));
+  return (
+    <View style={{ width: breite, marginTop: 5, flexDirection: "row", justifyContent: teile.length > 1 ? "space-between" : "flex-start" }}>
+      {teile.map((t, i) => (
+        <Text key={i} style={{ fontSize: groesse, lineHeight: 1, color: farbe }}>
+          {t}
+        </Text>
+      ))}
+    </View>
+  );
+}
+
 function Daten({ name, wert }: { name: string; wert: string }) {
   return (
     <View style={st.datenZeile}>
@@ -169,7 +206,9 @@ function spalten(preise: boolean, rabatt: boolean, ust: boolean) {
   return { pos: 30, menge: 62, ep: preise ? 70 : 0, rabatt: preise && rabatt ? 40 : 0, ust: preise && ust ? 36 : 0, gesamt: preise ? 72 : 0 };
 }
 
-function BelegDokument({ b, positionen, firma, logo, entwurf, familie }: { b: PdfBeleg; positionen: PdfPosition[]; firma: PdfFirma; logo: LogoPfade; entwurf: boolean; familie: string }) {
+type Briefkopf = CustomerConfig["briefkopf"];
+
+function BelegDokument({ b, positionen, firma, logo, briefkopf, entwurf, familie }: { b: PdfBeleg; positionen: PdfPosition[]; firma: PdfFirma; logo: LogoPfade; briefkopf: Briefkopf; entwurf: boolean; familie: string }) {
   const zb = b.art === "zahlungsbestaetigung";
   const preise = b.art !== "lieferschein" && !zb;
   const s: Summen = belegSummen(positionen.map((p) => ({ ...p, abzug: !!p.abzug_beleg_id })), b);
@@ -177,7 +216,6 @@ function BelegDokument({ b, positionen, firma, logo, entwurf, familie }: { b: Pd
   const saetze = new Set(positionen.filter((p) => p.typ === "artikel").map((p) => p.steuersatz));
   const sp = spalten(preise, mitRabatt, !s.ohne_steuer && saetze.size > 1);
   const nummer = b.nummer ?? (["rechnung", "abschlagsrechnung", "gutschrift"].includes(b.art) ? "vergibt Lexware beim Fertigstellen" : "wird beim Fertigstellen vergeben");
-  const firmaZeile = zeilen(firma.firma_name, [firma.strasse, zeilen(firma.plz, firma.ort).join(" ")].filter(Boolean).join(" · ")).join(" · ");
   const zusatz: [string, string][] = [];
   if (b.art === "angebot" && b.gueltig_bis) zusatz.push(["Gültig bis", tag(b.gueltig_bis)]);
   if (b.art === "auftragsbestaetigung" && (b.leistung_von || b.leistung_bis))
@@ -201,41 +239,41 @@ function BelegDokument({ b, positionen, firma, logo, entwurf, familie }: { b: Pd
           </View>
         )}
 
-        {/* Zeilenhöhe am Inhalt statt an der Seite: mit lineHeight an der Seite oder am render-Text zeigt react-pdf 4 keine Seitenzahl */}
-        <View style={{ fontSize: 10, lineHeight: 1.5 }}>
-        {/* Kopf: Logo und Firmenzeile, rechts E-Mail und Website */}
-        <View style={st.zeile}>
-          <View>
-            <Logo l={logo} breite={177} />
-            <Text style={[st.klein, { marginTop: 6 }]}>{zeilen(firma.strasse, zeilen(firma.plz, firma.ort).join(" "), firma.telefon).join(" · ")}</Text>
-          </View>
-          <View style={{ alignItems: "flex-end", paddingTop: 4 }}>
-            {zeilen(firma.email, firma.website).map((t) => (
-              <Text key={t} style={st.klein}>{t}</Text>
-            ))}
-          </View>
+        {/* Briefkopf (nur Seite 1, fest positioniert): Logo mit Produktzeile, rechts E-Mail, Website und Telefon */}
+        <View style={{ position: "absolute", top: OBEN, left: RAND_L, width: LOGO_BREITE }}>
+          <Logo l={logo} breite={LOGO_BREITE} />
+          <Produktzeile produkte={briefkopf.produkte} farbe={briefkopf.farbe} breite={LOGO_BREITE} />
+        </View>
+        <View style={{ position: "absolute", top: OBEN + 4, right: RAND_R, alignItems: "flex-end", fontSize: 8.6, lineHeight: 1.5, color: F.muted }}>
+          {zeilen(firma.email, firma.website, firma.telefon).map((t) => (
+            <Text key={t}>{t}</Text>
+          ))}
         </View>
 
-        {/* Empfänger und Belegdaten */}
-        <View style={[st.zeile, { marginTop: 36 }]}>
-          <View style={{ width: 250 }}>
-            {firmaZeile ? <Text style={st.absender}>{firmaZeile}</Text> : null}
-            <Text style={{ fontWeight: 600 }}>{b.adresse_name ?? ""}</Text>
-            {zeilen(b.adresse_zusatz, b.adresse_strasse, zeilen(b.adresse_plz, b.adresse_ort).join(" "), b.adresse_land && b.adresse_land !== "Deutschland" ? b.adresse_land : null).map((t, i) => (
-              <Text key={i}>{t}</Text>
-            ))}
-          </View>
-          <View style={{ fontSize: 9.4 }}>
-            <Daten name={NUMMER_LABEL[b.art]} wert={nummer} />
-            {b.version > 1 && <Daten name="Version" wert={String(b.version)} />}
-            <Daten name="Datum" wert={tag(b.datum)} />
-            {b.kundennummer && <Daten name="Kunden-Nr." wert={b.kundennummer} />}
-            {b.bezug_nummer && b.art !== "auftragsbestaetigung" && b.art !== "angebot" && <Daten name="Auftrag" wert={b.bezug_nummer} />}
-            {zusatz.map(([n, w]) => (
-              <Daten key={n} name={n} wert={w} />
-            ))}
-          </View>
+        {/* Anschrift in der Anschriftzone des Fensters (DIN 5008 Form B: 62,7–90 mm, 25 mm vom linken Rand, 80 mm breit) */}
+        <View style={{ position: "absolute", top: 62.7 * MM, left: RAND_L, width: 80 * MM, fontSize: 10, lineHeight: 1.25 }}>
+          <Text style={{ fontWeight: 600 }}>{b.adresse_name ?? ""}</Text>
+          {zeilen(b.adresse_zusatz, b.adresse_strasse, zeilen(b.adresse_plz, b.adresse_ort).join(" "), b.adresse_land && b.adresse_land !== "Deutschland" ? b.adresse_land : null).map((t, i) => (
+            <Text key={i}>{t}</Text>
+          ))}
         </View>
+
+        {/* Informationsblock (Belegdaten) rechts ab 50 mm */}
+        <View style={{ position: "absolute", top: 50 * MM, right: RAND_R, fontSize: 9.4, lineHeight: 1.5 }}>
+          <Daten name={NUMMER_LABEL[b.art]} wert={nummer} />
+          {b.version > 1 && <Daten name="Version" wert={String(b.version)} />}
+          <Daten name="Datum" wert={tag(b.datum)} />
+          {b.kundennummer && <Daten name="Kunden-Nr." wert={b.kundennummer} />}
+          {b.bezug_nummer && b.art !== "auftragsbestaetigung" && b.art !== "angebot" && <Daten name="Auftrag" wert={b.bezug_nummer} />}
+          {zusatz.map(([n, w]) => (
+            <Daten key={n} name={n} wert={w} />
+          ))}
+        </View>
+
+        {/* Zeilenhöhe am Inhalt statt an der Seite: mit lineHeight an der Seite oder am render-Text zeigt react-pdf 4 keine Seitenzahl */}
+        <View style={{ fontSize: 10, lineHeight: 1.5 }}>
+        {/* Platz für Briefkopf und Anschriftfeld: der Text beginnt auf Seite 1 bei 100 mm */}
+        <View style={{ height: 100 * MM - OBEN }} />
 
         <Text style={st.titel}>{zeilen(b.titel || BELEGART_TEXT[b.art], b.nummer).join(" ")}</Text>
         {(b.bauvorhaben || b.objekt) && (
@@ -390,13 +428,13 @@ function BelegDokument({ b, positionen, firma, logo, entwurf, familie }: { b: Pd
           </View>
         </View>
         {/* Seitenzahl als eigenes Element: ein render-Text innerhalb der Fußzeile ließe den Fuß verschwinden */}
-        <Text fixed style={{ position: "absolute", bottom: 14, left: 54, right: 54, textAlign: "right", fontSize: 7, color: F.muted }} render={({ pageNumber, totalPages }) => `Seite ${pageNumber} von ${totalPages}`} />
+        <Text fixed style={{ position: "absolute", bottom: 14, left: RAND_L, right: RAND_R, textAlign: "right", fontSize: 7, color: F.muted }} render={({ pageNumber, totalPages }) => `Seite ${pageNumber} von ${totalPages}`} />
       </Page>
     </Document>
   );
 }
 
-export async function belegPdf(daten: { b: PdfBeleg; positionen: PdfPosition[]; firma: PdfFirma; logo: LogoPfade; entwurf: boolean }): Promise<Buffer> {
+export async function belegPdf(daten: { b: PdfBeleg; positionen: PdfPosition[]; firma: PdfFirma; logo: LogoPfade; briefkopf: Briefkopf; entwurf: boolean }): Promise<Buffer> {
   return mitSchrift((familie) => <BelegDokument {...daten} familie={familie} />);
 }
 

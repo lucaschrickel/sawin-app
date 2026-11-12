@@ -77,19 +77,21 @@ try {
   // 4. Bestellung vom Auftrag aus: vorbelegt aus „Noch nicht bestellt“, zweite Zeile für einen anderen Auftrag
   await b.gehe(`/auftraege/${a1.id}`);
   pruefe("Auftrag ohne Bestellung: Bestellstatus Offen", await b.warte("document.querySelector('[data-bestellstatus]')?.dataset.bestellstatus === 'offen'"));
-  await b.klick("main button[data-neue-bestellung]");
-  await b.da("[role=dialog] [data-zeile='1']");
-  const vorbelegt = await b.js(`[...document.querySelectorAll('[role=dialog] [data-zeile]')].map((z) => z.querySelector('[name=z_auftrag]').value + '|' + z.querySelector('[name=z_text]').value).join(';')`);
+  await b.klick("main a[data-neue-bestellung]");
+  await b.warte("location.pathname === '/bestellungen/neu'");
+  await b.da("main [data-zeile='1']");
+  const vorbelegt = await b.js(`[...document.querySelectorAll('main [data-zeile]')].map((z) => z.querySelector('[name=z_auftrag]').value + '|' + z.querySelector('[name=z_text]').value).join(';')`);
   pruefe("Positionen aus „Noch nicht bestellt“ vorbelegt", vorbelegt === `${a1.id}|Haustür RC2;${a1.id}|Rollladen links`, vorbelegt);
-  await waehleNativ("[role=dialog] [name=lieferant_id]", lid);
-  await b.tippe("[role=dialog] [name=liefer_kw]", String(KW));
-  await b.tippe("[role=dialog] [name=lieferanten_ab_nummer]", "AB-99");
-  await b.klickText("[role=dialog] button", "Weitere Zeile, auch für einen anderen Auftrag");
-  await b.da("[role=dialog] [data-zeile='2']");
-  await waehleNativ("[role=dialog] [data-zeile='2'] [name=z_auftrag]", a2.id);
-  await b.tippe("[role=dialog] [data-zeile='2'] [name=z_text]", "Fensterbank innen");
-  await b.tippe("[role=dialog] [data-zeile='2'] [name=z_menge]", "3");
-  await b.klickText("[role=dialog] button", "Bestellung anlegen");
+  await waehleNativ("main [name=lieferant_id]", lid);
+  await b.tippe("main [name=liefer_kw]", String(KW));
+  await b.tippe("main [name=lieferanten_ab_nummer]", "AB-99");
+  pruefe("Neue Bestellung: „ungespeicherte Änderungen“", await b.warte("document.querySelector('[data-speicherstand]')?.innerText === 'ungespeicherte Änderungen'"));
+  await b.klickText("main button", "Weitere Zeile, auch für einen anderen Auftrag");
+  await b.da("main [data-zeile='2']");
+  await waehleNativ("main [data-zeile='2'] [name=z_auftrag]", a2.id);
+  await b.tippe("main [data-zeile='2'] [name=z_text]", "Fensterbank innen");
+  await b.tippe("main [data-zeile='2'] [name=z_menge]", "3");
+  await b.klickText("main button", "Bestellung anlegen");
   await b.warte("/^\\/bestellungen\\/[0-9a-f-]{36}$/.test(location.pathname)");
   const bid = await b.js("location.pathname.split('/').pop()");
   merken("bestellung", bid);
@@ -99,7 +101,18 @@ try {
   pruefe("Bestellung BE-JJ-NNN mit drei Zeilen über zwei Aufträge", /^BE-\d{2}-\d{3}$/.test(best?.nummer ?? "") && best?.liefer_kw === KW && best?.lieferanten_ab_nummer === "AB-99" && zeilen.length === 3 && zeilen[2].auftrag_id === a2.id && zeilen[2].m === 3, JSON.stringify({ best, zeilen }));
   const [nn] = await dbAbfrage("select noch_nicht_bestellt from public.auftrag where id = $1", [a1.id]);
   pruefe("„Noch nicht bestellt“ des Auftrags geleert", nn?.noch_nicht_bestellt === null, JSON.stringify(nn));
-  pruefe("Bestellseite: Status Bestellt, Positionen", await b.warte(`document.querySelector('[data-bestellstatus]')?.dataset.bestellstatus === 'bestellt' && document.querySelectorAll('[data-bestellzeile]').length === 3`));
+  pruefe("Bestellseite: Status Bestellt, Positionen", await b.warte(`document.querySelector('[data-bestellstatus]')?.dataset.bestellstatus === 'bestellt' && document.querySelectorAll('main [data-bestellzeile]').length === 3`));
+
+  // 4b. Inline bearbeiten: AB-Nr. ändern, Verlassen fragt nach, Abbrechen bleibt, Speichern speichert
+  await b.tippe("main [name=lieferanten_ab_nummer]", "AB-100");
+  pruefe("Bestellung bearbeitet: „ungespeicherte Änderungen“", await b.warte("document.querySelector('[data-speicherstand]')?.innerText === 'ungespeicherte Änderungen'"));
+  await b.js("[...document.querySelectorAll('a[href=\"/bestellungen\"]')].find((x) => x.getClientRects().length).click()");
+  pruefe("Verlassen mit Änderungen: Abfrage Speichern | Verwerfen | Abbrechen", await b.warte("[...document.querySelectorAll('[role=dialog] button')].map((x) => x.textContent.trim()).join('|') .includes('Abbrechen|Verwerfen|Speichern')"));
+  await b.klickText("[role=dialog] button", "Abbrechen");
+  pruefe("Abbrechen: bleibt in der Bestellung", await b.warte(`location.pathname === '/bestellungen/${bid}' && !document.querySelector('[role=dialog]')`));
+  await b.klickText("main button", "Speichern");
+  pruefe("Speichern: AB-Nr. gespeichert, Zeilen unverändert", await warteDb("select lieferanten_ab_nummer a, (select count(*)::int from public.bestellzeile where bestellung_id = b.id and deleted_at is null) n from public.bestellung b where id = $1", [bid], (r) => r[0]?.a === "AB-100" && r[0]?.n === 3));
+  pruefe("nach dem Speichern: „gespeichert“", await b.warte("document.querySelector('[data-speicherstand]')?.innerText === 'gespeichert'"));
 
   // 5. Auftragsliste und Auftragsseite zeigen den Bestellstatus
   await b.gehe("/auftraege");
@@ -138,12 +151,13 @@ try {
 
   // 9. Zweite Bestellung über die Lieferantenseite; Lieferant mit offener Bestellung nicht löschbar
   await b.gehe(`/lieferanten/${lid}`);
-  await b.klickText("main button", "Neue Bestellung");
-  await b.da("[role=dialog] [data-zeile='0']");
-  pruefe("Lieferant im Dialog vorbelegt", (await b.js("document.querySelector('[role=dialog] [name=lieferant_id]').value")) === lid);
-  await waehleNativ("[role=dialog] [data-zeile='0'] [name=z_auftrag]", a2.id);
-  await b.tippe("[role=dialog] [data-zeile='0'] [name=z_text]", "Insektenschutz");
-  await b.klickText("[role=dialog] button", "Bestellung anlegen");
+  await b.klick("main a[data-neue-bestellung]");
+  await b.warte("location.pathname === '/bestellungen/neu'");
+  await b.da("main [data-zeile='0']");
+  pruefe("Lieferant in der Maske vorbelegt", (await b.js("document.querySelector('main [name=lieferant_id]').value")) === lid);
+  await waehleNativ("main [data-zeile='0'] [name=z_auftrag]", a2.id);
+  await b.tippe("main [data-zeile='0'] [name=z_text]", "Insektenschutz");
+  await b.klickText("main button", "Bestellung anlegen");
   await b.warte(`/^\\/bestellungen\\/[0-9a-f-]{36}$/.test(location.pathname) && location.pathname !== '/bestellungen/${bid}'`);
   const bid2 = await b.js("location.pathname.split('/').pop()");
   merken("bestellung", bid2);

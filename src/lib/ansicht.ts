@@ -17,3 +17,11 @@ export async function ladeDashboardAnsicht(): Promise<"gf" | "montage" | "einkau
   const v = (data?.ansichten as Record<string, string> | undefined)?.dashboard;
   return v === "gf" || v === "montage" || v === "einkauf" ? v : benutzer.dashboard_start;
 }
+
+/** Gezogene Spaltenbreiten (px) des angemeldeten Benutzers für eine Tabelle, z. B. „beleg_positionen“ */
+export async function ladeSpaltenbreiten(tabelle: string): Promise<Record<string, number>> {
+  const { supabase, benutzer } = await pruefeSitzung();
+  const { data } = await supabase.from("benutzer_einstellung").select("spaltenbreiten").eq("benutzer_id", benutzer.id).maybeSingle();
+  const roh = (data?.spaltenbreiten as Record<string, Record<string, unknown>> | undefined)?.[tabelle] ?? {};
+  return Object.fromEntries(Object.entries(roh).filter((e): e is [string, number] => typeof e[1] === "number"));
+}

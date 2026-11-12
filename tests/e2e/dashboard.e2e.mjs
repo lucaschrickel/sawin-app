@@ -29,7 +29,7 @@ try {
   const kz = "D" + lauf.replace(/[^a-f]/g, "").toUpperCase().padEnd(3, "X").slice(0, 3);
   const { data: m } = await service.from("mitarbeiter").insert({ kuerzel: kz, name: `Dora Dash ${lauf}`, ist_monteur: true }).select("id").single();
   merken("mitarbeiter", m.id);
-  const { data: e } = await service.from("einsatz").insert({ auftrag_id: a.id, beginn: utc(heute, "07:00"), ende: utc(heute, "23:30"), fest: false }).select("id").single();
+  const { data: e } = await service.from("einsatz").insert({ auftrag_id: a.id, beginn: utc(heute, "07:00"), ende: utc(heute, "23:59"), fest: false }).select("id").single();
   merken("einsatz", e.id);
   const { data: em } = await service.from("einsatz_monteur").insert({ einsatz_id: e.id, mitarbeiter_id: m.id }).select("id").single();
   merken("einsatz_monteur", em.id);
@@ -62,8 +62,12 @@ try {
   const hinweise = await b.js("document.querySelector('[data-aufmerksamkeit]').innerText");
   pruefe(
     "Braucht Aufmerksamkeit: Genehmigung, Vorplanung, Aufgabe, Ticket, Bestellung, Wiedervorlage",
-    ["zur Genehmigung", "vorgeplant", "fällig", "Service-Ticket", "überfällig", "Wiedervorlage"].every((x) => hinweise.includes(x)) && hinweise.includes(`Dashaufgabe ${lauf}`) && hinweise.includes(t.nummer) && hinweise.includes(best.nummer),
-    hinweise.replace(/\s+/g, " ").slice(0, 400),
+    ["zur Genehmigung", "vorgeplant", "fällig", "Service-Ticket", "überfällig", "Wiedervorlage"].every((x) => hinweise.includes(x)) &&
+      // die Testaufgabe steht in den ersten drei Titeln oder wird bei vielen fälligen Aufgaben (übernommene Daten) als „+n“ mitgezählt
+      (hinweise.includes(`Dashaufgabe ${lauf}`) || /Aufgaben fällig\s+[^\n]*· \+\d+/.test(hinweise)) &&
+      hinweise.includes(t.nummer) &&
+      hinweise.includes(best.nummer),
+    `fehlt: ${[...["zur Genehmigung", "vorgeplant", "fällig", "Service-Ticket", "überfällig", "Wiedervorlage"], `Dashaufgabe ${lauf}`, t.nummer, best.nummer].filter((x) => !hinweise.includes(x)).join(", ")}`,
   );
   pruefe("Aufträge je Status mit Phase Montage", await b.js("(() => { const z = [...document.querySelectorAll('[data-phasen] li')].find((x) => x.title.startsWith('Montage:')); return !!z && Number(z.title.split(': ')[1]) >= 1; })()"));
   pruefe("Abwesenheiten: Antrag wartet", gf.includes("auf Genehmigung"));

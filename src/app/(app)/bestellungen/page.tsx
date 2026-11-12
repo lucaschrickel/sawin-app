@@ -39,7 +39,7 @@ export default async function BestellungenPage({ searchParams }: PageProps<"/bes
 
   return (
     <Shell active="bestellungen" crumbs={[{ label: "Einkauf" }, { label: "Bestellungen" }]}>
-      <PageHeader title="Bestellungen" sub="Bestellungen bei Lieferanten · eine Bestellung kann mehrere Aufträge abdecken" actions={<NeueBestellung key={String(sp.neu ?? "")} startOffen={!!sp.neu} />} />
+      <PageHeader title="Bestellungen" sub="Bestellungen bei Lieferanten · eine Bestellung kann mehrere Aufträge abdecken" actions={<NeueBestellung />} />
       <div className="flex flex-col gap-4">
         {fehlt.length > 0 && (
           <Karte titel="Noch nicht bestellt" rechts={<span className="text-sm text-muted-2 tabular">{fehlt.length}</span>}>
@@ -53,11 +53,13 @@ export default async function BestellungenPage({ searchParams }: PageProps<"/bes
                   </span>
                   <NeueBestellung
                     auftragId={a.id}
-                    ausloeser={
-                      <button type="button" aria-label={`${a.nummer} bestellen`} className="inline-flex h-8 items-center gap-1.5 rounded-full border border-line bg-surface px-3 text-sm font-medium hover:border-line-strong">
+                    label={`${a.nummer} bestellen`}
+                    className="inline-flex h-8 items-center gap-1.5 rounded-full border border-line bg-surface px-3 text-sm font-medium hover:border-line-strong"
+                    inhalt={
+                      <>
                         <ShoppingCart className="size-3.5" />
                         Bestellen
-                      </button>
+                      </>
                     }
                   />
                 </li>

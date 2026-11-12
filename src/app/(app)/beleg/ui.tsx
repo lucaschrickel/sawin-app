@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ArrowRight, Maximize2 } from "lucide-react";
+import { ArrowRight, Lock, Maximize2, Pencil } from "lucide-react";
 import { useState, useTransition } from "react";
 import { Bestaetigen } from "@/components/ui/bestaetigen";
 import { Button } from "@/components/ui/button";
@@ -221,23 +221,58 @@ export function TagsKommentar({ id, tags, kommentar, vorschlaege }: { id: string
 }
 
 /** Verkleinerte PDF-Vorschau; Klick vergrößert */
-export function PdfKachel({ src, titel, hoehe = 250 }: { src: string; titel: string; hoehe?: number }) {
+/**
+ * Verkleinerte PDF-Vorschau (Vorschau-Leiste). Ein Klick öffnet die Bearbeitung, wenn der Beleg noch bearbeitbar ist
+ * (bearbeiten = Ziel); sonst erscheint kurz „Nicht mehr bearbeitbar“. Mauszeiger und Tooltip zeigen das vorher an.
+ * Vergrößern über das Symbol oben rechts.
+ */
+export function PdfKachel({ src, titel, hoehe = 250, bearbeiten }: { src: string; titel: string; hoehe?: number; bearbeiten?: string | null }) {
+  const router = useRouter();
   const [gross, setGross] = useState(false);
+  const [hinweis, setHinweis] = useState(false);
+  const klick = () => {
+    if (bearbeiten) return router.push(bearbeiten);
+    setHinweis(true);
+    window.setTimeout(() => setHinweis(false), 2400);
+  };
   return (
     <>
-      <button
-        type="button"
-        onClick={() => setGross(true)}
-        aria-label={`${titel} vergrößern`}
-        className="group relative block w-full overflow-hidden rounded-md border border-line bg-surface-sunken"
-        style={{ height: hoehe }}
-        data-pdf-kachel
-      >
-        <iframe title={titel} src={`${src}#toolbar=0&navpanes=0&view=FitH`} className="pointer-events-none h-[340%] w-[340%] origin-top-left scale-[0.294]" tabIndex={-1} />
-        <span className="absolute top-2 right-2 inline-flex size-7 items-center justify-center rounded-full bg-surface/90 text-ink opacity-0 shadow-sm group-hover:opacity-100">
+      <div className="group relative">
+        <button
+          type="button"
+          onClick={klick}
+          aria-label={bearbeiten ? `${titel} bearbeiten` : `${titel}: nicht mehr bearbeitbar`}
+          title={bearbeiten ? "Klicken zum Bearbeiten" : "Nicht mehr bearbeitbar"}
+          className={cn(
+            "relative block w-full overflow-hidden rounded-md border border-line bg-surface-sunken",
+            bearbeiten ? "cursor-pointer hover:border-line-strong" : "cursor-not-allowed",
+          )}
+          style={{ height: hoehe }}
+          data-pdf-kachel
+          data-bearbeitbar={bearbeiten ? "ja" : "nein"}
+        >
+          <iframe title={titel} src={`${src}#toolbar=0&navpanes=0&view=FitH`} className="pointer-events-none h-[340%] w-[340%] origin-top-left scale-[0.294]" tabIndex={-1} />
+          <span className="pointer-events-none absolute bottom-2 left-2 inline-flex items-center gap-1 rounded-full bg-surface/95 px-2.5 py-1 text-xs font-medium text-ink opacity-0 shadow-sm group-hover:opacity-100 group-focus-within:opacity-100">
+            {bearbeiten ? <Pencil className="size-3.5" /> : <Lock className="size-3.5" />}
+            {bearbeiten ? "Bearbeiten" : "Nicht mehr bearbeitbar"}
+          </span>
+          {hinweis && (
+            <span role="status" className="absolute inset-x-3 top-1/2 -translate-y-1/2 rounded-md bg-ink px-3 py-2 text-center text-sm font-medium text-surface shadow-pop" data-kachel-hinweis>
+              Nicht mehr bearbeitbar
+            </span>
+          )}
+        </button>
+        <button
+          type="button"
+          onClick={() => setGross(true)}
+          aria-label={`${titel} vergrößern`}
+          title="Vergrößern"
+          className="absolute top-2 right-2 inline-flex size-7 items-center justify-center rounded-full bg-surface/90 text-ink opacity-0 shadow-sm group-hover:opacity-100 focus-visible:opacity-100"
+          data-kachel-gross
+        >
           <Maximize2 className="size-3.5" />
-        </span>
-      </button>
+        </button>
+      </div>
       <Dialog open={gross} onOpenChange={setGross}>
         <DialogContent title={titel} wide className="max-w-[920px]">
           {gross && <iframe title={titel} src={src} className="h-[78vh] w-full rounded-md border border-line" />}

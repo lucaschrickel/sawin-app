@@ -206,11 +206,12 @@ export default async function AuftragPage({ params, searchParams }: PageProps<"/
                     {a.phase !== "abgeschlossen" && (
                       <NeueBestellung
                         auftragId={a.id}
-                        ausloeser={
-                          <button type="button" data-neue-bestellung className="inline-flex items-center gap-1 rounded-full border border-line px-3 py-1 text-sm font-medium hover:border-line-strong">
+                        className="inline-flex items-center gap-1 rounded-full border border-line px-3 py-1 text-sm font-medium hover:border-line-strong"
+                        inhalt={
+                          <>
                             <Plus className="size-3.5" strokeWidth={2.2} />
                             Bestellung
-                          </button>
+                          </>
                         }
                       />
                     )}

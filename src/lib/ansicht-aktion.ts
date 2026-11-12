@@ -32,3 +32,21 @@ export async function dashboardAnsichtSetzen(ansicht: "gf" | "montage" | "einkau
   else await supabase.from("benutzer_einstellung").insert({ benutzer_id: benutzer.id, ansichten });
   refresh();
 }
+
+/**
+ * Merkt die gezogenen Spaltenbreiten einer Tabelle je Benutzer (null = zurücksetzen). Kein refresh: die Breiten leben im
+ * Browser weiter. Nur bekannte Formen werden gespeichert (Schlüssel aus Kleinbuchstaben, Breiten 24–800 px).
+ */
+export async function spaltenbreitenSetzen(tabelle: string, breiten: Record<string, number> | null) {
+  if (!/^[a-z_]{1,40}$/.test(tabelle)) return;
+  const sauber = breiten
+    ? Object.fromEntries(Object.entries(breiten).filter(([k, v]) => /^[a-z_]{1,24}$/.test(k) && Number.isFinite(v)).slice(0, 20).map(([k, v]) => [k, Math.round(Math.min(800, Math.max(24, v)))]))
+    : null;
+  const { supabase, benutzer } = await pruefeSitzung();
+  const { data } = await supabase.from("benutzer_einstellung").select("id, spaltenbreiten").eq("benutzer_id", benutzer.id).maybeSingle();
+  const alle = { ...((data?.spaltenbreiten as Record<string, unknown>) ?? {}) };
+  if (sauber && Object.keys(sauber).length) alle[tabelle] = sauber;
+  else delete alle[tabelle];
+  if (data) await supabase.from("benutzer_einstellung").update({ spaltenbreiten: alle }).eq("id", data.id);
+  else await supabase.from("benutzer_einstellung").insert({ benutzer_id: benutzer.id, spaltenbreiten: alle });
+}
