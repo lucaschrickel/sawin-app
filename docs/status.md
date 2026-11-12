@@ -29,7 +29,7 @@ Stand: 12.11.2026, nach Formulare & Protokolle, Chat, erweiterter Suche, Zurück
 | Belege | Teil-AB, Lieferschein, Teilrechnung | fertig | |
 | Belege | Zahlungen, „Als bezahlt markieren“, Zahlungsbestätigung | fertig | Cron und Webhook aktiv erst mit Vercel |
 | Belege | Artikelkatalog, Textvorlagen, formatierte Beschreibungen | fertig | |
-| Belege | Belegübersichten mit Vorschau-Leiste, Offene Forderungen | fertig | Klick auf die PDF-Kachel öffnet die Bearbeitung, wenn bearbeitbar, sonst Hinweis „Nicht mehr bearbeitbar“ (12.11.2026) |
+| Belege | Belegübersichten mit Vorschau-Leiste, Offene Forderungen | fertig | Klick auf die PDF-Kachel öffnet die Bearbeitung, wenn bearbeitbar, sonst Hinweis „Nicht mehr bearbeitbar“ (12.11.2026); Spaltenbreiten der Belegübersichten und der Aufträge-Liste ziehbar, je Benutzer gespeichert (13.11.2026) |
 | Belege | Vorläufiger Versand: Download `<Nummer>_<Belegart>_<Kunde>.pdf`, „Versenden“ per `mailto` mit BCC | fertig | Angebot/AB eingefroren, Protokoll; Lexware-Belege nur mit Original |
 | Belege | Versand per Outlook aus der App, PDF-Gruppen, Versandprotokoll mit Anhängen | verschoben auf V2 | Entscheidung 11.11.2026 |
 | Aufträge | Liste mit AB-Vorschau, Board, Phasen, Prüfhinweis, Reklamation, Ware eingetroffen | fertig | |

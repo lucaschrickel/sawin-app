@@ -241,7 +241,9 @@ Die Monteur-App kommt in Version 2.
   bearbeitbar“; Mauszeiger und Tooltip zeigen das vorher an; Vergrößern über das Symbol in der Kachel), Belegdaten (Nummer, Datum, Kontakt, Gültig bis bzw. Fällig,
   Betrag, Bezug, Status), **Zugehörige Belege** (Belegkette), Tags und interner Kommentar. Klick auf eine Zeile
   wählt den Beleg, Doppelklick öffnet ihn. Die Liste passt ohne waagerechtes Scrollen neben die Vorschau
-  (bei schmalen Fenstern entfällt die Datumsspalte).
+  (bei schmalen Fenstern entfällt die Datumsspalte). Spaltenbreiten ziehbar wie in der Positionstabelle
+  (je Benutzer gespeichert, „Spalten zurücksetzen“), auch in der Aufträge-Liste; die Standardbreiten passen ab
+  1280 px ohne waagerechtes Scrollen, Beträge werden nie abgeschnitten.
 - **Eingeklappte Seitenleiste:** zeigt Logo, Ausklapp-Knopf und Symbole mit Zähler-Badges. CSS-Klassen der Seitenleiste
   (z. B. `.mini`) dürfen nicht mit Klassen anderer Bausteine kollidieren; Bausteine verwenden eigene Präfixe
   (z. B. `.cal-mini` für den Mini-Monatskalender, `.es-sw` für Farbstreifen von Einsätzen).

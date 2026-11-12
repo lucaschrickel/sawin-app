@@ -18,7 +18,10 @@ export function SpaltenGriff({
   onBreite,
   onEnde,
   onPassend,
+  amRand,
 }: {
+  /** letzte Spalte: Griff innen am Rand (ragt nicht über die Tabelle hinaus) */
+  amRand?: boolean;
   titel: string;
   breite: number;
   min: number;
@@ -40,7 +43,9 @@ export function SpaltenGriff({
       title="Ziehen ändert die Breite, Doppelklick passt sie an"
       data-spalten-griff={titel}
       className={cn(
-        "group/griff absolute top-0 -right-[5px] bottom-0 z-10 flex w-[10px] cursor-col-resize touch-none justify-center outline-none select-none",
+        "group/griff absolute top-0 bottom-0 z-10",
+        amRand ? "right-0" : "-right-[5px]",
+        "flex w-[10px] cursor-col-resize touch-none justify-center outline-none select-none",
         "focus-visible:[&>span]:bg-accent-text",
       )}
       onPointerDown={(e) => {

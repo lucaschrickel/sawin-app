@@ -217,6 +217,21 @@ try {
   await b.klick(kachel);
   pruefe("Klick auf gesperrte Kachel: Hinweis, keine Bearbeitung", await b.warte("document.querySelector('[data-kachel-hinweis]')?.innerText === 'Nicht mehr bearbeitbar'") && (await b.js("location.pathname")) === "/belege");
   await foto("belege-liste");
+  // Spaltenbreiten der Belegliste: per Tastatur ändern, je Benutzer gespeichert, zurücksetzen
+  const listenGriff = "[data-belegliste] [data-spalten-griff='Betrag']";
+  await b.js(`document.querySelector("${listenGriff}").focus()`);
+  await b.taste("ArrowRight", "ArrowRight", 39);
+  await b.taste("ArrowRight", "ArrowRight", 39);
+  pruefe("Belegliste: Betrag 136 px", (await b.js(`document.querySelector("${listenGriff}").getAttribute('aria-valuenow')`)) === "136");
+  const listenBreite = async () => (await dbAbfrage("select spaltenbreiten->'beleg_liste'->>'betrag' v from public.benutzer_einstellung where benutzer_id = $1", [admin.id]))[0]?.v;
+  let lb = null;
+  for (let i = 0; i < 40 && lb !== "136"; i++) {
+    lb = await listenBreite();
+    if (lb !== "136") await sleep(250);
+  }
+  pruefe("Belegliste: Breite je Benutzer gespeichert", lb === "136", String(lb));
+  await b.klick("[data-spalten-zuruecksetzen]");
+  pruefe("Belegliste: Spalten zurückgesetzt", await b.warte(`document.querySelector("${listenGriff}").getAttribute('aria-valuenow') === '120'`));
   await b.js(`document.querySelector('[data-beleg-zeile="${lsId}"]').dispatchEvent(new MouseEvent('dblclick', { bubbles: true }))`);
   pruefe("Doppelklick öffnet den Beleg", await b.warte(`location.pathname === '/beleg/${lsId}'`));
 
@@ -275,6 +290,7 @@ try {
 
   // 12. Aufträge: Liste mit AB-Vorschau, Anfrage-Seite zeigt Hinweis
   await b.gehe(`/auftraege?q=${encodeURIComponent(kundeName)}`);
+  pruefe("Aufträge: Spaltengriffe in der Liste", await b.warte("!!document.querySelector(\"[data-spalten-griff='Wert']\") && !!document.querySelector(\"[data-spalten-griff='Status']\")"));
   pruefe("Aufträge: Wert aus der AB und AB in der Vorschau", await b.warte(`(document.querySelector('[data-wert]')?.textContent ?? '').includes('3.284,40') && !!document.querySelector('[data-vorschau="${abId}"]')`));
 } catch (e) {
   pruefe(`Abbruch: ${e.message}`, false);

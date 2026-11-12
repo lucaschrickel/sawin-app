@@ -2,9 +2,8 @@
 
 import { verlaufVergessen } from "@/components/app/verlauf";
 import { useVerlassenSchutz, VerlassenDialog } from "@/components/app/verlassen-schutz";
-import { inhaltsBreiten, SpaltenGriff } from "@/components/ui/spalten-griff";
-import { spaltenbreitenSetzen } from "@/lib/ansicht-aktion";
-import { breitenAus, geaendertGegenStandard, passendeBreite, type SpaltenDef } from "@/lib/spalten";
+import { useSpaltenbreiten } from "@/components/ui/ziehbare-tabelle";
+import type { SpaltenDef } from "@/lib/spalten";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { BookOpen, Copy, Eye, FileText, GripVertical, Lock, Pencil, Plus, Save, Trash2, UserPlus, X, RotateCcw } from "lucide-react";
@@ -194,27 +193,7 @@ export function BelegEditor({ start, hinweis, modus, zahlungsbedingungen, kundeS
   const { verlassen, setVerlassen, geaendertRef } = useVerlassenSchutz(geaendert);
 
   // ---------- Spaltenbreiten der Positionstabelle (je Benutzer gespeichert) ----------
-  const tabelleRef = useRef<HTMLTableElement>(null);
-  const [breiten, setBreiten] = useState(() => breitenAus(spaltenStart, SPALTEN));
-  const breitenRef = useRef(breiten);
-  const breiteSetzen = (schluessel: string, b: number) =>
-    setBreiten((alt) => {
-      const neu = { ...alt, [schluessel]: b };
-      breitenRef.current = neu;
-      return neu;
-    });
-  const breitenMerken = () => void spaltenbreitenSetzen("beleg_positionen", breitenRef.current);
-  const passend = (d: SpaltenDef) => {
-    if (!tabelleRef.current) return;
-    breiteSetzen(d.schluessel, passendeBreite(inhaltsBreiten(tabelleRef.current, d.schluessel), 4, d.min, d.max));
-    setTimeout(breitenMerken, 0);
-  };
-  const spaltenZuruecksetzen = () => {
-    const standard = breitenAus(undefined, SPALTEN);
-    breitenRef.current = standard;
-    setBreiten(standard);
-    void spaltenbreitenSetzen("beleg_positionen", null);
-  };
+  const { ref: tabelleRef, breiten, griff: spaltenGriff, geaendert: spaltenGeaendert, zuruecksetzen: spaltenZuruecksetzen } = useSpaltenbreiten("beleg_positionen", SPALTEN, spaltenStart);
 
   const nachSpeichern = (id: string, wohin?: string) => {
     setGeaendert(false);
@@ -603,15 +582,7 @@ export function BelegEditor({ start, hinweis, modus, zahlungsbedingungen, kundeS
                     {sichtbar.map((d) => (
                       <th key={d.schluessel} className={cn("relative px-1 pb-2", rechts.has(d.schluessel) && "text-right")} data-spalte={d.schluessel}>
                         {kopfText[d.schluessel]}
-                        <SpaltenGriff
-                          titel={d.titel}
-                          breite={breiten[d.schluessel]}
-                          min={d.min}
-                          max={d.max}
-                          onBreite={(b) => breiteSetzen(d.schluessel, b)}
-                          onEnde={breitenMerken}
-                          onPassend={() => passend(d)}
-                        />
+                        {spaltenGriff(d)}
                       </th>
                     ))}
                     <th />
@@ -764,7 +735,7 @@ export function BelegEditor({ start, hinweis, modus, zahlungsbedingungen, kundeS
               <Button size="sm" onClick={() => setPositionen((ps) => [...ps, leerePosition("text")])}>
                 <Plus className="size-4" /> Freitext
               </Button>
-              {geaendertGegenStandard(breiten, SPALTEN) && (
+              {spaltenGeaendert && (
                 <Button size="sm" variant="ghost" onClick={spaltenZuruecksetzen} data-spalten-zuruecksetzen>
                   <RotateCcw className="size-4" /> Spalten zurücksetzen
                 </Button>

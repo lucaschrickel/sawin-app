@@ -6,9 +6,10 @@ import { PageHeader } from "@/components/app/page-header";
 import { Shell } from "@/components/app/shell";
 import { Badge } from "@/components/ui/badge";
 import { Table, Td, Th } from "@/components/ui/table";
+import { ZiehbareTabelle } from "@/components/ui/ziehbare-tabelle";
 import { getCustomer } from "@/customers";
 import { ladeBenutzerAuswahl } from "@/lib/anfragen";
-import { ladeAnsicht } from "@/lib/ansicht";
+import { ladeAnsicht, ladeSpaltenbreiten } from "@/lib/ansicht";
 import { ladeAuftraege, montageTermin, type AuftragZeile } from "@/lib/auftraege";
 import { cn } from "@/lib/cn";
 import { AUFTRAG_BESTELL_TEXT, auftragBestellstatus } from "@/lib/einkauf-status";
@@ -189,17 +190,21 @@ export default async function AuftraegePage({ searchParams }: PageProps<"/auftra
         <div className="grid items-start gap-4 min-[1100px]:grid-cols-[minmax(0,1fr)_340px]">
           <div className="min-w-0 rounded-lg border border-line-soft bg-surface">
             {liste.length ? (
-              <Table className="min-w-[700px]">
-                <thead>
-                  <tr>
-                    <Th className="pl-4">Auftrag</Th>
-                    <Th>Kunde</Th>
-                    <Th>Status</Th>
-                    <Th className="max-[1380px]:hidden">Produkte</Th>
-                    <Th>Termin</Th>
-                    <Th className="pr-4 text-right">Wert</Th>
-                  </tr>
-                </thead>
+              <ZiehbareTabelle
+                tabelle="auftrag_liste"
+                start={await ladeSpaltenbreiten("auftrag_liste")}
+                className="text-base"
+                kopfKlasse=""
+                zellenKlasse="border-b border-line-soft px-3 py-2.5 text-left text-xs font-medium whitespace-nowrap text-muted-2"
+                spalten={[
+                  { schluessel: "auftrag", titel: "Auftrag", standard: 110, min: 96, max: 260, klasse: "pl-4" },
+                  { schluessel: "kunde", titel: "Kunde", rest: true, min: 130 },
+                  { schluessel: "status", titel: "Status", standard: 120, min: 100, max: 260 },
+                  { schluessel: "produkte", titel: "Produkte", standard: 140, min: 90, max: 320, ausblendenBis: 1380 },
+                  { schluessel: "termin", titel: "Termin", standard: 100, min: 80, max: 220 },
+                  { schluessel: "wert", titel: "Wert", standard: 112, min: 96, max: 220, klasse: "pr-4 text-right" },
+                ]}
+              >
                 <tbody>
                   {liste.map((a) => {
                     const s = stand(a, heute);
@@ -207,7 +212,7 @@ export default async function AuftraegePage({ searchParams }: PageProps<"/auftra
                     const ab = abZu.get(a.id);
                     return (
                       <AuswahlZeile key={a.id} id={a.id} href={`/auftraege/${a.id}`} gewaehlt={a.id === gewaehlt}>
-                        <Td className="pl-4 whitespace-nowrap">
+                        <Td className="truncate pl-4" data-spalte="auftrag">
                           <Link href={`/auftraege/${a.id}`} className="font-mono font-medium hover:underline">{a.nummer}</Link>
                           {teilAbZahl.get(a.id) ? <div className="text-xs text-muted" data-teil-ab>+{teilAbZahl.get(a.id)} Teil-AB</div> : null}
                         </Td>
@@ -215,19 +220,19 @@ export default async function AuftraegePage({ searchParams }: PageProps<"/auftra
                           <b className="font-medium">{a.kunde?.name ?? "–"}</b> <ChatZahl n={ungelesen.auftrag.get(a.id)} className="ml-1 align-text-bottom" />
                           <div className="text-sm text-muted">{[a.titel, a.objekt].filter(Boolean).join(" · ")}</div>
                         </Td>
-                        <Td>
+                        <Td className="overflow-hidden" data-spalte="status">
                           <Badge tone={AUFTRAG_PHASE_TON[a.phase]} dot>{AUFTRAG_PHASE_TEXT[a.phase]}</Badge>
                           {a.phase !== "abgeschlossen" && (() => { const b = auftragBestellstatus(a.bestellzeilen, a.noch_nicht_bestellt, a.phase); return <div className={cn("mt-1 text-xs", b === "abgeschlossen" ? "text-tone-green-fg" : "text-muted")} data-bestellstatus={b}>{AUFTRAG_BESTELL_TEXT[b]}</div>; })()}
                           {w && <div className="mt-1 text-xs text-tone-red-fg">{w}</div>}
                         </Td>
-                        <Td className="max-[1380px]:hidden"><span className="flex flex-wrap gap-1">{a.produkte.map((p) => <Badge key={p} tone="gray">{p}</Badge>)}</span></Td>
-                        <Td className={cn("text-sm whitespace-nowrap", s.ueberfaellig ? "font-medium text-tone-red-fg" : "text-ink-3")}>{s.text}</Td>
-                        <Td className="pr-4 text-right tabular whitespace-nowrap" data-wert>{ab ? eur(ab.summe_brutto) : <span className="text-muted-2">ohne AB</span>}</Td>
+                        <Td className="overflow-hidden max-[1380px]:hidden" data-spalte="produkte"><span className="flex flex-wrap gap-1">{a.produkte.map((p) => <Badge key={p} tone="gray">{p}</Badge>)}</span></Td>
+                        <Td data-spalte="termin" className={cn("text-sm", s.ueberfaellig ? "font-medium text-tone-red-fg" : "text-ink-3")}>{s.text}</Td>
+                        <Td className="truncate pr-4 text-right tabular" data-wert data-spalte="wert">{ab ? eur(ab.summe_brutto) : <span className="text-muted-2">ohne AB</span>}</Td>
                       </AuswahlZeile>
                     );
                   })}
                 </tbody>
-              </Table>
+              </ZiehbareTabelle>
             ) : (
               <p className="px-4 py-10 text-center text-sm text-muted">
                 {q || phase || meine || produkt ? "Keine Aufträge für diese Auswahl." : "Noch keine Aufträge. Ein Auftrag entsteht mit dem Fertigstellen der Auftragsbestätigung."}

@@ -11,6 +11,7 @@ import { eur } from "@/lib/format";
 import { zahlungenImHintergrund } from "@/lib/lexware/zahlungen";
 import { tag, zeitpunkt } from "@/lib/zeit";
 import { PdfKachel, TagsKommentar, VerwerfenKnopf } from "../beleg/ui";
+import { ladeSpaltenbreiten } from "@/lib/ansicht";
 import { BelegTabelle, Filterleiste, NeuMenue } from "./ui";
 
 /*
@@ -100,7 +101,7 @@ export async function BelegListe({ liste, searchParams }: { liste: string; searc
       />
 
       <div className="grid items-start gap-4 min-[1100px]:grid-cols-[minmax(0,1fr)_340px]">
-        <BelegTabelle
+        <BelegTabelle spalten={await ladeSpaltenbreiten("beleg_liste")}
           gewaehlt={gewaehlt}
           mehrereArten={mehrereArten}
           zeilen={zeilen.map(({ b, s }) => ({

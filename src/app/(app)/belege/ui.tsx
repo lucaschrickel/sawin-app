@@ -6,6 +6,7 @@ import { ChevronDown, Plus } from "lucide-react";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { useListenParameter } from "@/components/app/listen-suche";
 import { Badge, type Tone } from "@/components/ui/badge";
+import { ZiehbareTabelle, type KopfSpalte } from "@/components/ui/ziehbare-tabelle";
 import { cn } from "@/lib/cn";
 
 export type TabellenZeile = {
@@ -19,8 +20,18 @@ export type TabellenZeile = {
   status: { key: string; text: string; ton: Tone };
 };
 
-/** Belegliste: Klick wählt (Vorschau rechts), Doppelklick oder Enter öffnet den Beleg */
-export function BelegTabelle({ zeilen, gewaehlt, mehrereArten, leer }: { zeilen: TabellenZeile[]; gewaehlt: string; mehrereArten: boolean; leer: string }) {
+/** Spalten der Belegliste: Breiten ziehbar (je Benutzer gespeichert), „Kunde“ nimmt den übrigen Platz */
+const LISTEN_SPALTEN: KopfSpalte[] = [
+  { schluessel: "nummer", titel: "Nummer", standard: 104, min: 90, max: 260 },
+  { schluessel: "art", titel: "Art", standard: 96, min: 72, max: 220 },
+  { schluessel: "datum", titel: "Datum", standard: 96, min: 84, max: 180, ausblendenBis: 1380 },
+  { schluessel: "kunde", titel: "Kunde", rest: true, min: 140 },
+  { schluessel: "betrag", titel: "Betrag", standard: 120, min: 96, max: 220, klasse: "text-right" },
+  { schluessel: "status", titel: "Status", standard: 104, min: 90, max: 240 },
+];
+
+/** Belegliste: Klick wählt (Vorschau rechts), Doppelklick oder Enter öffnet den Beleg; Spaltenbreiten ziehbar */
+export function BelegTabelle({ zeilen, gewaehlt, mehrereArten, leer, spalten }: { zeilen: TabellenZeile[]; gewaehlt: string; mehrereArten: boolean; leer: string; spalten?: Record<string, number> }) {
   const router = useRouter();
   const pfad = usePathname();
   const params = useSearchParams();
@@ -32,17 +43,7 @@ export function BelegTabelle({ zeilen, gewaehlt, mehrereArten, leer }: { zeilen:
   if (!zeilen.length) return <p className="rounded-lg border border-line-soft bg-surface px-5 py-8 text-center text-sm text-muted">{leer}</p>;
   return (
     <div className="overflow-hidden rounded-lg border border-line-soft bg-surface">
-      <table className="w-full border-collapse text-[14px]" data-belegliste>
-        <thead>
-          <tr className="border-b border-line text-left text-[11px] font-semibold tracking-[0.06em] text-muted-2 uppercase">
-            <th className="px-3 py-2.5">Nummer</th>
-            {mehrereArten && <th className="px-3 py-2.5">Art</th>}
-            <th className="px-3 py-2.5 max-[1380px]:hidden">Datum</th>
-            <th className="px-3 py-2.5">Kunde</th>
-            <th className="px-3 py-2.5 text-right">Betrag</th>
-            <th className="px-3 py-2.5">Status</th>
-          </tr>
-        </thead>
+      <ZiehbareTabelle tabelle="beleg_liste" spalten={LISTEN_SPALTEN.filter((x) => mehrereArten || x.schluessel !== "art")} start={spalten} className="text-[14px]" attribute={{ "data-belegliste": true }}>
         <tbody>
           {zeilen.map((z) => (
             <tr
@@ -61,21 +62,21 @@ export function BelegTabelle({ zeilen, gewaehlt, mehrereArten, leer }: { zeilen:
               }}
               className={cn("cursor-pointer border-t border-line-soft outline-none hover:bg-surface-muted focus-visible:bg-surface-muted", z.id === gewaehlt && "bg-tone-brand-bg hover:bg-tone-brand-bg")}
             >
-              <td className="px-3 py-2.5 font-mono text-[13px] whitespace-nowrap">{z.nummer ?? <span className="font-sans text-muted">Entwurf</span>}</td>
-              {mehrereArten && <td className="px-3 py-2.5 whitespace-nowrap">{z.art}</td>}
-              <td className="px-3 py-2.5 whitespace-nowrap text-muted max-[1380px]:hidden">{z.datum}</td>
-              <td className="max-w-[200px] px-3 py-2.5">
-                <span className="block truncate max-[1380px]:max-w-[140px]">{z.kunde}</span>
-                {z.titel && <span className="block truncate text-xs text-muted-2 max-[1380px]:max-w-[140px]">{z.titel}</span>}
-              </td>
-              <td className="px-3 py-2.5 text-right tabular whitespace-nowrap">{z.betrag}</td>
+              <td className="truncate px-3 py-2.5 font-mono text-[13px]" data-spalte="nummer">{z.nummer ?? <span className="font-sans text-muted">Entwurf</span>}</td>
+              {mehrereArten && <td className="truncate px-3 py-2.5" data-spalte="art">{z.art}</td>}
+              <td className="truncate px-3 py-2.5 text-muted max-[1380px]:hidden" data-spalte="datum">{z.datum}</td>
               <td className="px-3 py-2.5">
+                <span className="block truncate">{z.kunde}</span>
+                {z.titel && <span className="block truncate text-xs text-muted-2">{z.titel}</span>}
+              </td>
+              <td className="truncate px-3 py-2.5 text-right tabular" data-spalte="betrag">{z.betrag}</td>
+              <td className="overflow-hidden px-3 py-2.5" data-spalte="status">
                 <Badge tone={z.status.ton}>{z.status.text}</Badge>
               </td>
             </tr>
           ))}
         </tbody>
-      </table>
+      </ZiehbareTabelle>
     </div>
   );
 }
