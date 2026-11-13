@@ -3,6 +3,7 @@
 //
 //   npm run golive:pruefen                       mit .env.local (Staging: Lexware = Testkonto, nur bedingt aussagekräftig)
 //   npm run golive:pruefen -- --env=.env.produktion
+//   node scripts/prod.mjs npm run golive:pruefen       Produktion über Abschnitt 2 von .env.local (LEXWARE_API_KEY_PROD)
 //   … --ohne-lexware                             nur die Datenbank prüfen
 //
 // Exit-Code 1, wenn ein Startwert nicht passt.
@@ -44,7 +45,15 @@ async function lexwareLesen() {
       return r.json();
     }
   };
-  const konto = (await get("/v1/profile")).companyName;
+  const profil = await get("/v1/profile");
+  const konto = profil.companyName;
+  const organisation = profil.organizationId;
+  // Zuletzt angelegte Rechnung und Gutschrift (nur zur Information; ihre Nummern vergibt weiter Lexware)
+  const zuletzt_ = {};
+  for (const t of ["invoice", "creditnote"]) {
+    const r = await get(`/v1/voucherlist?voucherType=${t}&voucherStatus=any&size=1&page=0&sort=createdDate,DESC`);
+    zuletzt_[t] = r.content?.[0]?.voucherNumber ?? "–";
+  }
   const nummern = { quotation: [], orderconfirmation: [], deliverynote: [], kunde: [] };
   for (let seite = 0; seite < 100; seite++) {
     const r = await get(`/v1/voucherlist?voucherType=quotation,orderconfirmation,deliverynote&voucherStatus=any&size=250&page=${seite}`);
@@ -56,7 +65,7 @@ async function lexwareLesen() {
     for (const k of r.content) if (k.roles?.customer?.number != null) nummern.kunde.push(String(k.roles.customer.number));
     if (r.last || !r.content.length) break;
   }
-  return { konto, nummern };
+  return { konto, organisation, zuletzt: zuletzt_, nummern };
 }
 
 const db = new pg.Client({ connectionString: process.env.SUPABASE_DB_URL, ssl: { rejectUnauthorized: false } });
@@ -69,9 +78,10 @@ try {
   const { rows: auftraege } = await db.query("select nummer from public.auftrag where nummer is not null");
   const { rows: kunden } = await db.query("select nummer, airtable_id is not null as importiert from public.kunde");
   const lex = await lexwareLesen();
-  const sawin = process.env.LEXWARE_ALTBESTAND?.trim() === "aktiv";
+  const sawin = process.env.LEXWARE_ALTBESTAND?.trim() === "aktiv" || process.env.GOLIVE_PRODUKTION === "1";
   console.log(`Go-live-Prüfung Nummernkreise – Supabase-Projekt ${projekt}`);
-  console.log(lex ? `Lexware: ${lex.konto}${sawin ? "" : " (nicht als Sawins Konto markiert: LEXWARE_ALTBESTAND ist nicht aktiv)"}` : "Lexware: nicht geprüft");
+  console.log(lex ? `Lexware: ${lex.konto} · organizationId ${lex.organisation}${sawin ? "" : " (nicht als Sawins Konto markiert: LEXWARE_ALTBESTAND ist nicht aktiv)"}` : "Lexware: nicht geprüft (kein LEXWARE_API_KEY bzw. --ohne-lexware)");
+  if (lex) console.log(`Zuletzt in Lexware angelegt: Rechnung ${lex.zuletzt.invoice}, Gutschrift ${lex.zuletzt.creditnote} (Nummern vergibt weiter Lexware)`);
   console.log("");
   const zeilen = [["Kreis", "Startwert", "nächste Nummer", "höchste in der App", "höchste in Lexware", "Ergebnis"]];
   for (const k of kreise) {

@@ -26,6 +26,7 @@ Vorlage: `.env.example`. Lokal in `.env.local` (nie einchecken), auf Vercel in d
 | `SUPABASE_SERVICE_ROLE_KEY` | nur Server, Tests | Secret Key (`sb_secret_…`) aus Supabase › Project Settings › API Keys. Nie mit `NEXT_PUBLIC_`. |
 | `ERLAUBTES_TESTPROJEKT` | nur lokal (`.env.local`), nie in `.env.produktion` | Ref des Staging-Projekts. Alle Tests, `test:aufraeumen` und `staging:leeren` prüfen API- und Datenbank-Adresse dagegen und brechen sonst ab (`scripts/testprojekt.mjs`). |
 | `…_PROD` (`NEXT_PUBLIC_SUPABASE_URL_PROD`, `SUPABASE_DB_URL_PROD`, `SUPABASE_SERVICE_ROLE_KEY_PROD`, `SUPABASE_AUTH_SITE_URL_PROD`, `LEXWARE_API_KEY_PROD`) | nur lokal (`.env.local`, Abschnitt 2), nur am Go-live | Werte des Produktionsprojekts für einzelne Schritte (Migrationen, Auth-Einstellungen, ersten Admin einladen, Datenübernahme, Go-live-Prüfung). Die Skripte lesen die Namen ohne `_PROD`; sie werden nur für den einzelnen Aufruf gesetzt. Nach dem Einspielen wieder löschen. Gliederung und Fundorte stehen als Kommentare in `.env.example`. |
+| `SUPABASE_DB_URL_RESTORE` | nur lokal, nur für den Wiederherstellungstest | Verbindung des Testprojekts, in das die Sicherung wiederhergestellt wurde (`npm run backup:pruefen`); danach löschen. |
 | `SUPABASE_DB_URL` | nur lokal / Deployment-Rechner | Verbindung zur Datenbank für Migrationen: Supabase › Connect › Session pooler (mit Passwort). Nicht auf Vercel setzen. |
 | `SUPABASE_ACCESS_TOKEN` | nur lokal | Persönliches Token (Supabase › Account › Access Tokens) zum Einspielen der Auth-Einstellungen. Nicht auf Vercel setzen. |
 | `SUPABASE_AUTH_SITE_URL` | nur lokal (beim Einspielen) | Adresse der App für Links in Auth-E-Mails, z. B. `http://localhost:3000` (Staging lokal) oder die Vercel-Adresse |
@@ -193,6 +194,35 @@ auch mit `npm run auth:push` einspielen (Sessions und Passwortschutz nur im Pro-
 - [ ] Eigene App-Registrierung für Staging mit einer Test-Bibliothek (Entscheidung M9); die Produktions-Registrierung
       nur für „Kundenprojekte“.
 - [ ] Client-Secret der Produktion mit Ablaufdatum neu anlegen, das alte löschen.
+
+## Backup und Wiederherstellungstest
+
+Supabase sichert die Datenbank täglich; mit Point-in-Time-Recovery (PITR, Pro-Tarif mit Add-on) lässt sie sich auf jede
+Minute der Aufbewahrungszeit zurücksetzen. Dateien im Speicher (Beleg-PDFs, Chat-Fotos, Zwischenspeicher) sind **nicht**
+Teil dieser Sicherung; die Originale liegen zusätzlich in OneDrive bzw. Lexware.
+
+**Wiederherstellung einmal testen (vor dem Go-live, danach jährlich):**
+
+1. Supabase › sawin-produktion › Database › Backups: „Restore to a new project“ (bzw. PITR auf einen Zeitpunkt) in ein
+   **neues Testprojekt** (z. B. `sawin-restore-test`, Region Frankfurt). Nie über das Produktionsprojekt selbst.
+   Ohne diese Funktion im Tarif: mit der Supabase-CLI sichern und einspielen (braucht Docker bzw. `psql`):
+   ```bash
+   npx supabase db dump --db-url "<SUPABASE_DB_URL_PROD>" --role-only -f roles.sql
+   npx supabase db dump --db-url "<SUPABASE_DB_URL_PROD>" -f schema.sql
+   npx supabase db dump --db-url "<SUPABASE_DB_URL_PROD>" --data-only --use-copy -f daten.sql
+   psql "<Verbindung des Testprojekts>" -f roles.sql -f schema.sql -c "set session_replication_role = replica" -f daten.sql
+   ```
+   Die Dateien enthalten personenbezogene Daten: nur lokal, nach dem Test löschen.
+2. In `.env.local` (Abschnitt 2) vorübergehend `SUPABASE_DB_URL_RESTORE` = Session-Pooler-Verbindung des Testprojekts
+   eintragen; `SUPABASE_DB_URL_PROD` muss gesetzt sein.
+3. `npm run backup:pruefen`: vergleicht die Zeilenzahl jeder Tabelle (und die Zahl der Speicher-Einträge) zwischen
+   Produktion und Testprojekt, nur lesend; lehnt ein Ziel ab, das Produktion oder Staging ist.
+4. Datum und Ergebnis unten eintragen, Testprojekt löschen, `SUPABASE_DB_URL_RESTORE` und `…_PROD` aus `.env.local`
+   entfernen.
+
+| Datum | Art (PITR, tägliche Sicherung, Dump) | Ergebnis `backup:pruefen` | durch |
+|---|---|---|---|
+| | | | |
 
 ## Vercel
 

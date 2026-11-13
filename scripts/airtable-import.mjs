@@ -9,6 +9,9 @@
 //                                                             Sawins eigenem Lexware in Produktion)
 //   … --env=<datei>                                           andere Umgebungsdatei (Standard .env.local)
 //   … --aus-datei=<json>                                      Airtable-Daten aus einer gespeicherten Datei statt live
+//   … --nur-kunden                                           nur Kunden und Lieferadressen (Stammdaten für den Go-live):
+//                                                             keine Anfragen, Aufträge, Belege, Bestellungen, Aufgaben,
+//                                                             Ordner; Nummernkreise außer „kunde“ bleiben unberührt
 //
 // Umgebung: AIRTABLE_TOKEN (nur Lesen), AIRTABLE_BASE_ID, NEXT_PUBLIC_SUPABASE_URL, SUPABASE_DB_URL; für
 // --lexware-lesen LEXWARE_API_KEY und LEXWARE_ALTBESTAND=aktiv. Bericht in berichte/ (nicht im Repository).
@@ -31,6 +34,11 @@ const envDatei = arg("env") || ".env.local";
 if (existsSync(envDatei)) process.loadEnvFile(envDatei);
 const SCHREIBEN = !!arg("schreiben");
 const LEXWARE_LESEN = !!arg("lexware-lesen");
+const NUR_KUNDEN = !!arg("nur-kunden");
+if (NUR_KUNDEN && LEXWARE_LESEN) {
+  console.error("Abbruch: --nur-kunden liest kein Lexware (ohne --lexware-lesen aufrufen).");
+  process.exit(1);
+}
 const heute = new Intl.DateTimeFormat("sv-SE", { timeZone: "Europe/Berlin" }).format(new Date());
 
 function abbruch(text) {
@@ -167,6 +175,7 @@ async function schreiben(db, plan) {
 
   // Nummernkreise vor den Aufträgen ohne AB (die eine neue Nummer aus dem AB-Kreis bekommen)
   for (const [art, n] of Object.entries(plan.nummernkreise)) {
+    if (NUR_KUNDEN && art !== "kunde") continue;
     const { rows } = await db.query("select letzte, jahr, jaehrlich, start, start_jahr from public.nummernkreis where art = $1 and deleted_at is null", [art]);
     if (!rows[0]) continue;
     const vorher = rows[0].jaehrlich && rows[0].jahr !== jahr ? 0 : rows[0].letzte;
@@ -177,6 +186,10 @@ async function schreiben(db, plan) {
     nk[art] = { vorher, airtable: n, nachher, start };
   }
 
+  if (NUR_KUNDEN) {
+    for (const x of Object.values(nk)) x.naechste = Math.max(x.nachher + 1, x.start ?? 0);
+    return { ergebnis, fehler, nk, ids };
+  }
   await tabelleSchreiben(db, "anfrage", plan.anfragen, ids, ergebnis, fehler, (r) => ({ kunde_id: id(ids, "kunde", r._kunde) }));
   await tabelleSchreiben(db, "auftrag", plan.auftraege, ids, ergebnis, fehler, (r) => ({ kunde_id: id(ids, "kunde", r._kunde) }), async () => (await db.query("select app.naechste_nummer('auftragsbestaetigung') as n")).rows[0].n);
   const { rows: abNach } = await db.query("select letzte from public.nummernkreis where art = 'auftragsbestaetigung' and deleted_at is null");
@@ -362,6 +375,63 @@ function bericht({ plan, daten, ergebnis, fehler, nk, lex, proben, summen, vorha
   return t.join("\n") + "\n";
 }
 
+/** Bericht für --nur-kunden: Anzahl, Dubletten, Kunden ohne Lexware-ID bzw. Kundennummer, Fehler */
+function kundenBericht({ plan, ergebnis, fehler, nk, vorhanden }) {
+  const k = plan.kunden;
+  const gruppen = (schluessel) => {
+    const m = new Map();
+    for (const x of k) {
+      const s = schluessel(x);
+      if (!s) continue;
+      m.set(s, [...(m.get(s) ?? []), x]);
+    }
+    return [...m.entries()].filter(([, l]) => l.length > 1);
+  };
+  const zeile = (x) => `${x.nummer} ${x.name}${x.plz || x.ort ? ` (${[x.plz, x.ort].filter(Boolean).join(" ")})` : ""}`;
+  const dubletten = [
+    ["gleiche Kundennummer", gruppen((x) => (x.nummer && x.nummer !== "undefined" ? x.nummer : null))],
+    ["gleiche Lexware-Kontakt-ID", gruppen((x) => x.lexware_kontakt_id)],
+    ["gleiche E-Mail", gruppen((x) => x.email)],
+    ["gleicher Name und gleiche PLZ", gruppen((x) => (x.name && x.plz ? `${x.name.toLowerCase()}|${x.plz}` : null))],
+  ];
+  const ohneLex = k.filter((x) => !x.lexware_kontakt_id);
+  const ohneNr = k.filter((x) => !x.nummer || x.nummer === "undefined" || x.nummer === "null");
+  const t = [
+    `# Kundenimport (nur Stammdaten)`,
+    ``,
+    `${SCHREIBEN ? "Lauf mit Schreiben" : "Probelauf (nichts geschrieben)"} am ${new Date().toLocaleString("de-DE", { timeZone: "Europe/Berlin" })}, Supabase-Projekt \`${projekt}\`. Airtable nur lesend, nichts an Lexware.`,
+    ``,
+    `| | Anzahl |`,
+    `|---|---|`,
+    `| Kunden | ${k.length} |`,
+    `| davon mit Lexware-Kontakt-ID (altbestand) | ${k.length - ohneLex.length} |`,
+    `| davon ohne Lexware-Kontakt-ID | ${ohneLex.length} |`,
+    `| davon ohne Kundennummer | ${ohneNr.length} |`,
+    `| Lieferadressen | ${plan.lieferadressen.length} |`,
+    `| schon in der Datenbank (airtable_id) | Kunden ${vorhanden?.kunde ?? "–"}, Lieferadressen ${vorhanden?.kunde_lieferadresse ?? "–"} |`,
+    ...(ergebnis ? [`| geschrieben | ${Object.entries(ergebnis).map(([t2, e]) => `${t2}: ${JSON.stringify(e)}`).join("; ")} |`] : []),
+    ``,
+    `Kundennummern: übernommene Kunden behalten ihre bisherige Nummer (höchste: ${Math.max(0, ...k.map((x) => Number(x.nummer)).filter(Number.isFinite))}); neue Kunden der App bekommen Nummern ab dem Startwert des Nummernkreises${nk?.kunde ? ` (nächste: ${nk.kunde.naechste})` : ""}.`,
+    ``,
+    `## Dubletten`,
+    ``,
+  ];
+  for (const [titel, g] of dubletten) {
+    t.push(`### ${titel}: ${g.length}`, ``);
+    for (const [, l] of g.slice(0, 200)) t.push(`- ${l.map(zeile).join(" · ")}`);
+    if (g.length > 200) t.push(`- … und ${g.length - 200} weitere`);
+    t.push(``);
+  }
+  t.push(`## Kunden ohne Lexware-Kontakt-ID: ${ohneLex.length}`, ``, `Sie werden beim ersten Lexware-Beleg über die Dubletten-Suche (Kundennummer, E-Mail, Name, Adresse) einem vorhandenen Lexware-Kontakt zugeordnet oder neu angelegt.`, ``);
+  for (const x of ohneLex.slice(0, 300)) t.push(`- ${zeile(x)}`);
+  if (ohneLex.length > 300) t.push(`- … und ${ohneLex.length - 300} weitere`);
+  if (ohneNr.length) t.push(``, `## Kunden ohne Kundennummer: ${ohneNr.length}`, ``, ...ohneNr.map((x) => `- ${x.airtable_id} ${x.name}`));
+  const probleme = [...plan.probleme.filter((x) => x.tabelle === "Kunden"), ...(fehler ?? [])];
+  t.push(``, `## Fehler und Hinweise: ${probleme.length}`, ``);
+  for (const x of probleme) t.push(`- ${x.tabelle} ${x.id} ${x.nummer ?? ""}: ${String(x.text).replace(/\n/g, " ")}`);
+  return t.join("\n") + "\n";
+}
+
 // ---------------------------------------------------------------------------------------------------------------------
 // Ablauf
 // ---------------------------------------------------------------------------------------------------------------------
@@ -395,20 +465,31 @@ try {
     ({ ergebnis, fehler, nk } = await schreiben(db, plan));
     if (LEXWARE_LESEN) lex = await lexwareLesen(db);
     await db.query("commit");
-    proben = await stichproben(db, plan);
-    summen = await summenAbgleich(db, daten, plan);
+    if (!NUR_KUNDEN) {
+      proben = await stichproben(db, plan);
+      summen = await summenAbgleich(db, daten, plan);
+    }
   } else {
-    for (const [tab, rows] of Object.entries({ kunde: plan.kunden, anfrage: plan.anfragen, auftrag: plan.auftraege, beleg: plan.belege, aufgabe: plan.aufgaben, ablage_ordner: plan.ordner, kunde_lieferadresse: plan.lieferadressen })) {
+    const zaehlen = NUR_KUNDEN ? { kunde: plan.kunden, kunde_lieferadresse: plan.lieferadressen } : { kunde: plan.kunden, anfrage: plan.anfragen, auftrag: plan.auftraege, beleg: plan.belege, aufgabe: plan.aufgaben, ablage_ordner: plan.ordner, kunde_lieferadresse: plan.lieferadressen };
+    for (const [tab, rows] of Object.entries(zaehlen)) {
       const { rows: r } = await db.query(`select count(*)::int as n from public.${tab} where airtable_id = any($1)`, [rows.map((x) => x.airtable_id)]);
       vorhandeneAnzahl[tab] = r[0].n;
     }
   }
   mkdirSync("berichte", { recursive: true });
-  const datei = `berichte/airtable-import-${projekt}-${new Date().toISOString().slice(0, 19).replace(/[:T]/g, "-")}.md`;
+  const datei = `berichte/airtable-import-${NUR_KUNDEN ? "kunden-" : ""}${projekt}-${new Date().toISOString().slice(0, 19).replace(/[:T]/g, "-")}.md`;
+  if (NUR_KUNDEN) {
+    writeFileSync(datei, kundenBericht({ plan, ergebnis, fehler, nk, vorhanden: vorhandeneAnzahl }));
+    console.log(`${SCHREIBEN ? "Geschrieben" : "Probelauf"} (nur Kunden): ${plan.kunden.length} Kunden, ${plan.lieferadressen.length} Lieferadressen, ${plan.kunden.filter((x) => !x.lexware_kontakt_id).length} ohne Lexware-ID.`);
+    if (fehler?.length) console.log(`Fehler beim Schreiben: ${fehler.length} (siehe Bericht)`);
+    console.log(`Bericht: ${datei}`);
+    process.exitCode = fehler?.length ? 1 : 0;
+  } else {
   writeFileSync(datei, bericht({ plan, daten, ergebnis, fehler, nk, lex, proben, summen, vorhandeneAnzahl }));
   console.log(`${SCHREIBEN ? "Geschrieben" : "Probelauf"}: ${plan.kunden.length} Kunden, ${plan.anfragen.length} Anfragen, ${plan.auftraege.length} Aufträge, ${plan.belege.length} Belege, ${plan.ordner.length} Ordner, ${plan.aufgaben.length} Aufgaben.`);
   if (fehler?.length) console.log(`Fehler beim Schreiben: ${fehler.length} (siehe Bericht)`);
   console.log(`Bericht: ${datei}`);
+  }
 } catch (e) {
   await db.query("rollback").catch(() => {});
   console.error(e);

@@ -1029,5 +1029,8 @@ Airtable und Make bleiben nach dem Start 2 bis 4 Wochen eingefroren als Rückfal
 - Vor jedem Commit: `npm run lint`, `npx tsc --noEmit`, `npm run build`.
 - Tests und Testskripte laufen nur gegen das Projekt in `ERLAUBTES_TESTPROJEKT` (Staging, `scripts/testprojekt.mjs`);
   Testkonten räumen sie selbst auf (`npm run test:aufraeumen`).
+- Gegen die Produktion nur einzelne Befehle über `node scripts/prod.mjs <befehl>` (Werte aus Abschnitt 2 von
+  `.env.local`, alle Staging-Zugänge geleert, Projekt-Ref wird genannt); nie die RLS- oder Browser-Tests. Go-live-Ablauf:
+  `docs/golive.md`.
 - Next.js 16: vor neuem Code die Doku in `node_modules/next/dist/docs/` prüfen (siehe AGENTS.md).
 - Änderungen am fachlichen Umfang zuerst in der Demo und in dieser Datei festhalten, dann bauen.

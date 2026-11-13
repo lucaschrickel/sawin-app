@@ -1,6 +1,6 @@
 # Stand der App
 
-Stand: 13.11.2026, nach der Umsetzung der Sicherheitsprüfung (Blöcke A–D, `docs/sicherheit.md`). Vergleich mit dem Klick-Prototyp
+Stand: 13.11.2026, Produktion aufgebaut (Go-live-Vorbereitung, `docs/golive.md`). Vergleich mit dem Klick-Prototyp
 (`docs/demo/sawin-demo.html`) und `CLAUDE.md`. Wird nach jedem größeren Block aktualisiert.
 
 **Entscheidungen 11.11.2026:**
@@ -8,6 +8,28 @@ Stand: 13.11.2026, nach der Umsetzung der Sicherheitsprüfung (Blöcke A–D, `d
   kommen in **Version 2**. In Version 1 gibt es den vorläufigen Versand: PDF herunterladen und Outlook per `mailto`.
 - OneDrive-Ordner entstehen mit dem **ersten Angebot** (`<AG-Nummer>_<Kunde>`) und werden mit der AB in
   `<AB-Nummer>_<Kunde>` umbenannt (derselbe Ordner); Unterordner wie im bisherigen Make-Szenario.
+
+## Go-live-Vorbereitung 13.11.2026 (Produktion aufgebaut)
+
+Ablauf, Befehle, Vercel-Variablen und Checkliste für den Go-live-Tag: `docs/golive.md`.
+
+**Erledigt (Produktion `sawin-produktion`, Ref `zqjrxxrvhbrnhknkmpqh`):**
+- Alle 54 Migrationen eingespielt; Schema identisch mit Staging (`npm run golive:schema`); Advisors ohne Warnung.
+- Nummernkreise AG1261000, AB2261000, LS1000, Kunden ab 30000; Arbeitszeit 7–16 Uhr; OneDrive-Basisordner „2026“ vorbelegt.
+- Kundenimport nur Stammdaten (`--nur-kunden`), geschrieben: 861 Kunden (alle mit Lexware-Kontakt-ID und bisheriger
+  Kundennummer, höchste 10874), 143 Lieferadressen; keine Vorgänge oder Belege. Go-live-Datum 13.11.2026.
+- Dubletten-Suche mit übernommenen Kunden geprüft (Browser-Test `test:kontakte`, Fälle 4 und 5).
+- Werkzeuge: `scripts/prod.mjs` (ein Befehl gegen Produktion, Staging-Zugänge geleert), `benutzer:anlegen` (Startpasswort,
+  Pflicht zum Ändern bei der ersten Anmeldung), `golive:geheimnisse`, `golive:vercel`, `golive:schema`,
+  `backup:pruefen`; Go-live-Prüfung zeigt Lexware-Konto und organizationId.
+- Go-live-Prüfung gegen Produktion nur lesend (ohne Lexware): alle Startwerte ok.
+
+**Offen bzw. von Luca:**
+- Ersten Admin anlegen (Befehl vorbereitet, Startpasswort gibt Luca verdeckt ein).
+- Auth-Konfiguration in Produktion: Das persönliche Supabase-Token darf die Konfiguration von sawin-produktion nicht
+  lesen; im Dashboard setzen oder ein Token mit Rechten geben.
+- Dashboard-Schritte, Vercel Production (heute noch auf Staging, `golive:vercel` meldet das), Lexware-Schlüssel,
+  Webhook, Branch-Schutz, Wiederherstellungstest: Checkliste in `docs/golive.md`.
 
 ## Sicherheitsprüfung 13.11.2026 (OWASP ASVS 5.0, Level 1) und Umsetzung für den Go-live
 
