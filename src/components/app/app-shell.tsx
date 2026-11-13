@@ -7,17 +7,13 @@ import type { Darstellung } from "@/lib/darstellung";
 import { DarstellungAbgleich } from "./darstellung";
 import { Inaktivitaet } from "./inaktivitaet";
 import { Glocke, GlobaleSuche, NeuMenue } from "./kopfzeile";
-import type { Zaehler } from "./navigation";
 import { Seitenleiste } from "./seitenleiste";
+import { useRahmen } from "./rahmen-kontext";
 import { Pfad, Verlauf } from "./verlauf";
 
 type AppShellProps = {
-  active: string;
-  crumbs: { label: string; href?: string }[];
   brand: { name: string; logo: ReactNode; symbol: ReactNode };
   user: { initials: string; name: string; role: string };
-  /** Zahlen an den Menüpunkten */
-  zaehler: Zaehler;
   /** Seitenleiste eingeklappt (je Benutzer gemerkt) */
   eingeklappt: boolean;
   /** automatische Abmeldung nach so vielen Minuten ohne Eingabe */
@@ -30,8 +26,10 @@ type AppShellProps = {
 };
 
 /** App-Rahmen: dunkle Seitenleiste, helles Inhaltsfeld, Kopfzeile mit Suche, „Neu“-Menü und Glocke. */
-export function AppShell({ active, crumbs, brand, user, zaehler, eingeklappt, inaktivMinuten, lexware, darstellung, children }: AppShellProps) {
+export function AppShell({ brand, user, eingeklappt, inaktivMinuten, lexware, darstellung, children }: AppShellProps) {
   const [open, setOpen] = useState(false);
+  // Menüpunkt, Pfad und Zähler meldet die jeweilige Seite (Rahmen bleibt beim Seitenwechsel stehen)
+  const { active, crumbs, zaehler } = useRahmen();
 
   return (
     <div className="flex min-h-screen py-3 pr-3 max-[960px]:p-0">
@@ -48,9 +46,14 @@ export function AppShell({ active, crumbs, brand, user, zaehler, eingeklappt, in
           <Button size="icon" className="min-[961px]:hidden" aria-label="Menü öffnen" onClick={() => setOpen(true)}>
             <Menu className="size-[18px]" />
           </Button>
-          <Suspense fallback={<Pfad crumbs={crumbs} />}>
-            <Verlauf crumbs={crumbs} />
-          </Suspense>
+          {crumbs ? (
+            <Suspense fallback={<Pfad crumbs={crumbs} />}>
+              <Verlauf crumbs={crumbs} />
+            </Suspense>
+          ) : (
+            // Seite lädt noch: Platz halten, damit Suche und Knöpfe nicht springen
+            <div className="min-w-0" aria-hidden="true" />
+          )}
           <GlobaleSuche />
           <div className="flex items-center gap-2.5">
             <NeuMenue />

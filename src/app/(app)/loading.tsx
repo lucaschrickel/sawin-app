@@ -1,3 +1,6 @@
+import { DashboardPlatzhalter } from "@/components/app/platzhalter";
+
+/** Lade-Platzhalter im Aufbau der Seite (Seitenleiste und Kopfzeile bleiben stehen) */
 export default function Laden() {
-  return <p className="p-8 text-sm text-muted">Einen Moment …</p>;
+  return <DashboardPlatzhalter />;
 }

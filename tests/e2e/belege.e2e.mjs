@@ -246,10 +246,12 @@ try {
 
   // Spaltenbreiten der Positionstabelle: per Tastatur ändern, je Benutzer gespeichert, nach dem Neuladen erhalten, zurücksetzen
   const griff = "[data-spalten-griff='Menge']";
-  pruefe("Spaltengriff: Trenner mit Wert 64", (await b.js(`document.querySelector("${griff}").getAttribute('aria-valuenow')`)) === "64");
-  await b.js(`document.querySelector("${griff}").focus()`);
+  // Nach dem Speichern lädt die Belegseite; der alte Editor bleibt versteckt im DOM
+  await b.warte(`[...document.querySelectorAll("${griff}")].some((x) => x.getClientRects().length)`, 30000);
+  pruefe("Spaltengriff: Trenner mit Wert 64", (await b.js(`[...document.querySelectorAll("${griff}")].find((x) => x.getClientRects().length).getAttribute('aria-valuenow')`)) === "64");
+  await b.js(`[...document.querySelectorAll("${griff}")].find((x) => x.getClientRects().length).focus()`);
   for (let i = 0; i < 3; i++) await b.taste("ArrowRight", "ArrowRight", 39);
-  pruefe("Pfeil rechts: Menge 88 px", (await b.js(`document.querySelector("${griff}").getAttribute('aria-valuenow')`)) === "88");
+  pruefe("Pfeil rechts: Menge 88 px", (await b.js(`[...document.querySelectorAll("${griff}")].find((x) => x.getClientRects().length).getAttribute('aria-valuenow')`)) === "88");
   const spalten = async () => (await dbAbfrage("select spaltenbreiten from public.benutzer_einstellung where benutzer_id = $1", [admin.id]))[0]?.spaltenbreiten?.beleg_positionen;
   let gemerkt = null;
   for (let i = 0; i < 40 && gemerkt?.menge !== 88; i++) {
@@ -257,13 +259,13 @@ try {
     if (gemerkt?.menge !== 88) await sleep(250);
   }
   pruefe("Breite je Benutzer gespeichert", gemerkt?.menge === 88, JSON.stringify(gemerkt));
-  await b.js(`document.querySelector("[data-spalten-griff='Einheit']").dispatchEvent(new MouseEvent('dblclick', { bubbles: true }))`);
-  pruefe("Doppelklick: Einheit passend (innerhalb der Grenzen)", await b.warte(`(() => { const v = Number(document.querySelector("[data-spalten-griff='Einheit']").getAttribute('aria-valuenow')); return v >= 56 && v <= 220 && v !== 84; })()`));
+  await b.js(`[...document.querySelectorAll("[data-spalten-griff='Einheit']")].find((x) => x.getClientRects().length).dispatchEvent(new MouseEvent('dblclick', { bubbles: true }))`);
+  pruefe("Doppelklick: Einheit passend (innerhalb der Grenzen)", await b.warte(`(() => { const v = Number([...document.querySelectorAll("[data-spalten-griff='Einheit']")].find((x) => x.getClientRects().length).getAttribute('aria-valuenow')); return v >= 56 && v <= 220 && v !== 84; })()`));
   await b.gehe(`/beleg/${entwurfId}`);
   await b.da("[data-beleg-editor=angebot]");
-  pruefe("nach dem Neuladen: Menge weiter 88 px", (await b.js(`document.querySelector("${griff}").getAttribute('aria-valuenow')`)) === "88");
+  pruefe("nach dem Neuladen: Menge weiter 88 px", (await b.js(`[...document.querySelectorAll("${griff}")].find((x) => x.getClientRects().length).getAttribute('aria-valuenow')`)) === "88");
   await b.klick("[data-spalten-zuruecksetzen]");
-  pruefe("Spalten zurücksetzen: Standard, Eintrag entfernt", await b.warte(`document.querySelector("${griff}").getAttribute('aria-valuenow') === '64' && !document.querySelector('[data-spalten-zuruecksetzen]')`));
+  pruefe("Spalten zurücksetzen: Standard, Eintrag entfernt", await b.warte(`[...document.querySelectorAll("${griff}")].find((x) => x.getClientRects().length).getAttribute('aria-valuenow') === '64' && !document.querySelector('[data-spalten-zuruecksetzen]')`));
   gemerkt = 1;
   for (let i = 0; i < 40 && gemerkt; i++) {
     gemerkt = await spalten();

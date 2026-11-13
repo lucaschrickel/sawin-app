@@ -180,6 +180,8 @@ export async function browser() {
   /** Echter Mausklick auf die Mitte des Elements (Radix reagiert auf Zeigerereignisse). */
   const klick = async (sel) => {
     if (!(await da(sel))) throw new Error(`Element fehlt: ${sel}`);
+    // Erst klicken, wenn React das Element übernommen hat (Inhalt streamt hinter Suspense, Hydration folgt danach)
+    await warte(`(() => { const el = ${F}(${q(sel)}); return !!el && Object.keys(el).some((k) => k.startsWith("__reactProps")); })()`, 10000);
     const r = await js(`(() => { const el = ${F}(${q(sel)}); el.scrollIntoView({ block: "center" }); const b = el.getBoundingClientRect(); return { x: b.x + b.width / 2, y: b.y + b.height / 2 }; })()`);
     await cdp("Input.dispatchMouseEvent", { type: "mouseMoved", x: r.x, y: r.y, buttons: 0 });
     await sleep(60);

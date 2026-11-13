@@ -47,6 +47,7 @@ try {
   pruefe("gespeichert: Kunde, Produkte, Wert, Zuständig = ich", q1.kunde_id === kunde.id && q1.produkte.includes("Fenster") && Number(q1.geschaetzter_wert) === 12000 && q1.zustaendig_id === admin.id && q1.created_by === admin.id);
 
   // 2. Status ändern, Historie, Notiz
+  await b.warte(`!!${sichtbar("button[aria-label='Status ändern']")}`);
   await b.js(`${sichtbar("button[aria-label='Status ändern']")}.setAttribute("data-x", "status")`);
   await b.klick("[data-x='status']");
   await b.klickText("[role=option]", "In Klärung");

@@ -53,6 +53,8 @@ try {
 
   // 1. Geschäftsführung (Standard-Start-Ansicht)
   pruefe("Ansicht Geschäftsführung gewählt", await b.warte("document.querySelector('[role=tab][aria-selected=true]')?.textContent === 'Geschäftsführung'"));
+  // Kennzahlen streamen nach dem Seitenkopf: warten, bis kein Platzhalter mehr sichtbar ist
+  await b.warte("/Guten (Morgen|Tag|Abend)/.test(document.querySelector('main').innerText) && ![...document.querySelectorAll('main [aria-busy=true]')].some((x) => x.getClientRects().length)", 30000);
   const gf = await main();
   pruefe("Begrüßung mit Vorname und Datum", /Guten (Morgen|Tag|Abend), E2E/.test(gf), gf.slice(0, 120));
   pruefe("Belege-Kennzahlen aus den Belegen (keine Platzhalter mehr)", await b.warte("!document.querySelector('[data-platzhalter]') && !!document.querySelector('[data-angebotsquote]') && document.body.innerText.includes('Offene Forderungen') && document.body.innerText.includes('Auftragsbestand, noch nicht berechnet')"));

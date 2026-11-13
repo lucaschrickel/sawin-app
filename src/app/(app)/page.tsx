@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { CalendarDays } from "lucide-react";
+import { Suspense, type ReactNode } from "react";
+import { DashboardInhaltPlatzhalter, ZeilenPlatzhalter } from "@/components/app/platzhalter";
 import { PageHeader } from "@/components/app/page-header";
 import { Shell } from "@/components/app/shell";
 import { ladeDashboardAnsicht } from "@/lib/ansicht";
@@ -18,6 +20,11 @@ export const metadata: Metadata = { title: "Dashboard" };
 const WOCHENTAG = ["Sonntag", "Montag", "Dienstag", "Mittwoch", "Donnerstag", "Freitag", "Samstag"];
 const MONAT = ["Januar", "Februar", "März", "April", "Mai", "Juni", "Juli", "August", "September", "Oktober", "November", "Dezember"];
 
+/** Wartet auf die Daten einer Ansicht (gemeinsames Versprechen für Unterzeile und Inhalt) */
+async function Warte<T>({ daten, children }: { daten: Promise<T>; children: (d: T) => ReactNode | Promise<ReactNode> }) {
+  return children(await daten);
+}
+
 /** Startseite: Dashboard mit drei Ansichten (Geschäftsführung, Montage, Einkauf), je Benutzer gemerkt */
 export default async function DashboardPage() {
   const [{ benutzer }, ansicht] = await Promise.all([pruefeSitzung(), ladeDashboardAnsicht()]);
@@ -29,13 +36,18 @@ export default async function DashboardPage() {
   // Die Ansicht steht im Umschalter; im Pfad und im Zurück-Knopf heißt die Maske „Dashboard“
   const crumbs = [{ label: "Übersicht" }, { label: "Dashboard" }];
 
+  // Titel und Umschalter stehen sofort da; Kennzahlen und Unterzeile laden hinter Suspense nach
   if (ansicht === "montage") {
-    const d = await ladeMontage();
+    const daten = ladeMontage();
     return (
       <Shell active="dashboard" crumbs={crumbs}>
         <PageHeader
           title="Dashboard · Montage"
-          sub={`${datum} · KW ${d.kw} · Planung, Freigabe und Ressourcen`}
+          sub={
+            <Suspense fallback={<ZeilenPlatzhalter />}>
+              <Warte daten={daten}>{(d) => `${datum} · KW ${d.kw} · Planung, Freigabe und Ressourcen`}</Warte>
+            </Suspense>
+          }
           actions={
             <>
               {umschalter}
@@ -46,31 +58,49 @@ export default async function DashboardPage() {
             </>
           }
         />
-        <Montage d={d} jetzt={jetzt} />
+        <Suspense fallback={<DashboardInhaltPlatzhalter />}>
+          <Warte daten={daten}>{(d) => <Montage d={d} jetzt={jetzt} />}</Warte>
+        </Suspense>
       </Shell>
     );
   }
   if (ansicht === "einkauf") {
-    const d = await ladeEinkauf();
+    const daten = ladeEinkauf();
     return (
       <Shell active="dashboard" crumbs={crumbs}>
         <PageHeader title="Dashboard · Einkauf" sub={`KW ${kalenderwoche(heute)} · Bestellungen, Liefertermine und offene Positionen`} actions={<>{umschalter}<NeueBestellung /></>} />
-        <Einkauf d={d} />
+        <Suspense fallback={<DashboardInhaltPlatzhalter />}>
+          <Warte daten={daten}>{(d) => <Einkauf d={d} />}</Warte>
+        </Suspense>
       </Shell>
     );
   }
-  const d = await ladeGeschaeftsfuehrung();
-  await zahlungenImHintergrund();
+  const daten = ladeGeschaeftsfuehrung();
   const gruss = stunde < 11 ? "Guten Morgen" : stunde < 18 ? "Guten Tag" : "Guten Abend";
-  const abwesend = d.abwesenheiten.abwesendHeute;
   return (
     <Shell active="dashboard" crumbs={crumbs}>
       <PageHeader
         title="Dashboard"
-        sub={`${gruss}, ${benutzer.name.split(" ")[0]} · ${datum} · ${d.termine.length} ${d.termine.length === 1 ? "Termin" : "Termine"} heute${abwesend.length ? ` · abwesend: ${abwesend.join(", ")}` : ""}`}
+        sub={
+          <Suspense fallback={<ZeilenPlatzhalter />}>
+            <Warte daten={daten}>
+              {(d) => {
+                const abwesend = d.abwesenheiten.abwesendHeute;
+                return `${gruss}, ${benutzer.name.split(" ")[0]} · ${datum} · ${d.termine.length} ${d.termine.length === 1 ? "Termin" : "Termine"} heute${abwesend.length ? ` · abwesend: ${abwesend.join(", ")}` : ""}`;
+              }}
+            </Warte>
+          </Suspense>
+        }
         actions={umschalter}
       />
-      <Geschaeftsfuehrung d={d} jetzt={jetzt} />
+      <Suspense fallback={<DashboardInhaltPlatzhalter />}>
+        <Warte daten={daten}>
+          {async (d) => {
+            await zahlungenImHintergrund();
+            return <Geschaeftsfuehrung d={d} jetzt={jetzt} />;
+          }}
+        </Warte>
+      </Suspense>
     </Shell>
   );
 }

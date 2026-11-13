@@ -17,6 +17,7 @@ import { AUFTRAG_PHASE_TEXT, AUFTRAG_PHASE_TON, AUFTRAG_PHASEN, BELEG_STATUS_TON
 import { AblageUploadDemo, BestaetigenDemo, ChatDemo, DialogDemo, FarbWahlDemo, FormDemo, FormularDialogDemo, PdfKachelDemo, RichTextDemo, SpaltenGriffDemo, VerlassenDemo } from "./demo-interactive";
 import { TrefferZeile } from "@/components/app/kopfzeile";
 import { UmgesetztVon } from "@/components/app/umgesetzt-von";
+import { Balken, KopfPlatzhalter, TabellenPlatzhalter, ZeilenPlatzhalter } from "@/components/app/platzhalter";
 import { Pfad, ZurueckKnopf } from "@/components/app/verlauf";
 import { FORMULAR_STATUS_TEXT, FORMULAR_STATUS_TON, type FormularStatus } from "@/lib/formular-logik";
 import type { Treffer } from "@/lib/such-typen";
@@ -295,6 +296,20 @@ export default function StyleguidePage() {
             <div data-theme="dark" className="flex items-center justify-center rounded-lg bg-canvas p-6">
               <Logo className="block w-[220px]" />
             </div>
+          </div>
+        </Section>
+
+        <Section title="Lade-Platzhalter" description="loading.tsx je Bereich (src/components/app/platzhalter.tsx): Aufbau der Seite ohne Daten, Seitenleiste und Kopfzeile bleiben stehen · Bausteine Balken, ZeilenPlatzhalter, KopfPlatzhalter, TabellenPlatzhalter sowie fertige Seiten (Liste, Belegliste, Detail, Dashboard, Plantafel, Kalender, Beleg, Einstellungen)">
+          <div className="flex flex-col gap-4 rounded-lg border border-line bg-canvas p-5">
+            <KopfPlatzhalter />
+            <p className="text-sm text-muted">
+              Unterzeile lädt nach: <ZeilenPlatzhalter className="w-48" />
+            </p>
+            <div className="flex gap-2">
+              <Balken className="h-9 w-24 rounded-full" />
+              <Balken className="h-9 w-24 rounded-full" />
+            </div>
+            <TabellenPlatzhalter zeilen={3} spalten={5} />
           </div>
         </Section>
 

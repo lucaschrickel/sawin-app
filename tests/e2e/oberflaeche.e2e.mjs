@@ -79,10 +79,11 @@ try {
   await b.klick("aside button[aria-label='Seitenleiste ausklappen']");
   await b.warte("document.querySelector('aside').getBoundingClientRect().width > 200");
 
-  // 6. Designsystem: Logo hell (anthrazit) und dunkel (weiß), Passwortfeld im dunklen Theme
+  // 6. Designsystem: Logo hell (anthrazit) und dunkel (weiß), Passwortfeld im dunklen Theme (die ersten drei Logos;
+  // danach folgt der Briefkopf auf hellem Papier)
   await b.gehe("/styleguide");
   await b.da("[data-theme=dark] [data-passwort-auge]");
-  const farben = await b.js(`JSON.stringify([...document.querySelectorAll("main svg[viewBox='50 14.5 584 193'] g[stroke]")].map((g) => getComputedStyle(g).stroke))`);
+  const farben = await b.js(`JSON.stringify([...document.querySelectorAll("main svg[viewBox='50 14.5 584 193'] g[stroke]")].filter((g) => g.getClientRects().length).map((g) => getComputedStyle(g).stroke).slice(0, 3))`);
   pruefe("Designsystem: Logo anthrazit auf hell, weiß auf Seitenleiste und dunkel", farben === JSON.stringify([ANTHRAZIT, WEISS, WEISS]), farben);
   await b.klick("[data-theme=dark] [data-passwort-auge]");
   pruefe("Designsystem: Passwortfeld im dunklen Theme umschaltbar", await b.js("document.querySelector('[data-theme=dark] [data-passwort-auge]').parentElement.querySelector('input').type === 'text'"));

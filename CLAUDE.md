@@ -226,6 +226,12 @@ Die Monteur-App kommt in Version 2.
   Browser-Zurück oder Link), endet der Verlauf dort. Der Knopf nutzt `history.back()`, wenn der Browser-Verlauf genau
   dorthin führt, sonst öffnet er die gemerkte Adresse. Gelöschte Vorgänge (Auftrag, Anfrage, Kunde, Ticket, Bestellung,
   Lieferant) verschwinden aus dem Verlauf.
+- **Seitenwechsel (13.11.2026):** Seitenleiste und Kopfzeile stehen im Layout `src/app/(app)/layout.tsx` (`Rahmen`) und
+  bleiben beim Wechsel stehen; jede Seite meldet über `<Shell active crumbs>` Menüpunkt und Pfad (Kontext
+  `rahmen-kontext.tsx`, gültig nur für den gemeldeten Pfad) und lädt die Zähler der Seitenleiste im Hintergrund nach.
+  Während eine Seite lädt, zeigt `loading.tsx` je Bereich einen Platzhalter im Aufbau der Seite ohne Daten
+  (`src/components/app/platzhalter.tsx`); die Seitenleisten-Links laden diese App-Shell vorab (Partial Prefetching).
+  Langsame Teile streamen hinter Suspense (Dashboard: Titel und Umschalter sofort, Kennzahlen danach).
 - Gruppen und Reihenfolge:
   - **Übersicht:** Dashboard, Aufgaben
   - **Kunden & Anfragen:** Kunden, Anfragen
