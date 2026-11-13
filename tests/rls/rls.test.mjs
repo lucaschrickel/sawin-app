@@ -294,6 +294,20 @@ describe("Abwesenheiten genehmigen", () => {
     assert.ok(roh.deleted_at);
   });
 
+  it("Nicht-Admins machen aus einem Antrag oder einer Ablehnung keine Krankmeldung (sonst genehmigt ohne Admin)", async () => {
+    const { data: u } = await buero.client.from("abwesenheit").insert({ mitarbeiter_id: daten.monteur.id, art: "urlaub", von: "2027-04-05", bis: "2027-04-09" }).select().single();
+    angelegt.push(["abwesenheit", u.id]);
+    const beantragt = await buero.client.from("abwesenheit").update({ art: "krank" }).eq("id", u.id);
+    assert.equal(beantragt.error?.code, "42501", "beantragter Urlaub wurde zur Krankmeldung");
+    assert.ifError((await admin.client.from("abwesenheit").update({ status: "abgelehnt" }).eq("id", u.id)).error);
+    const abgelehnt = await buero.client.from("abwesenheit").update({ art: "krank" }).eq("id", u.id);
+    assert.equal(abgelehnt.error?.code, "42501", "abgelehnter Urlaub wurde zur Krankmeldung");
+    const loeschen = await buero.client.rpc("loeschen", { p_tabelle: "abwesenheit", p_id: u.id });
+    assert.equal(loeschen.error?.code, "42501");
+    const { data } = await service.from("abwesenheit").select("art, status, deleted_at").eq("id", u.id).single();
+    assert.deepEqual(data, { art: "urlaub", status: "abgelehnt", deleted_at: null });
+  });
+
   it("einen eigenen Antrag und eine Krankmeldung darf jeder löschen", async () => {
     const { data: a } = await buero.client.from("abwesenheit").insert({ mitarbeiter_id: daten.monteur.id, art: "schulung", von: "2027-03-01", bis: "2027-03-02" }).select().single();
     angelegt.push(["abwesenheit", a.id]);
@@ -553,6 +567,31 @@ describe("Montageplan", () => {
     assert.equal(sichtbar.length, 0);
     const { data: roh } = await service.from("einsatz_monteur").select("deleted_at").eq("einsatz_id", einsatzId);
     assert.ok(roh.length && roh.every((x) => x.deleted_at));
+  });
+
+  it("Go-live-Datum, OneDrive-Verbindung und interne Kopie ändert nur der Admin; Server-Felder nur der Server", async (t) => {
+    const spalten = "golive_datum, onedrive_drive_id, onedrive_basis_id, onedrive_basis_url, lexware_zahlung_abgleich_am, lexware_fremdbelege, deleted_at";
+    const { data: vorher } = await service.from("einstellung").select(spalten).eq("einzig", true).single();
+    // Falls die Datenbank den Versuch doch annimmt, stellt der Test den alten Stand wieder her
+    t.after(async () => { await service.from("einstellung").update(vorher).eq("einzig", true); });
+    for (const feld of [{ golive_datum: vorher.golive_datum === "2030-01-01" ? "2031-01-01" : "2030-01-01" }, { onedrive_basis_id: "fremd" }, { onedrive_drive_id: "fremd" }, { onedrive_basis_url: "https://example.com" }]) {
+      const { error } = await buero.client.from("einstellung").update(feld).eq("einzig", true);
+      assert.equal(error?.code, "42501", `Büro konnte ${Object.keys(feld)[0]} ändern`);
+    }
+    for (const c of [buero.client, admin.client]) {
+      for (const feld of [{ lexware_zahlung_abgleich_am: "2099-01-01T00:00:00Z" }, { lexware_fremdbelege: [{ nummer: "X" }] }, { deleted_at: new Date().toISOString() }]) {
+        const { error } = await c.from("einstellung").update(feld).eq("einzig", true);
+        assert.equal(error?.code, "42501", `${Object.keys(feld)[0]} durch Benutzer geändert`);
+      }
+    }
+    const { error: adminFehler } = await admin.client.from("einstellung").update({ golive_datum: vorher.golive_datum }).eq("einzig", true);
+    assert.ifError(adminFehler);
+    const { data: nachher } = await service.from("einstellung").select(spalten).eq("einzig", true).single();
+    assert.deepEqual(nachher, vorher);
+    const bcc = await buero.client.from("belegart_einstellung").update({ bcc_email: "extern@example.com" }).neq("belegart", "").select();
+    assert.ok(bcc.error || bcc.data.length === 0, "Büro konnte die interne Kopie ändern");
+    const neu = await buero.client.from("belegart_einstellung").insert({ belegart: "lieferschein", bcc_email: "extern@example.com" });
+    assert.equal(neu.error?.code, "42501", "Büro konnte eine interne Kopie anlegen");
   });
 
   it("Arbeitszeit nur in vollen Stunden; nicht angemeldet keine Konflikte", async () => {

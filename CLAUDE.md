@@ -770,7 +770,7 @@ Die Monteur-App kommt in Version 2.
 - **Abwesenheiten:** Anträge trägt in Version 1 das Büro ein.
   - Arten: Urlaub, Krank, Schulung, Überstundenabbau, Sonstiges.
   - Status: Beantragt, Genehmigt, Abgelehnt. Genehmigen, Ablehnen und „Direkt genehmigen“ beim Eintragen nur durch
-    `admin`. Ausnahme: Eine Krankmeldung gilt sofort als genehmigt. Eine genehmigte oder abgelehnte Abwesenheit löscht nur `admin`;
+    `admin`. Ausnahme: Eine Krankmeldung gilt sofort als genehmigt (immer ein neuer Eintrag; eine andere Art wird ohne `admin` nicht nachträglich zu „krank“). Eine genehmigte oder abgelehnte Abwesenheit löscht nur `admin`;
     beantragte und Krankmeldungen darf jeder löschen (Entscheidung 10.11.2026).
   - Genehmigungsübersicht: offene Anträge mit Person, Art, Zeitraum, Arbeitstagen, Resturlaub danach und Hinweis,
     wenn die Person in dem Zeitraum eingeplant ist.
@@ -851,7 +851,9 @@ Maßstab ist OWASP ASVS Level 1. Vor dem Start mit Echtdaten müssen alle Mindes
    Die Dashboard-Ansicht ist eine Benutzereinstellung, keine Rolle. Rolle `monteur` ist im Datenmodell vorgesehen,
    aber erst mit der Monteur-App (Version 2) in Gebrauch.
    Vor dem Finalisieren einer Rechnung oder Gutschrift immer ein Bestätigungsdialog.
-7. **Sicherheits-Header** stehen in `next.config.ts`. Offen: vollständige CSP mit Nonce, sobald die Supabase-URL feststeht.
+7. **Sicherheits-Header** stehen in `next.config.ts`. Admin-Einstellungen (Go-live-Datum, OneDrive-Verbindung, interne
+   Kopie) prüft die Datenbank (`app.einstellung_schutz`, Policies von `belegart_einstellung`), nicht nur die App.
+   Offen: vollständige CSP mit Nonce (Konzept und Abwägung in `docs/sicherheit.md`, M3).
 8. **Abhängigkeiten:** Dependabot aktiv, `npm audit --omit=dev` ohne hohe Befunde.
 9. **Datenbankänderungen nur als Migration** über die Supabase CLI (`supabase/migrations`), nie per Klick im Dashboard.
 10. **Uploads** (Fotos im Chat, Scans) nur in private Storage-Buckets mit RLS, Dateityp und Größe serverseitig prüfen.
@@ -994,7 +996,8 @@ Maßstab ist OWASP ASVS Level 1. Vor dem Start mit Echtdaten müssen alle Mindes
       Zahlungsbestätigung (ohne Umsatzsteuer) mit Sawins Steuerberater abgestimmt
 - [ ] Datenübernahme aus Airtable als Probelauf auf Staging durchgeführt und geprüft (Skript und Plan fertig,
       `docs/airtable-uebernahme.md`; offen: Probelauf, Lieferantenkürzel von Sawin)
-- [ ] ASVS-Level-1-Checkliste abgehakt
+- [ ] ASVS-Level-1-Checkliste abgehakt (geprüft 13.11.2026 nach ASVS 5.0, Bericht `docs/sicherheit.md`: keine kritischen,
+      hohe behoben; offen sind die mittleren Funde M1–M9)
 - [ ] AVV mit Sawin angepasst (Supabase direkt mit Sawin, Vercel bis zur Übergabe als Unterauftragsverarbeiter von Luca)
 - [ ] Übergabe-Anleitung vollständig: alle Umgebungsvariablen, Dienste und manuellen Schritte beschrieben
 

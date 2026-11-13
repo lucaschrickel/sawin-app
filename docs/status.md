@@ -1,6 +1,6 @@
 # Stand der App
 
-Stand: 13.11.2026, nach dem Nachtauftrag (Passwort, Zwei-Faktor, Lexware-Übergang, dunkles Theme, Anmeldung, Seitenwechsel, volle Breite). Vergleich mit dem Klick-Prototyp
+Stand: 13.11.2026, nach der Sicherheitsprüfung (ASVS 5.0 Level 1, `docs/sicherheit.md`). Vergleich mit dem Klick-Prototyp
 (`docs/demo/sawin-demo.html`) und `CLAUDE.md`. Wird nach jedem größeren Block aktualisiert.
 
 **Entscheidungen 11.11.2026:**
@@ -8,6 +8,52 @@ Stand: 13.11.2026, nach dem Nachtauftrag (Passwort, Zwei-Faktor, Lexware-Überga
   kommen in **Version 2**. In Version 1 gibt es den vorläufigen Versand: PDF herunterladen und Outlook per `mailto`.
 - OneDrive-Ordner entstehen mit dem **ersten Angebot** (`<AG-Nummer>_<Kunde>`) und werden mit der AB in
   `<AB-Nummer>_<Kunde>` umbenannt (derselbe Ordner); Unterordner wie im bisherigen Make-Szenario.
+
+## Sicherheitsprüfung 13.11.2026 (OWASP ASVS 5.0, Level 1)
+
+Bericht: `docs/sicherheit.md`.
+
+**Ergebnis:** 140 Funde, davon 138 nach unabhängiger Gegenprüfung bestätigt.
+- 0 kritisch, 3 hoch, 14 mittel, 75 niedrig, 46 Hinweise.
+- ASVS: 41 Anforderungen erfüllt, 22 nicht erfüllt, 7 nicht relevant.
+
+**Behoben (hoch), Migration `20261121090000_admin_rechte.sql` auf Staging:**
+- Go-live-Datum, OneDrive-Verbindung und interne Kopie (BCC) änderte bisher jeder Benutzer per Direktzugriff auf die
+  Datenbank. Jetzt nur der Admin; Abgleich- und Fremdbeleg-Felder nur der Server.
+- Urlaub ließ sich über die Art „krank“ ohne Admin genehmigen. Jetzt verhindert; eine Krankmeldung ist immer ein neuer
+  Eintrag.
+- Zwei neue RLS-Tests, RLS 94/94.
+
+**Offen (mittel, nur aufgelistet):**
+- Beleg-PDFs ersetzbar (Storage-Upsert, `pdf_pfad`).
+- Belegart und Kette eines Entwurfs direkt änderbar.
+- CSP mit Nonce.
+- Supabase-Cookies ohne HttpOnly.
+- 60-Minuten-Abmeldung umgehbar.
+- Offene Weiterleitung über `?weiter=` mit Tab.
+- Anmeldeversuche nur über die IP-Grenze von Supabase begrenzt.
+- Schutz vor geleakten Passwörtern aus.
+- Staging hängt an Sawins echter Bibliothek und enthält Echtdaten.
+
+Keinen Schlüssel muss man sofort erneuern (nichts offengelegt); die Liste für die Übergabe steht im Bericht.
+
+### Offene Entscheidungen aus der Sicherheitsprüfung
+
+1. **Mittlere Funde beheben?** Empfehlung vor dem Go-live: M1 (Beleg-PDFs), M2 (Belegart/Kette), M4 (HttpOnly),
+   M5 (Abmeldung), M6 (Weiterleitung). Das sind kleine Änderungen mit Tests. M7 und M8 brauchen den Pro-Tarif bzw. eine
+   Einstellung im Dashboard.
+2. **CSP mit Nonce oder Hash:** Mit Nonce rendert jede Seite dynamisch, die vorgerenderten Platzhalter aus dem Block
+   „Seitenwechsel“ gehen teilweise verloren. Alternative: Hash für das Darstellungs-Skript. Vor der Entscheidung im
+   Browser messen.
+3. **Passwortregel:** ASVS 5.0 verlangt keine Pflicht für Zeichenklassen (V6.2.5), dafür eine Prüfung gegen geleakte
+   Passwörter (V6.2.4). Die App verlangt Groß/klein und Ziffer. Vorschlag: Zeichenklassen streichen, 12 Zeichen
+   behalten, HaveIBeenPwned aktivieren.
+4. **Staging mit Echtdaten:** Staging bis zum Go-live wie Produktion behandeln oder den Import pseudonymisieren.
+   Außerdem eine eigene Graph-App-Registrierung für Staging.
+5. **Next.js 16.4.2 → 16.4.6:** sieben moderate Advisories vom 03.11.2026. Im Projekt ohne Angriffsweg, npm audit zeigt
+   sie nicht. Patch-Update empfohlen (niedrig, nach Vorgabe nicht umgesetzt).
+6. **22 Test-Admins auf Staging:** verwaiste Konten mit gültigen Sitzungen aus Browser-Tests (F115, F92). Aufräumen
+   (Konten deaktivieren) und die Tests ihre Konten selbst entfernen lassen.
 
 ## Nachtauftrag 13.11.2026 (autonom, direkt auf main)
 
@@ -109,7 +155,7 @@ Stand: 13.11.2026, nach dem Nachtauftrag (Passwort, Zwei-Faktor, Lexware-Überga
 
 | Punkt | Stand |
 |---|---|
-| RLS, Policies, Advisors | RLS-Tests 92/92; Advisors: nur „Schutz vor geleakten Passwörtern“ (Pro-Tarif) |
+| RLS, Policies, Advisors | RLS-Tests 94/94; Advisors: nur „Schutz vor geleakten Passwörtern“ (Pro-Tarif) |
 | MFA | in der App erzwungen |
 | SMTP, Sitzungsgrenze 60 Minuten, Passwortschutz | offen (Pro-Tarif, eigener SMTP) |
 | Backups (PITR) und Wiederherstellungstest | offen |
@@ -121,7 +167,7 @@ Stand: 13.11.2026, nach dem Nachtauftrag (Passwort, Zwei-Faktor, Lexware-Überga
 | Vorläufiger Versand mit Sawins Outlook | offen (mailto mit BCC prüfen) |
 | Steuerberater | offen |
 | Airtable-Übernahme | Probelauf auf Staging erledigt (12.11.2026); Go-live-Schritte in `docs/uebergabe.md` |
-| ASVS Level 1, CSP mit Nonce | offen |
+| ASVS Level 1, CSP mit Nonce | geprüft 13.11.2026 (`docs/sicherheit.md`): hohe Funde behoben, 14 mittlere offen, CSP mit Nonce offen |
 | AVV | offen |
 | Übergabe-Anleitung | Vercel, Cron, Webhook, OneDrive (Entra) beschrieben |
 
