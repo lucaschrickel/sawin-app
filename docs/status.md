@@ -1,6 +1,6 @@
 # Stand der App
 
-Stand: 13.11.2026, nach der Sicherheitsprüfung (ASVS 5.0 Level 1, `docs/sicherheit.md`). Vergleich mit dem Klick-Prototyp
+Stand: 13.11.2026, nach der Umsetzung der Sicherheitsprüfung (Blöcke A–D, `docs/sicherheit.md`). Vergleich mit dem Klick-Prototyp
 (`docs/demo/sawin-demo.html`) und `CLAUDE.md`. Wird nach jedem größeren Block aktualisiert.
 
 **Entscheidungen 11.11.2026:**
@@ -9,51 +9,64 @@ Stand: 13.11.2026, nach der Sicherheitsprüfung (ASVS 5.0 Level 1, `docs/sicherh
 - OneDrive-Ordner entstehen mit dem **ersten Angebot** (`<AG-Nummer>_<Kunde>`) und werden mit der AB in
   `<AB-Nummer>_<Kunde>` umbenannt (derselbe Ordner); Unterordner wie im bisherigen Make-Szenario.
 
-## Sicherheitsprüfung 13.11.2026 (OWASP ASVS 5.0, Level 1)
+## Sicherheitsprüfung 13.11.2026 (OWASP ASVS 5.0, Level 1) und Umsetzung für den Go-live
 
-Bericht: `docs/sicherheit.md`.
+Bericht mit Status je Fund: `docs/sicherheit.md`.
 
-**Ergebnis:** 140 Funde, davon 138 nach unabhängiger Gegenprüfung bestätigt.
-- 0 kritisch, 3 hoch, 14 mittel, 75 niedrig, 46 Hinweise.
-- ASVS: 41 Anforderungen erfüllt, 22 nicht erfüllt, 7 nicht relevant.
+**Prüfung:** 140 Funde, davon 138 nach unabhängiger Gegenprüfung bestätigt (0 kritisch, 3 hoch, 14 mittel, 75 niedrig,
+46 Hinweise). ASVS bei der Prüfung 41 erfüllt, 22 nicht erfüllt, 7 nicht relevant; **nach der Umsetzung 46 erfüllt,
+17 nicht erfüllt, 7 nicht relevant**.
 
-**Behoben (hoch), Migration `20261121090000_admin_rechte.sql` auf Staging:**
-- Go-live-Datum, OneDrive-Verbindung und interne Kopie (BCC) änderte bisher jeder Benutzer per Direktzugriff auf die
-  Datenbank. Jetzt nur der Admin; Abgleich- und Fremdbeleg-Felder nur der Server.
-- Urlaub ließ sich über die Art „krank“ ohne Admin genehmigen. Jetzt verhindert; eine Krankmeldung ist immer ein neuer
-  Eintrag.
-- Zwei neue RLS-Tests, RLS 94/94.
+**Umgesetzt (jeder Block mit Tests und Build grün, einzeln gepusht):**
+- Prüfung (8e836fa): hohe Funde – Admin-Einstellungen nur noch für Admins in der Datenbank, keine Genehmigung über
+  „krank“.
+- Block A (d04e6b0): Next.js 16.4.6, React 19.3.1; Tests und `staging:leeren` nur gegen `ERLAUBTES_TESTPROJEKT`
+  (API- und Datenbank-Adresse); 24 verwaiste Test-Admins entfernt, Tests räumen selbst auf.
+- Block B (43aadd0): Belege unveränderbar (GoBD): PDFs nur vom Server mit SHA-256 im Audit-Log, Belegart/Kette/Vorgänger
+  fest, Belege, Positionen, Versionen, Versand und Zahlungen nur über die App-Funktionen, Summen aus der Datenbank.
+- Block C (c62e274): Sitzungscookies httpOnly, Aktivitäts-Cookie an die Sitzung gebunden, `sicheresZiel` gehärtet,
+  Sperre je Konto nach 10 Fehlversuchen, Passwort ohne das bisherige nur nach Link, Abmelden nur von derselben Herkunft,
+  Konto-Historie geschützt, Funktionen im Schema `app` gezielt freigegeben.
+- Block D: CSP mit Nonce je Anfrage (ohne Partial Prerendering; Seitenwechsel gemessen, nicht spürbar langsamer),
+  `Cache-Control: private, no-store`, Sitzungsprüfung am Anfang jeder Route, deutsche Fehlerseiten, `npm run test:csp`.
+- Tests am Ende: Unit 140/140, RLS 101/101, alle Browser-Tests einschließlich CSP; Supabase-Advisors nur die bekannte
+  Warnung zum Passwortschutz (Dashboard-Schritt).
 
-**Offen (mittel, nur aufgelistet):**
-- Beleg-PDFs ersetzbar (Storage-Upsert, `pdf_pfad`).
-- Belegart und Kette eines Entwurfs direkt änderbar.
-- CSP mit Nonce.
-- Supabase-Cookies ohne HttpOnly.
-- 60-Minuten-Abmeldung umgehbar.
-- Offene Weiterleitung über `?weiter=` mit Tab.
-- Anmeldeversuche nur über die IP-Grenze von Supabase begrenzt.
-- Schutz vor geleakten Passwörtern aus.
-- Staging hängt an Sawins echter Bibliothek und enthält Echtdaten.
-
-Keinen Schlüssel muss man sofort erneuern (nichts offengelegt); die Liste für die Übergabe steht im Bericht.
+**Dashboard-Schritte (Luca):** Checkliste in `docs/uebergabe.md` („Checkliste Dashboard-Schritte vor dem Go-live“):
+Passwortschutz (HaveIBeenPwned), Sessions 12 h / 60 min, sicherer Passwortwechsel, SMTP, Rate Limits ablesen, Redirect-URLs,
+PITR mit Wiederherstellungstest, Realtime, Schlüssel erneuern, Vercel-Variablen.
 
 ### Offene Entscheidungen aus der Sicherheitsprüfung
 
-1. **Mittlere Funde beheben?** Empfehlung vor dem Go-live: M1 (Beleg-PDFs), M2 (Belegart/Kette), M4 (HttpOnly),
-   M5 (Abmeldung), M6 (Weiterleitung). Das sind kleine Änderungen mit Tests. M7 und M8 brauchen den Pro-Tarif bzw. eine
-   Einstellung im Dashboard.
-2. **CSP mit Nonce oder Hash:** Mit Nonce rendert jede Seite dynamisch, die vorgerenderten Platzhalter aus dem Block
-   „Seitenwechsel“ gehen teilweise verloren. Alternative: Hash für das Darstellungs-Skript. Vor der Entscheidung im
-   Browser messen.
-3. **Passwortregel:** ASVS 5.0 verlangt keine Pflicht für Zeichenklassen (V6.2.5), dafür eine Prüfung gegen geleakte
+1. **M9 – Staging mit Echtdaten und Sawins Bibliothek:** Staging hängt an Sawins echter SharePoint-Bibliothek (dieselbe
+   App-Registrierung wie Produktion) und enthält Echtdaten aus Airtable. Vorschlag: eigene App-Registrierung mit einer
+   Test-Bibliothek für Staging. **Bis dahin Staging wie Produktion behandeln** (Dashboard-Checkliste auch für Staging,
+   keine Testkonten stehen lassen, kein `staging:leeren` ohne Sicherung des Audit-Logs). Alternativ den Staging-Import
+   pseudonymisieren. Entscheidung und Rechtsgrundlage in der AVV festhalten.
+2. **Passwortregel:** ASVS 5.0 verlangt keine Pflicht für Zeichenklassen (V6.2.5), dafür eine Prüfung gegen geleakte
    Passwörter (V6.2.4). Die App verlangt Groß/klein und Ziffer. Vorschlag: Zeichenklassen streichen, 12 Zeichen
-   behalten, HaveIBeenPwned aktivieren.
-4. **Staging mit Echtdaten:** Staging bis zum Go-live wie Produktion behandeln oder den Import pseudonymisieren.
-   Außerdem eine eigene Graph-App-Registrierung für Staging.
-5. **Next.js 16.4.2 → 16.4.6:** sieben moderate Advisories vom 03.11.2026. Im Projekt ohne Angriffsweg, npm audit zeigt
-   sie nicht. Patch-Update empfohlen (niedrig, nach Vorgabe nicht umgesetzt).
-6. **22 Test-Admins auf Staging:** verwaiste Konten mit gültigen Sitzungen aus Browser-Tests (F115, F92). Aufräumen
-   (Konten deaktivieren) und die Tests ihre Konten selbst entfernen lassen.
+   behalten, HaveIBeenPwned einschalten (Dashboard).
+
+### Nach dem Go-live (niedrige Funde, Vorschläge in `docs/sicherheit.md`)
+
+- Fehlermeldungen: technische Texte von Postgres, Speicher, Lexware und Graph nicht an den Browser weitergeben
+  (F23, F40, F66, F95, F96, F132).
+- Datenbank-Härtung: Prüfungen auch in der Datenbank statt nur in der App (HTML, URLs, Foto-Pfade, Längen; F43, F45,
+  F128), Benachrichtigungen nur über den Server (F04), `app.loeschen` und Ablage (F42), `app.basis` (F08, F87),
+  Standardrechte im Schema public (F09).
+- Anmeldung und Protokoll: Zwei-Faktor-Zurücksetzen, Admin-Aktionen und Cron-Aufrufe ohne Secret ins Audit-Log (F22,
+  F97, F117); Lesezugriffe als Datenbank-Owner (F99); E-Mail-Kontingent bei „Passwort vergessen“ (F137).
+- Webhook und Crons: organizationId gegen das eigene Lexware-Konto prüfen (F32, F63, F113), Body-Grenze vor dem Lesen
+  (F33), Laufsperren für Ablage-Cron und „Jetzt nachladen“ (F34, F138), Präfix der Maschinen-Pfade (F35).
+- Uploads und Speicher: Mengenbegrenzung und Aufräumen nicht abgeschlossener Uploads (F46, F130), MIME-Typen des
+  Zwischenspeichers (F86), Laufzeit der signierten Foto-Adressen (F129), PDF-Vorschau ohne Größengrenze (F135).
+- Lexware: serverseitige Sperre gegen parallele Aufrufe (F133), Original-PDF nicht erneut holen (F134).
+- Graph: Adressen nicht über Umgebungsvariablen umlenkbar, IDs kodieren (F28, F64, F65).
+- Header: Cross-Origin-Opener-Policy (F56).
+- Logs ohne Kundennamen (F27, F98).
+- Abläufe: Geheimnis-Prüfung und CI (Audit, Lint, Build) für das Repository (F25, F74), Fristen für Sicherheitsupdates
+  (F71), moderate Befunde in Entwicklungsabhängigkeiten (F72), `.gitignore` für Schlüsseldateien (F26), Dokumentation
+  „nur gegen Staging“ (F122).
 
 ## Nachtauftrag 13.11.2026 (autonom, direkt auf main)
 
@@ -155,7 +168,7 @@ Keinen Schlüssel muss man sofort erneuern (nichts offengelegt); die Liste für 
 
 | Punkt | Stand |
 |---|---|
-| RLS, Policies, Advisors | RLS-Tests 94/94; Advisors: nur „Schutz vor geleakten Passwörtern“ (Pro-Tarif) |
+| RLS, Policies, Advisors | RLS-Tests 101/101; Advisors: nur „Schutz vor geleakten Passwörtern“ (Pro-Tarif) |
 | MFA | in der App erzwungen |
 | SMTP, Sitzungsgrenze 60 Minuten, Passwortschutz | offen (Pro-Tarif, eigener SMTP) |
 | Backups (PITR) und Wiederherstellungstest | offen |
@@ -167,7 +180,7 @@ Keinen Schlüssel muss man sofort erneuern (nichts offengelegt); die Liste für 
 | Vorläufiger Versand mit Sawins Outlook | offen (mailto mit BCC prüfen) |
 | Steuerberater | offen |
 | Airtable-Übernahme | Probelauf auf Staging erledigt (12.11.2026); Go-live-Schritte in `docs/uebergabe.md` |
-| ASVS Level 1, CSP mit Nonce | geprüft 13.11.2026 (`docs/sicherheit.md`): hohe Funde behoben, 14 mittlere offen, CSP mit Nonce offen |
+| ASVS Level 1, CSP mit Nonce | umgesetzt 13.11.2026 (Blöcke A–D): hohe und mittlere Funde behoben außer M8 (Dashboard) und M9 (Entscheidung); CSP mit Nonce aktiv; ASVS 46 erfüllt, 17 nicht erfüllt (Dashboard-Schritte, M9, niedrige Funde nach Go-live) |
 | AVV | offen |
 | Übergabe-Anleitung | Vercel, Cron, Webhook, OneDrive (Entra) beschrieben |
 

@@ -1,9 +1,10 @@
 import type { NextConfig } from "next";
 
 /**
- * Sicherheits-Header (OWASP ASVS Level 1).
- * Eine vollständige Content-Security-Policy mit Nonce folgt, sobald die
- * Supabase-URL feststeht (siehe CLAUDE.md, Abschnitt Sicherheit).
+ * Sicherheits-Header (OWASP ASVS Level 1). Die vollständige Content-Security-Policy mit Nonce je Anfrage setzt der Proxy
+ * (src/lib/csp.ts); die Grundregeln hier (frame-ancestors, base-uri, form-action, object-src) gelten zusätzlich auch
+ * für Dateien, die nicht über den Proxy laufen. Mit Nonce muss jede Seite je Anfrage gerendert werden: deshalb ohne
+ * Cache Components / Partial Prerendering (Messung der Seitenwechsel in docs/sicherheit.md, M3).
  */
 const securityHeaders = [
   { key: "Strict-Transport-Security", value: "max-age=63072000; includeSubDomains; preload" },
@@ -15,14 +16,7 @@ const securityHeaders = [
 ];
 
 const nextConfig: NextConfig = {
-  cacheComponents: true,
-  partialPrefetching: true,
-  experimental: {
-    // Jede App-Seite liest die Sitzung (Cookies) und lädt Daten des Benutzers; sofortige Navigation ohne Server ist
-    // dort nicht möglich (loading.tsx zeigt den Platzhalter). Die Dev-Prüfung „instant navigation“ läuft deshalb nur für
-    // Seiten, die ausdrücklich `export const instant = …` setzen (Guide „Authentication with Cache Components“).
-    instantInsights: { validationLevel: "manual-warning" },
-  },
+  cacheComponents: false,
   poweredByHeader: false,
   turbopack: {
     rules: {

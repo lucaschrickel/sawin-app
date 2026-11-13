@@ -197,6 +197,9 @@ try {
 
   // 7. Inaktivität: Zeitstempel älter als 60 Minuten
   const host = new URL(APP).hostname;
+  // Erst die Seite verlassen: laufende Hintergrund-Anfragen (Prefetch) würden das Cookie sonst gleich wieder erneuern
+  await cdp("Page.navigate", { url: "about:blank" });
+  await sleep(500);
   await cdp("Network.setCookie", { name: "app_letzte_aktivitaet", value: String(Date.now() - 61 * 60_000), domain: host, path: "/", httpOnly: true, secure: APP.startsWith("https:") });
   await gehe("/styleguide");
   pruefe("nach 60 Minuten ohne Aktivität abgemeldet", (await pfad()) === "/anmelden?grund=inaktiv", await pfad());
@@ -210,6 +213,9 @@ try {
   pruefe("erneut angemeldet", await warte("location.pathname === '/'"), await pfad());
   await gehe("/passwort-setzen");
   pruefe("Passwort setzen nur nach einem Link (angemeldet: weiter zu Konto › Passwort)", await warte("location.pathname === '/konto/passwort'"), await pfad());
+  // Erst die Seite verlassen: laufende Hintergrund-Anfragen (Prefetch) würden das Cookie sonst gleich wieder erneuern
+  await cdp("Page.navigate", { url: "about:blank" });
+  await sleep(500);
   await cdp("Network.deleteCookies", { name: "app_letzte_aktivitaet", domain: host, path: "/" });
   await gehe("/styleguide");
   pruefe("ohne Aktivitäts-Cookie abgemeldet", (await pfad()) === "/anmelden?grund=inaktiv", await pfad());

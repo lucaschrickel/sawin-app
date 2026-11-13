@@ -15,6 +15,8 @@ import { versandDateiname } from "@/lib/versand";
  */
 export async function GET(request: Request, ctx: RouteContext<"/pdf/beleg/[id]">) {
   const { id } = await ctx.params;
+  // Sitzung zuerst (aal2, Inaktivität), nicht erst beim Laden der Daten
+  await pruefeSitzung();
   const url = new URL(request.url);
   const d = await ladeBeleg(id);
   if (!d) return new Response("Beleg nicht gefunden", { status: 404 });

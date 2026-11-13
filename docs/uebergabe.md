@@ -67,7 +67,10 @@ npm run test:aufraeumen            # Testkonten älter als 2 Stunden entfernen (
 
 E-Mail und Passwort über Supabase Auth, danach Pflicht-Code aus einer Authenticator-App (TOTP). Ohne bestätigten
 zweiten Faktor gibt die Datenbank keine Daten heraus. Zugänge nur per Einladung durch einen Admin (Einstellungen ›
-Benutzer). Automatische Abmeldung nach 60 Minuten ohne Aktivität (`src/lib/auth/konstanten.ts`).
+Benutzer). Automatische Abmeldung nach 60 Minuten ohne Aktivität (`src/lib/auth/konstanten.ts`, Aktivitäts-Cookie an die
+Sitzung gebunden; nach dem Schließen des Browsers neu anmelden). Nach 10 Fehlversuchen ist ein Konto 15 Minuten
+gesperrt (Passwort, Code, „Passwort ändern“; Einträge im Audit-Log). Das Passwort ohne das bisherige setzt man nur über
+den Link aus der Einladungs- oder „Passwort vergessen“-E-Mail; angemeldet unter Konto › Passwort mit dem bisherigen.
 
 Die Auth-Einstellungen stehen als Code in `supabase/config.toml` (keine Selbstregistrierung, Passwort mindestens 12
 Zeichen mit Groß-/Kleinbuchstaben und Ziffer, TOTP an, Links eine Stunde gültig) mit den deutschen E-Mail-Vorlagen in
@@ -148,6 +151,48 @@ einen eigenen SMTP-Zugang eintragen (z. B. Microsoft 365 des Betriebs oder ein V
   Belegart prüfen (Vorgabe: `AG1JJNNNN`, `AB2JJNNNN`, `LS1JJNNNN`, `ZB1JJNNNN`, `ST-JJ-NNNN`, `BE-JJ-NNN`).
 - Interne Kopie (BCC) je Belegart in `belegart_einstellung` eintragen (bei Sawin: Angebot an `angebot@…`, AB und
   Teil-AB an `auftrag@…`).
+
+### Checkliste Dashboard-Schritte vor dem Go-live (Sicherheitsprüfung, `docs/sicherheit.md`)
+
+Diese Einstellungen lassen sich nicht per Migration setzen. Für **Produktion** vor dem Go-live abhaken. **Staging**
+genauso behandeln, solange dort Echtdaten liegen (Entscheidung M9). Was in `supabase/config.toml` steht, lässt sich
+auch mit `npm run auth:push` einspielen (Sessions und Passwortschutz nur im Pro-Tarif).
+
+**Supabase › Produktionsprojekt**
+- [ ] Authentication › Sign In / Providers: „Allow new users to sign up“ aus (`enable_signup = false`).
+- [ ] Authentication › Multi-Factor: TOTP an.
+- [ ] Authentication › Attack Protection: „Prevent use of leaked passwords“ an (HaveIBeenPwned, Pro-Tarif). Danach
+      zeigen die Advisors keine Warnung mehr.
+- [ ] Authentication › Sessions: Time-box 12 Stunden, Inactivity timeout 1 Stunde (Pro-Tarif; steht in `config.toml`
+      unter `[auth.sessions]`). Die App meldet zusätzlich selbst nach 60 Minuten ohne Aktivität ab.
+- [ ] Authentication › Email: „Secure password change“ an (`secure_password_change = true`).
+- [ ] Authentication › Emails › SMTP Settings: eigener SMTP-Zugang (Microsoft 365 des Betriebs oder Versanddienst mit
+      Sitz in der EU); Einladung und „Passwort vergessen“ einmal testen.
+- [ ] Authentication › Rate Limits: Werte für Anmeldung, Token-Prüfungen und E-Mails ablesen und hier eintragen. Die App
+      sperrt zusätzlich jedes Konto nach 10 Fehlversuchen für 15 Minuten (Passwort, Code, „Passwort ändern“).
+- [ ] Authentication › URL Configuration: Site URL = Produktionsadresse; Redirect URLs nur Produktionsadressen, kein
+      `localhost`.
+- [ ] Database › Backups: Point-in-Time-Recovery an (Pro-Tarif); eine Wiederherstellung einmal testen (z. B. in ein
+      Testprojekt) und das Datum hier eintragen.
+- [ ] Project Settings › Realtime: öffentlichen Zugriff aus bzw. nur private Kanäle (die App nutzt Realtime in Version 1
+      nicht).
+- [ ] Advisors › Security und Performance: keine Warnung (WARN/ERROR).
+- [ ] Project Settings › API Keys: vor der Übergabe einen neuen Secret Key anlegen, in Vercel setzen, den alten widerrufen;
+      Datenbankpasswort neu setzen (Schlüsselliste in `docs/sicherheit.md`).
+
+**Supabase › Konto des Entwicklers (nach der Übergabe)**
+- [ ] Account › Access Tokens: persönliches Token widerrufen; Mitgliedschaft in Sawins Organisation beenden.
+
+**Vercel › Projekt › Settings › Environment Variables (Production)**
+- [ ] Alle Einträge aus Abschnitt 3 von `.env.example`; geheime Werte als „Sensitive“. `CRON_SECRET` und
+      `MS_TOKEN_SCHLUESSEL` mit eigenen Werten für Produktion.
+- [ ] Nach dem Deploy prüfen: Antwort einer App-Seite hat `Content-Security-Policy` mit `nonce-…` und
+      `Cache-Control: private, no-store` (Browser › Entwicklertools › Netzwerk).
+
+**Microsoft Entra**
+- [ ] Eigene App-Registrierung für Staging mit einer Test-Bibliothek (Entscheidung M9); die Produktions-Registrierung
+      nur für „Kundenprojekte“.
+- [ ] Client-Secret der Produktion mit Ablaufdatum neu anlegen, das alte löschen.
 
 ## Vercel
 

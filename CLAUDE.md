@@ -230,8 +230,10 @@ Die Monteur-App kommt in Version 2.
   bleiben beim Wechsel stehen; jede Seite meldet über `<Shell active crumbs>` Menüpunkt und Pfad (Kontext
   `rahmen-kontext.tsx`, gültig nur für den gemeldeten Pfad) und lädt die Zähler der Seitenleiste im Hintergrund nach.
   Während eine Seite lädt, zeigt `loading.tsx` je Bereich einen Platzhalter im Aufbau der Seite ohne Daten
-  (`src/components/app/platzhalter.tsx`); die Seitenleisten-Links laden diese App-Shell vorab (Partial Prefetching).
+  (`src/components/app/platzhalter.tsx`); die Seitenleisten-Links laden diesen Platzhalter vorab.
   Langsame Teile streamen hinter Suspense (Dashboard: Titel und Umschalter sofort, Kennzahlen danach).
+  **Seit der CSP mit Nonce (Sicherheit, 13.11.2026)** ohne Cache Components / Partial Prerendering: jede Seite wird je
+  Anfrage gerendert (`connection()` im Root-Layout); gemessen nicht spürbar langsamer (`docs/sicherheit.md`, M3).
 - Gruppen und Reihenfolge:
   - **Übersicht:** Dashboard, Aufgaben
   - **Kunden & Anfragen:** Kunden, Anfragen
@@ -851,15 +853,28 @@ Maßstab ist OWASP ASVS Level 1. Vor dem Start mit Echtdaten müssen alle Mindes
    Die Dashboard-Ansicht ist eine Benutzereinstellung, keine Rolle. Rolle `monteur` ist im Datenmodell vorgesehen,
    aber erst mit der Monteur-App (Version 2) in Gebrauch.
    Vor dem Finalisieren einer Rechnung oder Gutschrift immer ein Bestätigungsdialog.
-7. **Sicherheits-Header** stehen in `next.config.ts`. Admin-Einstellungen (Go-live-Datum, OneDrive-Verbindung, interne
-   Kopie) prüft die Datenbank (`app.einstellung_schutz`, Policies von `belegart_einstellung`), nicht nur die App.
-   Offen: vollständige CSP mit Nonce (Konzept und Abwägung in `docs/sicherheit.md`, M3).
+7. **Sicherheits-Header** stehen in `next.config.ts`; die Content-Security-Policy mit Nonce je Anfrage setzt der Proxy
+   (`src/lib/csp.ts`: `script-src` nur mit Nonce, Hash des Darstellungs-Skripts und `strict-dynamic`), dazu
+   `Cache-Control: private, no-store` für alle Seiten. Neue Inline-Skripte brauchen die Nonce oder einen Hash in
+   `csp.ts`; neue externe Quellen (Bilder, Verbindungen) müssen dort ergänzt werden (`npm run test:csp`).
+   Admin-Einstellungen (Go-live-Datum, OneDrive-Verbindung, interne Kopie) prüft die Datenbank
+   (`app.einstellung_schutz`, Policies von `belegart_einstellung`), nicht nur die App.
 8. **Abhängigkeiten:** Dependabot aktiv, `npm audit --omit=dev` ohne hohe Befunde.
 9. **Datenbankänderungen nur als Migration** über die Supabase CLI (`supabase/migrations`), nie per Klick im Dashboard.
 10. **Uploads** (Fotos im Chat, Scans) nur in private Storage-Buckets mit RLS, Dateityp und Größe serverseitig prüfen.
 11. **Formatierte Texte** (Positions- und Artikelbeschreibungen) werden vor dem Speichern serverseitig nach Whitelist
     bereinigt und nie ungeprüft als HTML ausgegeben (XSS). E-Mail-Empfänger und Anhänge prüft der Server; Anhänge nur
     aus dem OneDrive-Ordner des jeweiligen Auftrags bzw. Tickets, aus freigegebenen Vorlagen oder als frischer Upload.
+12. **Belege nur über die Funktionen der App (GoBD, 13.11.2026):** Belege, Positionen, Versionen, Versandprotokolle und
+    Zahlungen ändern Benutzer nur über `beleg_speichern`, `beleg_fertigstellen`, `beleg_uebergeben`, `beleg_versenden`,
+    `zahlung_erfassen` (Trigger prüfen `app.beleg_vorgang`); direkt nur Tags, Kommentar, Status nach den Regeln und das
+    Verwerfen eines Entwurfs. Belegart, Kette und Vorgänger sind unveränderlich, Summen rechnet die Datenbank
+    (`app.beleg_summen`, wie `beleg-summen.ts`). Beleg-PDFs legt nur der Server ab (`beleg_pdf_setzen`, `lexware_pdf`)
+    mit SHA-256 am Beleg und im Audit-Log.
+13. **Anmeldung und Sitzung (13.11.2026):** Sitzungscookies httpOnly; Aktivitäts-Cookie an die Sitzung gebunden
+    (`src/lib/auth/aktivitaet.ts`, fehlt es, ist die Sitzung abgelaufen); Sperre je Konto nach 10 Fehlversuchen für
+    15 Minuten (Passwort, Code, „Passwort ändern“; `src/lib/auth/sperre.ts`); Passwort ohne das bisherige nur nach einem
+    Einladungs- oder Zurücksetzen-Link; Abmelden einer aktiven Sitzung nur von derselben Herkunft.
 
 ## Lexware-Regeln
 
@@ -930,10 +945,12 @@ Maßstab ist OWASP ASVS Level 1. Vor dem Start mit Echtdaten müssen alle Mindes
   **Umsetzung (12.11.2026):** Einstellungen › Darstellung (je Benutzer in `benutzer_einstellung.farbschema` und
   `seitenleiste_hell`, wirkt sofort). Gesetzt wird `data-theme="dark"` bzw. `data-seitenleiste="hell"` auf `<html>`
   (Dialoge und Auswahllisten hängen am `<body>`); ein kleines Skript im `<head>` setzt die zuletzt gewählte
-  Darstellung aus dem localStorage vor dem ersten Zeichnen, die App gleicht sie danach mit der Datenbank ab („Wie das
+  Darstellung aus dem localStorage vor dem ersten Zeichnen (die CSP erlaubt es über seinen SHA-256 in `src/lib/csp.ts`;
+  bei jeder Änderung von `DARSTELLUNG_SKRIPT` rechnet der Proxy den Hash neu), die App gleicht sie danach mit der
+  Datenbank ab („Wie das
   System“ folgt einem Wechsel des Betriebssystems sofort). **Dunkle Werte wie in der Demo (13.11.2026):** gestaffelte,
   warme Grautöne statt Schwarz (Seitenleiste `#121110` < Seite `#1b1a18` < Karte `#252320` < Feld `#2a2824`), Text
-  `#eeeae5` bis `#a29c94`, Statusfarben der Demo; alle Text/Fläche-Paare mind. 4,5:1 (rechnerisch geprüft). Bei der CSP mit Nonce muss das Skript die Nonce bekommen. Die
+  `#eeeae5` bis `#a29c94`, Statusfarben der Demo; alle Text/Fläche-Paare mind. 4,5:1 (rechnerisch geprüft). Die
   Seitenleiste nutzt nur Frame-Tokens (`--frame-text`, `--frame-strong`, `--frame-hover`, `--frame-chip`,
   `--frame-alarm`); die helle Seitenleiste setzt sie unter `:root[data-seitenleiste="hell"]:not([data-theme="dark"])`.
 - **Logo:** exakt das Logo von sawin-bauelemente.de, als SVG nachgezeichnet: Gebäude-Symbol (Konturen in Strichfarbe,
@@ -996,8 +1013,9 @@ Maßstab ist OWASP ASVS Level 1. Vor dem Start mit Echtdaten müssen alle Mindes
       Zahlungsbestätigung (ohne Umsatzsteuer) mit Sawins Steuerberater abgestimmt
 - [ ] Datenübernahme aus Airtable als Probelauf auf Staging durchgeführt und geprüft (Skript und Plan fertig,
       `docs/airtable-uebernahme.md`; offen: Probelauf, Lieferantenkürzel von Sawin)
-- [ ] ASVS-Level-1-Checkliste abgehakt (geprüft 13.11.2026 nach ASVS 5.0, Bericht `docs/sicherheit.md`: keine kritischen,
-      hohe behoben; offen sind die mittleren Funde M1–M9)
+- [ ] ASVS-Level-1-Checkliste abgehakt (geprüft und umgesetzt 13.11.2026 nach ASVS 5.0, Bericht `docs/sicherheit.md`:
+      keine kritischen, hohe und mittlere behoben außer M8 (Dashboard) und M9 (Entscheidung); offen sind die
+      Dashboard-Schritte der Checkliste in `docs/uebergabe.md`)
 - [ ] AVV mit Sawin angepasst (Supabase direkt mit Sawin, Vercel bis zur Übergabe als Unterauftragsverarbeiter von Luca)
 - [ ] Übergabe-Anleitung vollständig: alle Umgebungsvariablen, Dienste und manuellen Schritte beschrieben
 
@@ -1007,5 +1025,7 @@ Airtable und Make bleiben nach dem Start 2 bis 4 Wochen eingefroren als Rückfal
 
 - Erst auf Staging, nach Abnahme auf Produktion. Updates gebündelt einmal pro Woche.
 - Vor jedem Commit: `npm run lint`, `npx tsc --noEmit`, `npm run build`.
+- Tests und Testskripte laufen nur gegen das Projekt in `ERLAUBTES_TESTPROJEKT` (Staging, `scripts/testprojekt.mjs`);
+  Testkonten räumen sie selbst auf (`npm run test:aufraeumen`).
 - Next.js 16: vor neuem Code die Doku in `node_modules/next/dist/docs/` prüfen (siehe AGENTS.md).
 - Änderungen am fachlichen Umfang zuerst in der Demo und in dieser Datei festhalten, dann bauen.
