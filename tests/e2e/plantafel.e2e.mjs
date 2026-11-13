@@ -9,9 +9,9 @@ import { aufraeumen, bilanz, browser, dbAbfrage, lauf, merken, pruefe, service, 
 
 const fotos = process.env.FOTOS;
 const WOCHE = "2027-01-11";
-const SLOT = 26;
-const SLOT_TAG = 44;
 let b;
+/** Breite eines Slots der sichtbaren Plantafel (Stunde bzw. Tag); sie richtet sich nach dem Platz */
+const slot = async () => Number(await b.js("[...document.querySelectorAll('[data-tafel]')].find((t) => t.getClientRects().length)?.dataset.slot")) || 26;
 const sichtbar = (sel) => `[...document.querySelectorAll(${JSON.stringify(sel)})].find((e) => e.getClientRects().length > 0)`;
 const rechteck = async (sel, scrollen = true) => {
   if (scrollen) {
@@ -106,12 +106,12 @@ try {
   pruefe("Kolonne als Gruppenzeile, Carla darunter", await b.warte(`!!document.querySelector("[data-kolonne-zeile='${kolonneId}']") && document.querySelector("[data-monteur-zeile='${carla.id}']")?.dataset.gruppe === "kolonne:${kolonneId}"`));
 
   // 3. In der Pipeline auf Donnerstag ziehen: Datum der Stufe „Lieferung“
-  await html5(`[data-pipeline-auftrag='${auftragA.id}']`, "[data-ziel='p:lieferung']", 3 * 9 * SLOT + 12);
+  await html5(`[data-pipeline-auftrag='${auftragA.id}']`, "[data-ziel='p:lieferung']", 3 * 9 * (await slot()) + 12);
   pruefe("Pipeline: Lieferung am Donnerstag (Datum der Stufe)", await warteDb("select stufe_lieferung_datum::text d, liefertermin::text l from public.auftrag where id = $1", [auftragA.id], (r) => r[0]?.d === "2027-01-14" && r[0]?.l === "2027-01-13"));
 
   // 4. Aus der Pipeline auf die Kolonne ziehen (Di 9 Uhr): alle Mitglieder und das Stammfahrzeug, vorgeplant; Urlaub warnt
   await b.warte(`document.querySelector("[data-pipeline-auftrag='${auftragA.id}']")?.dataset.tag === "2027-01-14"`);
-  await html5(`[data-pipeline-auftrag='${auftragA.id}']`, `[data-ziel='k:${kolonneId}']`, (9 + 2) * SLOT + 8);
+  await html5(`[data-pipeline-auftrag='${auftragA.id}']`, `[data-ziel='k:${kolonneId}']`, (9 + 2) * (await slot()) + 8);
   pruefe("Einsatz aus der Pipeline: Di 09–16 Uhr, vorgeplant", await warteDb("select count(*)::int n from public.einsatz where auftrag_id = $1 and deleted_at is null", [auftragA.id], (r) => r[0]?.n === 1));
   const [a1] = await einsaetzeVon(auftragA.id);
   let [z] = await zeit(a1.id);
@@ -133,7 +133,7 @@ try {
   await b.klick("[data-dup-modus]");
   pruefe("Duplizier-Modus an", await b.warte("document.querySelector('[data-dup-modus]')?.dataset.dupModus === 'an'"));
   balken = await rechteck(`[data-monteur-zeile='${emil.id}'] [data-einsatz='${a2.id}']`);
-  await ziehe(balken.x + 30, balken.y + balken.h / 2, balken.x + 30 + 9 * SLOT, balken.y + balken.h / 2);
+  await ziehe(balken.x + 30, balken.y + balken.h / 2, balken.x + 30 + 9 * (await slot()), balken.y + balken.h / 2);
   pruefe("Duplizier-Modus: dritter Einsatz", await warteDb("select count(*)::int n from public.einsatz where auftrag_id = $1 and deleted_at is null", [auftragA.id], (r) => r[0]?.n === 3));
   const [, , a3] = await einsaetzeVon(auftragA.id);
   [z] = await zeit(a3.id);
@@ -197,10 +197,10 @@ try {
 
   // 12. 4-Wochen-Ansicht: tagesgenau, Verschieben um einen Tag behält die Uhrzeit
   await b.klickText("main a", "4 Wochen");
-  pruefe("4 Wochen: 20 Arbeitstage tagesgenau", await b.warte(`location.search.includes("ansicht=4") && document.querySelector("[data-tafel]")?.dataset.ansicht === "4" && document.querySelector("[data-zeile='${emil.id}']")?.getBoundingClientRect().width === ${20 * SLOT_TAG}`));
+  pruefe("4 Wochen: 20 Arbeitstage tagesgenau", await b.warte(`location.search.includes("ansicht=4") && document.querySelector("[data-tafel]")?.dataset.ansicht === "4" && Math.abs(document.querySelector("[data-zeile='${emil.id}']")?.getBoundingClientRect().width - 20 * Number(document.querySelector('[data-tafel]').dataset.slot)) < 1`));
   pruefe("Kopf: KW 2–5, tagesgenau", await b.enthaelt("KW 2–5"));
   balken = await rechteck(`[data-monteur-zeile='${emil.id}'] [data-einsatz='${a2.id}']`);
-  await ziehe(balken.x + 10, balken.y + balken.h / 2, balken.x + 10 + SLOT_TAG, balken.y + balken.h / 2);
+  await ziehe(balken.x + 10, balken.y + balken.h / 2, balken.x + 10 + (await slot()), balken.y + balken.h / 2);
   pruefe("4 Wochen: einen Tag später, Uhrzeit bleibt (Mi 09–16)", await warteDb("select to_char(beginn at time zone 'Europe/Berlin', 'YYYY-MM-DD\"T\"HH24:MI') b, to_char(ende at time zone 'Europe/Berlin', 'YYYY-MM-DD\"T\"HH24:MI') e from public.einsatz where id = $1", [a2.id], (r) => r[0]?.b === "2027-01-13T09:00" && r[0]?.e === "2027-01-13T16:00"));
   if (fotos) await b.foto(path.join(fotos, "plantafel-4wochen.png"));
   await b.klick("a[aria-label='Nächste Woche']");

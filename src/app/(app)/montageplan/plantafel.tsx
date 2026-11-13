@@ -40,12 +40,21 @@ import { EinsatzDialog, MonteurDialog, ueberfaellig, type BezugWahl, type Dialog
 import { einsatzZurueck, gruppenReihenfolge, kolonneMonteur, zeilenReihenfolge } from "./tafel-aktionen";
 import { FreigabeDialog, KolonneDialog, MonteurKolonnenDialog, RessourceDialog, WochenplanDialog, type FreigabeEintrag } from "./tafel-dialoge";
 
-/** Breite der Beschriftung, Breite eines Slots (Stunde bzw. Tag) und Höhe einer Spur in Pixeln */
+/**
+ * Breite der Beschriftung und Höhe einer Spur in Pixeln. Die Breite eines Slots (Stunde bzw. Tag) richtet sich nach dem
+ * Platz: Die Tafel füllt die ganze Breite wie in der Demo; erst unter der Mindestbreite scrollt sie waagerecht.
+ */
 export const LABEL = 210;
-export const SLOT = 26;
-const SLOT_TAG = 44;
-export const slotBreite = (r: Raster) => (r.tagesgenau ? SLOT_TAG : SLOT);
+export const SLOT_MIN = 18;
+const SLOT_TAG_MIN = 36;
 const SPUR = 36;
+
+/** Slotbreite für den verfügbaren Platz (auf Viertelpixel abgerundet, damit Raster und Balken genau aufeinander liegen) */
+export function slotBreite(r: Raster, platz: number | null, gesamt: number): number {
+  const min = r.tagesgenau ? SLOT_TAG_MIN : SLOT_MIN;
+  if (!platz || gesamt <= 0) return min;
+  return Math.max(min, Math.floor(((platz - LABEL) / gesamt) * 4) / 4);
+}
 
 type Zug = {
   id: string;
@@ -104,9 +113,21 @@ type Props = {
 
 export function Plantafel(p: Props) {
   const { raster } = p;
-  const SB = slotBreite(raster);
   const n = stundenJeTag(raster);
   const gesamt = slotsGesamt(raster);
+  // Verfügbare Breite der Tafel (ohne senkrechten Scrollbalken); bis zur ersten Messung die Mindestbreite
+  const scroller = useRef<HTMLDivElement>(null);
+  const [platz, setPlatz] = useState<number | null>(null);
+  useEffect(() => {
+    const el = scroller.current;
+    if (!el) return;
+    const messen = () => setPlatz(el.clientWidth);
+    messen();
+    const ro = new ResizeObserver(messen);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+  const SB = slotBreite(raster, platz, gesamt);
   const router = useRouter();
   const pfad = usePathname();
   const eigeneArt = p.plan === "montage" ? "auftrag" : "ticket";
@@ -142,7 +163,6 @@ export function Plantafel(p: Props) {
     p.bezugVorlage ? { beginn: `${tagStandard}T${stunde(raster.von)}:00`, ende: `${tagStandard}T${stunde(raster.bis)}:00`, monteure: [], bezug: p.bezugVorlage } : null,
   );
   const [, starten] = useTransition();
-  const scroller = useRef<HTMLDivElement>(null);
 
   // Beim Öffnen steht der heutige Tag im Blick
   useEffect(() => {
@@ -840,7 +860,7 @@ export function Plantafel(p: Props) {
         </details>
       )}
 
-      <div ref={scroller} className="max-h-[calc(100vh-220px)] overflow-scroll rounded-lg border border-line-soft bg-surface select-none" data-tafel={p.plan} data-ansicht={raster.tagesgenau ? "4" : "1"}>
+      <div ref={scroller} className="max-h-[calc(100vh-220px)] overflow-scroll rounded-lg border border-line-soft bg-surface select-none" data-tafel={p.plan} data-ansicht={raster.tagesgenau ? "4" : "1"} data-slot={SB}>
         <div style={{ width: LABEL + breite }}>
           {/* Kopf: Tage und Stunden bzw. Tage mit Kalenderwoche */}
           <div className="sticky top-0 z-20 flex border-b border-line bg-surface">

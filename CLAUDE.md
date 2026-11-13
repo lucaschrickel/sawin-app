@@ -680,8 +680,10 @@ Die Monteur-App kommt in Version 2.
 - **Ansichten:** 1 Woche im Stundenraster und 4 Wochen tagesgenau. Das Stundenraster folgt der Geschäftszeit aus
   den Einstellungen (Standard 7 bis 16 Uhr), Raster eine Stunde. Ziehen auf eine Stunde setzt die Beginnzeit, die
   Dauer bleibt erhalten. In schmalen Balken steht nur der Kundenname, die Nummer im Tooltip.
-- Die Tafel scrollt waagerecht in einem eigenen Bereich; Kopfzeile und Zeilenbeschriftung bleiben stehen, der
-  Scrollbalken ist immer sichtbar. Beim Öffnen steht der heutige Tag im Blick.
+- Die Tafel nutzt wie in der Demo die ganze Breite: Die Spalten (Stunden bzw. Tage) verteilen den Platz neben der
+  Zeilenbeschriftung (13.11.2026); erst unter der Mindestbreite (18 px je Stunde, 36 px je Tag) scrollt sie waagerecht in
+  einem eigenen Bereich. Kopfzeile und Zeilenbeschriftung bleiben stehen, der Scrollbalken ist immer sichtbar. Beim
+  Öffnen steht der heutige Tag im Blick.
 - Ein Einsatz kann mehrere Monteure haben und erscheint dann in jeder beteiligten Zeile.
 - **Mehrere Einsätze je Auftrag oder Ticket:** **Duplizier-Modus** (Knopf „Duplizieren“ in der Kopfzeile) oder
   gedrückte Alt-Taste: Ziehen eines Balkens erzeugt einen **weiteren echten Einsatz** zum selben Auftrag bzw. Ticket

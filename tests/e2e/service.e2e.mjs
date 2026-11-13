@@ -5,8 +5,9 @@ import path from "node:path";
 import { aufraeumen, bilanz, browser, dbAbfrage, lauf, merken, pruefe, service, sleep, testAdmin } from "./hilfen.mjs";
 
 const fotos = process.env.FOTOS;
-const SLOT = 26;
 let b;
+/** Breite eines Slots der sichtbaren Plantafel (Stunde bzw. Tag); sie richtet sich nach dem Platz */
+const slot = async () => Number(await b.js("[...document.querySelectorAll('[data-tafel]')].find((t) => t.getClientRects().length)?.dataset.slot")) || 26;
 const sichtbar = (sel) => `[...document.querySelectorAll(${JSON.stringify(sel)})].find((e) => e.getClientRects().length > 0)`;
 const berlinHeute = new Intl.DateTimeFormat("sv-SE", { timeZone: "Europe/Berlin" }).format(new Date());
 const plus = (d, n) => new Date(Date.parse(`${d}T12:00:00Z`) + n * 864e5).toISOString().slice(0, 10);
@@ -136,13 +137,13 @@ try {
   // Erste Aktion nach dem Laden: wiederholen, bis React die Seite übernommen hat
   let verschoben = false;
   for (let i = 0; i < 4 && !verschoben; i++) {
-    await ziehen(`[data-terminierbar='${tid}']`, "[data-planungszeile='terminierbar'] > div:last-child", (2 * 9 + 1) * SLOT);
+    await ziehen(`[data-terminierbar='${tid}']`, "[data-planungszeile='terminierbar'] > div:last-child", (2 * 9 + 1) * (await slot()));
     verschoben = await warteDb("select vorab_datum::text v from public.service_ticket where id = $1", [tid], (r) => r[0]?.v === MITTWOCH);
   }
   pruefe("Ziehen in der Zeile verschiebt den Tag auf Mittwoch", verschoben);
   await b.warte(`document.querySelector("[data-terminierbar='${tid}']")?.dataset.tag === "${MITTWOCH}"`);
   if (fotos) await b.foto(path.join(fotos, "serviceplan-terminierbar.png"));
-  await ziehen(`[data-terminierbar='${tid}']`, `[data-zeile='${monteur.id}']`, (2 * 9 + 2.5) * SLOT);
+  await ziehen(`[data-terminierbar='${tid}']`, `[data-zeile='${monteur.id}']`, (2 * 9 + 2.5) * (await slot()));
   pruefe("Ziehen auf den Monteur plant ein: Mi 09:00–11:00, vorgeplant", await warteDb("select to_char(beginn at time zone 'Europe/Berlin', 'YYYY-MM-DD\"T\"HH24:MI') b, to_char(ende at time zone 'Europe/Berlin', 'HH24:MI') e, fest from public.einsatz where ticket_id = $1 and deleted_at is null", [tid], (r) => r[0]?.b === `${MITTWOCH}T09:00` && r[0]?.e === "11:00" && r[0]?.fest === false));
   const [e1] = await dbAbfrage("select id from public.einsatz where ticket_id = $1", [tid]);
   if (e1) merken("einsatz", e1.id);

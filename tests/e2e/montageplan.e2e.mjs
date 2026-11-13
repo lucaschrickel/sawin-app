@@ -6,8 +6,9 @@ import { aufraeumen, bilanz, browser, dbAbfrage, lauf, merken, pruefe, service, 
 
 const fotos = process.env.FOTOS;
 const WOCHE = "2026-12-14";
-const SLOT = 26;
 let b;
+/** Breite eines Slots der sichtbaren Plantafel (Stunde bzw. Tag); sie richtet sich nach dem Platz */
+const slot = async () => Number(await b.js("[...document.querySelectorAll('[data-tafel]')].find((t) => t.getClientRects().length)?.dataset.slot")) || 26;
 const sichtbar = (sel) => `[...document.querySelectorAll(${JSON.stringify(sel)})].find((e) => e.getClientRects().length > 0)`;
 const rechteck = (sel) => b.js(`(() => { const r = ${sichtbar(sel)}?.getBoundingClientRect(); return r && { x: r.x, y: r.y, w: r.width, h: r.height }; })()`);
 const maus = (type, x, y, buttons = 0) => b.cdp("Input.dispatchMouseEvent", { type, x, y, button: "left", buttons, clickCount: type === "mouseMoved" ? 0 : 1 });
@@ -78,9 +79,9 @@ try {
 
   // 3. Klick in Annas Zeile am Montag um 8 Uhr plant ein
   let zeile = await rechteck(`[data-zeile='${anna.id}']`);
-  await maus("mouseMoved", zeile.x + 1.5 * SLOT, zeile.y + 20);
-  await maus("mousePressed", zeile.x + 1.5 * SLOT, zeile.y + 20, 1);
-  await maus("mouseReleased", zeile.x + 1.5 * SLOT, zeile.y + 20);
+  await maus("mouseMoved", zeile.x + 1.5 * (await slot()), zeile.y + 20);
+  await maus("mousePressed", zeile.x + 1.5 * (await slot()), zeile.y + 20, 1);
+  await maus("mouseReleased", zeile.x + 1.5 * (await slot()), zeile.y + 20);
   pruefe("Dialog mit Montag 8 bis 16 Uhr und Anna vorbelegt", await b.warte(`(() => { const d = document.querySelector('[role=dialog]'); if (!d) return false; const f = [...d.querySelectorAll('input[type=datetime-local]')].map((x) => x.value); const anna = d.querySelector("input[value='${anna.id}']"); return f[0] === "2026-12-14T08:00" && f[1] === "2026-12-14T16:00" && anna?.checked; })()`));
   await b.tippe("[role=dialog] input[aria-label='Auftrag suchen']", `Plantest ${lauf}`);
   await b.klickText("#auftrag-treffer button span", auftrag.nummer);
@@ -96,7 +97,7 @@ try {
 
   // 4. Am rechten Ende ziehen: bis Dienstag 16 Uhr (über zwei Tage)
   let balken = await rechteck(`[data-monteur-zeile='${anna.id}'] [data-einsatz='${id}']`);
-  await ziehe(balken.x + balken.w - 3, balken.y + balken.h / 2, balken.x + balken.w - 3 + 9 * SLOT, balken.y + balken.h / 2);
+  await ziehe(balken.x + balken.w - 3, balken.y + balken.h / 2, balken.x + balken.w - 3 + 9 * (await slot()), balken.y + balken.h / 2);
   pruefe("Verlängern über zwei Tage: Ende Di 16:00", await warteDb("select to_char(ende at time zone 'Europe/Berlin', 'YYYY-MM-DD\"T\"HH24:MI') e from public.einsatz where id = $1", [id], (r) => r[0]?.e === "2026-12-15T16:00"));
   [z] = await einsatzZeit(id);
   pruefe("Beginn bleibt Mo 08:00, kein Termin-Dialog nach dem Griff", z.b === "2026-12-14T08:00" && !(await b.js("!!document.querySelector('[role=dialog]')")));
@@ -104,10 +105,10 @@ try {
 
   // 5. Am linken Ende ziehen: Beginn Mo 07:00 (verlängern nach vorn), dann Ende zurück auf Di 15:00 (verkürzen)
   balken = await rechteck(`[data-monteur-zeile='${anna.id}'] [data-einsatz='${id}']`);
-  await ziehe(balken.x + 3, balken.y + balken.h / 2, balken.x + 3 - SLOT, balken.y + balken.h / 2);
+  await ziehe(balken.x + 3, balken.y + balken.h / 2, balken.x + 3 - (await slot()), balken.y + balken.h / 2);
   pruefe("Beginn nach vorn: Mo 07:00", await warteDb("select to_char(beginn at time zone 'Europe/Berlin', 'YYYY-MM-DD\"T\"HH24:MI') b from public.einsatz where id = $1", [id], (r) => r[0]?.b === "2026-12-14T07:00"));
   balken = await rechteck(`[data-monteur-zeile='${anna.id}'] [data-einsatz='${id}']`);
-  await ziehe(balken.x + balken.w - 3, balken.y + balken.h / 2, balken.x + balken.w - 3 - SLOT, balken.y + balken.h / 2);
+  await ziehe(balken.x + balken.w - 3, balken.y + balken.h / 2, balken.x + balken.w - 3 - (await slot()), balken.y + balken.h / 2);
   pruefe("Verkürzen: Ende Di 15:00", await warteDb("select to_char(ende at time zone 'Europe/Berlin', 'YYYY-MM-DD\"T\"HH24:MI') e from public.einsatz where id = $1", [id], (r) => r[0]?.e === "2026-12-15T15:00"));
 
   // 6. Senkrecht zu Ben ziehen: Monteur wird getauscht, Zeit bleibt
@@ -121,7 +122,7 @@ try {
 
   // 7. Waagerecht verschieben: einen Tag später (Di 07:00 – Mi 15:00)
   balken = await rechteck(`[data-monteur-zeile='${ben.id}'] [data-einsatz='${id}']`);
-  await ziehe(balken.x + 40, balken.y + balken.h / 2, balken.x + 40 + 9 * SLOT, balken.y + balken.h / 2);
+  await ziehe(balken.x + 40, balken.y + balken.h / 2, balken.x + 40 + 9 * (await slot()), balken.y + balken.h / 2);
   pruefe("verschoben auf Di 07:00 – Mi 15:00", await warteDb("select to_char(beginn at time zone 'Europe/Berlin', 'YYYY-MM-DD\"T\"HH24:MI') b, to_char(ende at time zone 'Europe/Berlin', 'YYYY-MM-DD\"T\"HH24:MI') e from public.einsatz where id = $1", [id], (r) => r[0]?.b === "2026-12-15T07:00" && r[0]?.e === "2026-12-16T15:00"));
 
   // 8. Termin-Dialog: Anna dazu (Urlaub am Mittwoch) und fest einplanen → Warnung, blockiert nicht
@@ -183,7 +184,7 @@ try {
   await b.klickText("main button", "Speichern");
   pruefe("Arbeitszeit bis 17 Uhr gespeichert", await warteDb("select arbeitszeit_bis::text bis from public.einstellung", [], (r) => r[0]?.bis === "17:00:00"));
   await b.gehe(`/montageplan?woche=${WOCHE}`);
-  pruefe("Tafel zeigt 7 bis 17 Uhr (10 Stunden je Tag)", await b.warte(`document.querySelector('main').innerText.includes("Arbeitszeit 7 bis 17 Uhr") && document.querySelector('[data-zeile]').getBoundingClientRect().width === ${5 * 10 * SLOT}`));
+  pruefe("Tafel zeigt 7 bis 17 Uhr (10 Stunden je Tag)", await b.warte(`document.querySelector('main').innerText.includes("Arbeitszeit 7 bis 17 Uhr") && Math.abs(document.querySelector('[data-zeile]').getBoundingClientRect().width - 5 * 10 * Number(document.querySelector('[data-tafel]').dataset.slot)) < 1`));
   if (fotos) await b.foto(path.join(fotos, "montageplan.png"));
 
   // 14. Monteur deaktivieren
