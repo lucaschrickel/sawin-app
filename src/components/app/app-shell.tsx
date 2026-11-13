@@ -60,7 +60,7 @@ export function AppShell({ brand, user, eingeklappt, inaktivMinuten, lexware, da
             <Glocke />
           </div>
         </header>
-        <main className="mx-auto w-full max-w-[1360px] px-8 pt-2 pb-20 max-[960px]:px-4">{children}</main>
+        <main className="w-full min-w-0 px-8 pt-2 pb-20 max-[960px]:px-4">{children}</main>
       </div>
     </div>
   );

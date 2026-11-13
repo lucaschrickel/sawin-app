@@ -258,6 +258,9 @@ Die Monteur-App kommt in Version 2.
 - **Eingeklappte Seitenleiste:** zeigt Logo, Ausklapp-Knopf und Symbole mit Zähler-Badges. CSS-Klassen der Seitenleiste
   (z. B. `.mini`) dürfen nicht mit Klassen anderer Bausteine kollidieren; Bausteine verwenden eigene Präfixe
   (z. B. `.cal-mini` für den Mini-Monatskalender, `.es-sw` für Farbstreifen von Einsätzen).
+- **Volle Breite (13.11.2026):** Der Inhaltsbereich hat keine Höchstbreite; Listen, Tabellen, Pipeline, Plantafel und
+  Dashboard nutzen die ganze Fensterbreite. Formulare (Einstellungen, Passwort) behalten ihre Lesebreite wie in der Demo.
+  Auf Tablet und Handy scrollt keine Seite waagerecht (Tabellen blenden Spalten aus).
 - **Liste ist Standard.** Übersichten mit Board (Anfragen, Aufträge, Service-Tickets) öffnen als Liste. Das Board
   ist per Umschalter wählbar, die Wahl wird je Benutzer und Seite gemerkt.
 - **Suche** oben: Beim Tippen (ab zwei Zeichen) klappt eine Vorschlagsliste auf, nach Bereich gruppiert (Kunden,
