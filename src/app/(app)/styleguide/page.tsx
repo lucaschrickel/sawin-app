@@ -14,7 +14,7 @@ import { Table, Td, Th, Tr } from "@/components/ui/table";
 import { getCustomer, resolveSlot } from "@/customers";
 import { eur } from "@/lib/format";
 import { AUFTRAG_PHASE_TEXT, AUFTRAG_PHASE_TON, AUFTRAG_PHASEN, BELEG_STATUS_TONE } from "@/lib/status";
-import { AblageUploadDemo, BestaetigenDemo, ChatDemo, DialogDemo, FarbWahlDemo, FormDemo, FormularDialogDemo, PdfKachelDemo, RichTextDemo, SpaltenGriffDemo, VerlassenDemo } from "./demo-interactive";
+import { AblageUploadDemo, BestaetigenDemo, KontaktWahlDemo, ChatDemo, DialogDemo, FarbWahlDemo, FormDemo, FormularDialogDemo, PdfKachelDemo, RichTextDemo, SpaltenGriffDemo, VerlassenDemo } from "./demo-interactive";
 import { TrefferZeile } from "@/components/app/kopfzeile";
 import { UmgesetztVon } from "@/components/app/umgesetzt-von";
 import { Balken, KopfPlatzhalter, TabellenPlatzhalter, ZeilenPlatzhalter } from "@/components/app/platzhalter";
@@ -363,6 +363,10 @@ export default function StyleguidePage() {
           <div className="max-w-3xl">
             <ChatDemo />
           </div>
+        </Section>
+
+        <Section title="Lexware-Kontakt wählen" description="KontaktWahlDialog: beim Fertigstellen, wenn es in Lexware mögliche Treffer für den Kunden gibt (Name, E-Mail, Adresse, Kundennummer) · vorhandenen Kontakt verwenden oder neu anlegen">
+          <KontaktWahlDemo />
         </Section>
 
         <Section title="Spaltenbreiten" description="Positionstabelle im Beleg-Editor (SpaltenGriff): am rechten Rand ziehen, Doppelklick passt an, Tastatur: Pfeile (mit Umschalt größer), Pos1/Ende, Enter · je Benutzer gespeichert">

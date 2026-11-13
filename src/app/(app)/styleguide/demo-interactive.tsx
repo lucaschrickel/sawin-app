@@ -5,6 +5,7 @@ import { useState } from "react";
 import { VerlassenDialog } from "@/components/app/verlassen-schutz";
 import { SpaltenGriff } from "@/components/ui/spalten-griff";
 import { PdfKachel } from "../beleg/ui";
+import { KontaktWahlDialog, type KontaktWahl } from "../beleg/kontakt-wahl";
 import { AblageUpload } from "@/components/app/ablage-upload";
 import type { ChatNachricht } from "@/lib/chat";
 import { UNTERORDNER } from "@/lib/onedrive/schema";
@@ -222,6 +223,24 @@ export function VerlassenDemo() {
     <>
       <Button onClick={() => setV({ weiter: () => {} })}>Seite verlassen …</Button>
       <VerlassenDialog verlassen={v} text="Die Bestellung hat ungespeicherte Änderungen. Was soll mit ihnen passieren?" onAbbrechen={() => setV(null)} onVerwerfen={() => setV(null)} onSpeichern={() => setV(null)} />
+    </>
+  );
+}
+
+/** „Kunde schon in Lexware?“ mit Beispiel-Kandidaten (Auswahl im Styleguide meldet nur einen Fehler, kein Lexware-Aufruf) */
+export function KontaktWahlDemo() {
+  const [wahl, setWahl] = useState<KontaktWahl | null>(null);
+  const beispiel: KontaktWahl = {
+    kundeId: "styleguide",
+    kandidaten: [
+      { id: "00000000-0000-0000-0000-000000000001", name: "Doris Doppelt", nummer: "10412", email: "d1@example.org", adresse: "Teststraße 1, 38550 Isenbüttel", gruende: ["name", "adresse"] },
+      { id: "00000000-0000-0000-0000-000000000002", name: "Doris Doppelt", nummer: "10598", email: "d2@example.org", adresse: null, gruende: ["name"] },
+    ],
+  };
+  return (
+    <>
+      <Button onClick={() => setWahl(beispiel)}>Auswahl öffnen</Button>
+      <KontaktWahlDialog wahl={wahl} onSchliessen={() => setWahl(null)} onGewaehlt={() => setWahl(null)} />
     </>
   );
 }

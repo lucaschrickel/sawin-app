@@ -1,6 +1,6 @@
 # Stand der App
 
-Stand: 12.11.2026, nach Formulare & Protokolle, Chat, erweiterter Suche, Zurück-Verlauf und Darstellung. Vergleich mit dem Klick-Prototyp
+Stand: 13.11.2026, nach dem Nachtauftrag (Passwort, Zwei-Faktor, Lexware-Übergang, dunkles Theme, Anmeldung, Seitenwechsel, volle Breite). Vergleich mit dem Klick-Prototyp
 (`docs/demo/sawin-demo.html`) und `CLAUDE.md`. Wird nach jedem größeren Block aktualisiert.
 
 **Entscheidungen 11.11.2026:**
@@ -8,6 +8,53 @@ Stand: 12.11.2026, nach Formulare & Protokolle, Chat, erweiterter Suche, Zurück
   kommen in **Version 2**. In Version 1 gibt es den vorläufigen Versand: PDF herunterladen und Outlook per `mailto`.
 - OneDrive-Ordner entstehen mit dem **ersten Angebot** (`<AG-Nummer>_<Kunde>`) und werden mit der AB in
   `<AB-Nummer>_<Kunde>` umbenannt (derselbe Ordner); Unterordner wie im bisherigen Make-Szenario.
+
+## Nachtauftrag 13.11.2026 (autonom, direkt auf main)
+
+**Erledigt** (jeder Block mit Tests und Build grün, einzeln committet und gepusht):
+1. Passwort ändern im Benutzermenü (aal2, aktuelles Passwort serverseitig geprüft, andere Sitzungen abgemeldet, Audit-Log).
+2. Zwei-Faktor-Code: sendet nach 6 Ziffern selbst, Einfügen, nur Ziffern, kein doppeltes Absenden.
+3. Übergang Lexware → App: keine doppelten Kunden (Abgleich über Kundennummer, E-Mail, Name, Adresse; bei Unsicherheit
+   wählt das Büro), unbekannte Lexware-Belege im Zahlungsabgleich und Webhook ignoriert (nur Protokoll), Go-live-Datum in
+   Einstellungen › Verbindungen mit Hinweis im Dashboard, Kurzanleitung fürs Büro in `docs/uebergabe.md`.
+   Die Go-live-Prüfung der Nummernkreise gab es schon (`npm run golive:pruefen`).
+4. Dunkles Theme wie in der Demo: gestaffelte warme Grautöne statt Schwarz, alle Text/Fläche-Paare ≥ 4,5:1.
+5. Anmeldeseite: Sawin-Logo im Mittelpunkt, dezent „Umgesetzt von“ (Produkt-Einstellung, abschaltbar mit `UMGESETZT_VON=aus`).
+6. Gefühlte Ladezeit: Seitenleiste und Kopfzeile im Layout (bleiben stehen), Platzhalter je Bereich im Aufbau der Seite
+   ohne Daten, Prefetch der App-Shell, Dashboard-Kennzahlen per Suspense.
+7. Volle Breite: Inhaltsbereich ohne Höchstbreite, Formulare in Lesebreite, 1920/768/390 px ohne waagerechtes Scrollen.
+- Abschluss: neue Bausteine im Styleguide (Lade-Platzhalter, Umgesetzt von, Lexware-Kontakt wählen), hell und dunkel im
+  Browser geprüft; Unit 133/133, RLS 92/92, alle Browser-Tests grün (einzelne Ausreißer bei Wiederholung grün);
+  Supabase Advisors unverändert (nur die bekannte Pro-Tarif-Warnung zum Passwortschutz).
+
+**Übersprungen bzw. nicht ausgeführt:**
+- `npm run test:onedrive`: Der Test verweigert den Lauf, weil auf Staging 23 Ordner im Zwischenspeicher warten (die am
+  12.11. zurückgesetzten Ordner-Links übernommener Aufträge; sie bleiben wartend, solange `ONEDRIVE_ALTBESTAND` aus ist).
+  Nach den harten Grenzen nicht angefasst.
+- Die Lieferanten-Zuordnung bleibt offen (kein Go-live-Kriterium).
+
+### Offene Entscheidungen für Luca
+
+1. **23 wartende OneDrive-Ordner auf Staging:** so lassen (dann läuft `test:onedrive` nicht), als erledigt markieren oder
+   gezielt in `_App-Test` anlegen lassen? Annahme bis dahin: nichts ändern.
+2. **Kontaktabgleich, „sicherer“ Treffer:** gleiche Kundennummer, oder gleiche E-Mail mit gleichem Namen bzw. gleicher
+   Adresse, oder gleicher Name mit gleicher Adresse. Nur Name oder nur E-Mail → das Büro wählt. Beim Übernehmen eines
+   vorhandenen Kontakts gilt danach „App führt“ (Änderungen gehen von der App nach Lexware, leere Felder der App
+   überschreiben nichts). Passt das, oder soll der Lexware-Kontakt beim ersten Mal unverändert bleiben?
+3. **Hinweis nach dem Stichtag:** gemeldet werden nur Angebote, ABs und Lieferscheine, die direkt in Lexware entstehen.
+   Rechnungen oder Gutschriften, die nach dem Stichtag an der App vorbei in Lexware angelegt werden, meldet die App nicht
+   (sie stören die App nicht). Sollen sie ebenfalls gemeldet werden?
+4. **„Umgesetzt von“** ist standardmäßig sichtbar (Name „Schrickel Digital Consulting“). Mit Sawin abstimmen; abschalten
+   per `UMGESETZT_VON=aus`.
+5. **Volle Breite auch für Detailseiten** (Kunde, Auftrag, Ticket): angenommen ja (die rechte Spalte bleibt 360 px).
+   Auf sehr breiten Bildschirmen (> 2000 px) werden Textzeilen links lang; bei Bedarf dort eine Höchstbreite nur für
+   Detailseiten.
+6. **Erster Aufruf:** Beim Neuladen steht für etwa eine halbe Sekunde ein leerer Rahmen mit Logo (Sitzung wird geprüft),
+   immer ausgeklappt; eine eingeklappte Seitenleiste klappt danach ein. Alternative wäre, den Zustand zusätzlich im
+   Browser zu merken.
+7. **Beobachtung Montageplan:** Der Hinweis „88 Aufträge haben noch keinen Liefertermin und keinen Montagetermin“ listet
+   alle Aufträge im Fließtext und füllt die halbe Seite (Folge der Datenübernahme). Vorschlag: zugeklappt mit Anzahl und
+   „Alle zeigen“. Nicht umgesetzt, weil nicht Teil des Auftrags.
 
 ## Module und Funktionen
 

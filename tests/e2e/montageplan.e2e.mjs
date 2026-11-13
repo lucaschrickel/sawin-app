@@ -59,7 +59,7 @@ try {
 
   // 1. Tafel: Woche, Arbeitszeit, Monteur-Zeile, genehmigte Abwesenheit
   await b.gehe(`/montageplan?woche=${WOCHE}`);
-  pruefe("Navigation zeigt Montageplan", await b.js("[...document.querySelectorAll('aside a[href]')].some((a) => a.getAttribute('href') === '/montageplan')"));
+  pruefe("Navigation zeigt Montageplan", await b.warte("[...document.querySelectorAll('aside a[href]')].some((a) => a.getAttribute('href') === '/montageplan')"));
   pruefe("Kopf: KW 51, Arbeitszeit 7 bis 16 Uhr", await b.warte(`document.querySelector('main').innerText.includes("KW 51") && document.querySelector('main').innerText.includes("Arbeitszeit 7 bis 16 Uhr")`));
   pruefe("Zeile für den Monteur", await b.da(`[data-zeile='${anna.id}']`));
   pruefe("genehmigter Urlaub in der Zeile", await b.js(`!!document.querySelector("[data-monteur-zeile='${anna.id}'] [data-abwesenheit='genehmigt']")`));
