@@ -273,6 +273,9 @@ Die Monteur-App kommt in Version 2.
   5 Tagen), Aufträge ohne Rechnung (ab Phase Abnahme), Fahrzeugtermine, neue Tickets, Prüfhinweise, Wiedervorlagen,
   fällige Aufgaben.
 - Fuß der Seitenleiste: Status der Lexware-Verbindung und angemeldeter Benutzer.
+- **Anmeldeseite (13.11.2026):** Logo des Kunden im Mittelpunkt; darunter dezent „Umgesetzt von“ mit Bildmarke und
+  Name (Produkt-Einstellung `src/lib/produkt.ts`, Logo `public/brand/schrickel-logo.png`, nicht im Kunden-Ordner),
+  abschaltbar mit `UMGESETZT_VON=aus`.
 - **Passwort ändern** (Schlüssel-Symbol neben „Abmelden“, Seite /konto/passwort; 13.11.2026): aktuelles Passwort, neues
   Passwort und Wiederholung mit Augen-Symbol, Anforderungen beim Tippen (12 Zeichen, Groß/klein, Ziffer, nicht gleich
   dem alten). Nur mit zweitem Faktor (aal2); der Server prüft das aktuelle Passwort mit einer eigenen, sofort wieder

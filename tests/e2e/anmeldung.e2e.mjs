@@ -135,6 +135,7 @@ try {
   pruefe("ohne Anmeldung: Umleitung auf /anmelden", (await pfad()).startsWith("/anmelden"), await pfad());
   await gehe("/einstellungen/benutzer");
   pruefe("ohne Anmeldung: Benutzerverwaltung gesperrt", (await pfad()).startsWith("/anmelden"));
+  pruefe("Anmeldeseite: Logo des Kunden und dezent „Umgesetzt von“", await warte("!!document.querySelector('[data-logo] svg') && /Umgesetzt von/.test(document.querySelector('[data-umgesetzt-von]')?.innerText ?? '') && document.querySelector('[data-umgesetzt-von] img')?.complete && document.querySelector('[data-umgesetzt-von] img').naturalWidth > 0"));
 
   // 2. Falsches Passwort
   await formular({ email, passwort: "falsch-falsch-1A" });

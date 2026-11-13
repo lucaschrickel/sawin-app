@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { UmgesetztVon } from "@/components/app/umgesetzt-von";
 import { getCustomer } from "@/customers";
 
 /** Rahmen der Anmeldeseiten: dunkles Theme mit dem ganzen Logo des Kunden (Konturen weiß über --logo-ink). */
@@ -13,6 +14,7 @@ export default function AnmeldungLayout({ children }: { children: ReactNode }) {
         </div>
         <main className="rounded-lg border border-line bg-surface p-7 shadow-pop max-sm:p-5">{children}</main>
         <p className="mt-6 text-center text-xs text-muted">Zugang nur für Mitarbeiter von {c.name} · Anmeldung mit zweitem Faktor</p>
+        <UmgesetztVon className="mt-10 opacity-90" />
       </div>
     </div>
   );

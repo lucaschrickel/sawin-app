@@ -16,6 +16,7 @@ import { eur } from "@/lib/format";
 import { AUFTRAG_PHASE_TEXT, AUFTRAG_PHASE_TON, AUFTRAG_PHASEN, BELEG_STATUS_TONE } from "@/lib/status";
 import { AblageUploadDemo, BestaetigenDemo, ChatDemo, DialogDemo, FarbWahlDemo, FormDemo, FormularDialogDemo, PdfKachelDemo, RichTextDemo, SpaltenGriffDemo, VerlassenDemo } from "./demo-interactive";
 import { TrefferZeile } from "@/components/app/kopfzeile";
+import { UmgesetztVon } from "@/components/app/umgesetzt-von";
 import { Pfad, ZurueckKnopf } from "@/components/app/verlauf";
 import { FORMULAR_STATUS_TEXT, FORMULAR_STATUS_TON, type FormularStatus } from "@/lib/formular-logik";
 import type { Treffer } from "@/lib/such-typen";
@@ -293,6 +294,17 @@ export default function StyleguidePage() {
             </div>
             <div data-theme="dark" className="flex items-center justify-center rounded-lg bg-canvas p-6">
               <Logo className="block w-[220px]" />
+            </div>
+          </div>
+        </Section>
+
+        <Section title="Umgesetzt von" description="Produkt-Einstellung (src/lib/produkt.ts, nicht im Kunden-Ordner) unter der Anmeldung · abschaltbar mit UMGESETZT_VON=aus · lesbar auf hellem und dunklem Grund">
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div className="rounded-lg border border-line bg-canvas p-6">
+              <UmgesetztVon />
+            </div>
+            <div data-theme="dark" className="rounded-lg bg-canvas p-6">
+              <UmgesetztVon />
             </div>
           </div>
         </Section>
