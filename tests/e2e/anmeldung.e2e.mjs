@@ -12,8 +12,10 @@ import os from "node:os";
 import path from "node:path";
 import { createClient } from "@supabase/supabase-js";
 import pg from "pg";
+import { nurTestprojekt } from "../../scripts/testprojekt.mjs";
 
 if (existsSync(".env.local")) process.loadEnvFile(".env.local");
+nurTestprojekt();
 const APP = (process.env.APP_URL ?? "http://localhost:3000").replace(/\/$/, "");
 const { NEXT_PUBLIC_SUPABASE_URL: URL_, SUPABASE_SERVICE_ROLE_KEY: SECRET, SUPABASE_DB_URL: DB_URL } = process.env;
 if (!URL_ || !SECRET || !DB_URL) throw new Error("NEXT_PUBLIC_SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY und SUPABASE_DB_URL werden benötigt");
@@ -118,9 +120,15 @@ async function aufraeumen() {
   const db = new pg.Client({ connectionString: DB_URL, ssl: { rejectUnauthorized: false } });
   await db.connect();
   try {
-    for (const u of nutzer) await db.query("delete from public.benutzer where id = $1", [u]);
+    for (const u of nutzer) {
+      await db.query("delete from public.benutzer_einstellung where benutzer_id = $1", [u]);
+      await db.query("delete from public.benutzer where id = $1", [u]);
+    }
   } finally { await db.end(); }
-  for (const u of nutzer) await service.auth.admin.deleteUser(u);
+  for (const u of nutzer) {
+    const { error } = await service.auth.admin.deleteUser(u);
+    if (error) console.error(`Testkonto ${u} nicht gelöscht: ${error.message}`);
+  }
 }
 
 try {

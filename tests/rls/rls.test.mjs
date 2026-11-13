@@ -12,8 +12,11 @@ import { createHmac, randomBytes, randomUUID } from "node:crypto";
 import { existsSync } from "node:fs";
 import { createClient } from "@supabase/supabase-js";
 import pg from "pg";
+import { nurTestprojekt } from "../../scripts/testprojekt.mjs";
+import { testkontenEntfernen } from "../../scripts/testkonten.mjs";
 
 if (existsSync(".env.local")) process.loadEnvFile(".env.local");
+nurTestprojekt();
 const URL = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const PUBLISHABLE = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
 const SERVICE = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -100,6 +103,8 @@ async function fertig(wer, id) {
 // ---------- Aufbau ----------
 let admin, buero, ohneMfa, deaktiviert, daten;
 before(async () => {
+  // Reste abgebrochener Läufe (Testkonten älter als 2 Stunden)
+  await testkontenEntfernen().catch((e) => console.error("Alte Testkonten:", e.message));
   admin = await benutzerAnlegen("admin", { admin: true, konditionen: true });
   buero = await benutzerAnlegen("buero");
   ohneMfa = await benutzerAnlegen("ohnemfa", { mfa: false });

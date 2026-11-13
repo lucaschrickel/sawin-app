@@ -3,7 +3,7 @@
 // und als Hinweis im Dashboard; ohne Stichtag verschwindet der Hinweis. Der Lauf legt im Testkonto einen
 // Angebots-Entwurf an (dort nicht löschbar). Das Go-live-Datum wird danach auf den alten Wert zurückgesetzt.
 // Aufruf: App starten, dann APP_URL=http://localhost:3100 npm run test:uebergang
-import { bilanz, browser, dbAbfrage, pruefe, sleep, testAdmin } from "./hilfen.mjs";
+import { aufraeumen, bilanz, browser, dbAbfrage, pruefe, sleep, testAdmin } from "./hilfen.mjs";
 
 let b;
 let vorher;
@@ -77,5 +77,6 @@ try {
 } finally {
   b?.ende();
   if (vorher) await dbAbfrage("update public.einstellung set golive_datum = $1, lexware_fremdbelege = '[]', lexware_fremdbelege_am = null where einzig", [vorher.d]).catch((x) => console.error(x.message));
-  bilanz();
+  await aufraeumen().catch((e) => console.error("Aufräumen:", e.message));
 }
+process.exit(bilanz() ? 1 : 0);

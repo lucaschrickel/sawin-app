@@ -118,7 +118,13 @@ try {
   await foto("seitenleiste-hell");
   await b.klick("[data-farbschema=dunkel]");
   pruefe("Im Dunkelmodus bleibt die Seitenleiste dunkel", await b.warte("document.documentElement.dataset.theme === 'dark'") && (await var_("--frame")) === "#121110");
-  const [e] = await dbAbfrage("select farbschema, seitenleiste_hell from public.benutzer_einstellung where benutzer_id = $1", [admin.id]);
+  // Gespeichert wird per Server-Aktion nach dem Klick: kurz auf die Datenbank warten
+  let e;
+  for (let i = 0; i < 20; i++) {
+    [e] = await dbAbfrage("select farbschema, seitenleiste_hell from public.benutzer_einstellung where benutzer_id = $1", [admin.id]);
+    if (e?.farbschema === "dunkel" && e.seitenleiste_hell === true) break;
+    await sleep(250);
+  }
   pruefe("Gespeichert: dunkel, Seitenleiste hell (wirkt im hellen Schema)", e?.farbschema === "dunkel" && e.seitenleiste_hell === true, JSON.stringify(e));
   await b.klick("[data-farbschema=hell]");
   await b.klick("[data-seitenleiste-wahl=dunkel]");

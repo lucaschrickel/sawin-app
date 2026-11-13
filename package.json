@@ -48,7 +48,8 @@
     "golive:pruefen": "node scripts/golive-pruefung.mjs",
     "test:konto": "node tests/e2e/konto.e2e.mjs",
     "test:kontakte": "node tests/e2e/kontakte.e2e.mjs",
-    "test:uebergang": "node tests/e2e/uebergang.e2e.mjs"
+    "test:uebergang": "node tests/e2e/uebergang.e2e.mjs",
+    "test:aufraeumen": "node scripts/testkonten.mjs"
   },
   "dependencies": {
     "@fontsource-variable/inter": "^5.3.0",
@@ -70,9 +71,9 @@
     "clsx": "^2.1.1",
     "fontkit": "^2.0.4",
     "lucide-react": "^1.59.0",
-    "next": "16.4.2",
-    "react": "19.3.0",
-    "react-dom": "19.3.0",
+    "next": "16.4.6",
+    "react": "19.3.1",
+    "react-dom": "19.3.1",
     "sanitize-html": "^2.18.1",
     "server-only": "^0.0.1",
     "tailwind-merge": "^3.7.0"
@@ -84,7 +85,7 @@
     "@types/react-dom": "^19",
     "@types/sanitize-html": "^2.16.2",
     "eslint": "^9",
-    "eslint-config-next": "16.4.2",
+    "eslint-config-next": "16.4.6",
     "pg": "^8.23.1",
     "supabase": "^3.1.0",
     "tailwindcss": "^4",

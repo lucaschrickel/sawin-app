@@ -20,6 +20,7 @@ import pg from "pg";
 pg.types.setTypeParser(1082, (v) => v);
 import { belegSummen } from "../src/lib/beleg-summen.ts";
 import { lexwareZuBeleg, planen } from "./airtable/zuordnung.mjs";
+import { refAusDb } from "./testprojekt.mjs";
 
 /** --name → true, --name=wert → "wert", fehlt → undefined */
 const arg = (name) => {
@@ -44,6 +45,8 @@ const projekt = (() => {
   }
 })();
 if (!process.env.SUPABASE_DB_URL || !projekt) abbruch("NEXT_PUBLIC_SUPABASE_URL und SUPABASE_DB_URL fehlen.");
+// Geschrieben wird über SUPABASE_DB_URL: sie muss zum selben Projekt gehören wie die API-Adresse
+if (refAusDb(process.env.SUPABASE_DB_URL) !== projekt) abbruch(`SUPABASE_DB_URL gehört nicht zum Projekt ${projekt} aus NEXT_PUBLIC_SUPABASE_URL.`);
 if (SCHREIBEN && arg("projekt") !== projekt) abbruch(`Zum Schreiben --projekt=${projekt} angeben (Schutz gegen das falsche Supabase-Projekt).`);
 if (LEXWARE_LESEN && process.env.LEXWARE_ALTBESTAND?.trim() !== "aktiv")
   abbruch("--lexware-lesen nur mit LEXWARE_ALTBESTAND=aktiv (Sawins eigenes Lexware, Produktion). In Staging gehören die IDs nicht zum Testkonto.");

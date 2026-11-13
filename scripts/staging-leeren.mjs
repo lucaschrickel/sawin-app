@@ -7,12 +7,14 @@
 //   npm run staging:leeren -- --projekt=<ref>          zeigt, was gelöscht würde
 //   npm run staging:leeren -- --projekt=<ref> --ja     löscht
 //
-// Nie in Produktion: Das Skript bricht ab, wenn LEXWARE_ALTBESTAND oder ONEDRIVE_ALTBESTAND aktiv ist (nur in Produktion
-// gesetzt) oder --projekt nicht zum Supabase-Projekt der Umgebung passt.
+// Nie in Produktion: Das Skript läuft nur gegen das erlaubte Testprojekt (ERLAUBTES_TESTPROJEKT, geprüft für API- UND
+// Datenbank-Adresse, scripts/testprojekt.mjs), --projekt muss dazu passen. Zusätzlich Abbruch, wenn LEXWARE_ALTBESTAND
+// oder ONEDRIVE_ALTBESTAND aktiv ist (nur in Produktion gesetzt).
 
 import { existsSync } from "node:fs";
 import pg from "pg";
 import { createClient } from "@supabase/supabase-js";
+import { testprojektPruefen } from "./testprojekt.mjs";
 
 const arg = (n) => process.argv.find((a) => a.startsWith(`--${n}=`))?.split("=")[1] ?? process.argv.includes(`--${n}`);
 const envDatei = arg("env") || ".env.local";
@@ -21,7 +23,9 @@ const abbruch = (t) => {
   console.error(`Abbruch: ${t}`);
   process.exit(1);
 };
-const projekt = new URL(process.env.NEXT_PUBLIC_SUPABASE_URL ?? "http://x").hostname.split(".")[0];
+const pruefung = testprojektPruefen();
+if (pruefung.fehler) abbruch(pruefung.fehler);
+const projekt = pruefung.ref;
 if (arg("projekt") !== projekt) abbruch(`--projekt=${projekt} angeben (Schutz gegen das falsche Projekt).`);
 if (process.env.LEXWARE_ALTBESTAND?.trim() === "aktiv" || process.env.ONEDRIVE_ALTBESTAND?.trim() === "aktiv")
   abbruch("Diese Umgebung ist als Produktion eingerichtet (…_ALTBESTAND=aktiv).");

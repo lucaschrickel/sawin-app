@@ -7,8 +7,13 @@ import os from "node:os";
 import path from "node:path";
 import { createClient } from "@supabase/supabase-js";
 import pg from "pg";
+import { nurTestprojekt } from "../../scripts/testprojekt.mjs";
+import { testkontenEntfernen } from "../../scripts/testkonten.mjs";
 
 if (existsSync(".env.local")) process.loadEnvFile(".env.local");
+nurTestprojekt();
+// Reste abgebrochener Läufe (Testkonten älter als 2 Stunden) zuerst entfernen
+await testkontenEntfernen().catch((e) => console.error("Alte Testkonten:", e.message));
 export const APP = (process.env.APP_URL ?? "http://localhost:3000").replace(/\/$/, "");
 const { NEXT_PUBLIC_SUPABASE_URL: URL_, NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: PUB, SUPABASE_SERVICE_ROLE_KEY: SECRET, SUPABASE_DB_URL: DB_URL } = process.env;
 if (!URL_ || !PUB || !SECRET || !DB_URL) throw new Error("Supabase-Variablen und SUPABASE_DB_URL werden benötigt");
@@ -127,7 +132,10 @@ export async function aufraeumen() {
   } finally {
     await db.end();
   }
-  for (const id of nutzer) await service.auth.admin.deleteUser(id);
+  for (const id of nutzer) {
+    const { error } = await service.auth.admin.deleteUser(id);
+    if (error) console.error(`Testkonto ${id} nicht gelöscht: ${error.message}`);
+  }
 }
 export async function dbAbfrage(sql, werte = []) {
   const db = new pg.Client({ connectionString: DB_URL, ssl: { rejectUnauthorized: false } });

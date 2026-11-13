@@ -24,6 +24,7 @@ Vorlage: `.env.example`. Lokal in `.env.local` (nie einchecken), auf Vercel in d
 | `NEXT_PUBLIC_SUPABASE_URL` | App | Projekt-URL aus Supabase › Project Settings › API, nur `https://<ref>.supabase.co` (ohne `/rest/v1/`) |
 | `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | App | Publishable Key (`sb_publishable_…`) |
 | `SUPABASE_SERVICE_ROLE_KEY` | nur Server, Tests | Secret Key (`sb_secret_…`) aus Supabase › Project Settings › API Keys. Nie mit `NEXT_PUBLIC_`. |
+| `ERLAUBTES_TESTPROJEKT` | nur lokal (`.env.local`), nie in `.env.produktion` | Ref des Staging-Projekts. Alle Tests, `test:aufraeumen` und `staging:leeren` prüfen API- und Datenbank-Adresse dagegen und brechen sonst ab (`scripts/testprojekt.mjs`). |
 | `SUPABASE_DB_URL` | nur lokal / Deployment-Rechner | Verbindung zur Datenbank für Migrationen: Supabase › Connect › Session pooler (mit Passwort). Nicht auf Vercel setzen. |
 | `SUPABASE_ACCESS_TOKEN` | nur lokal | Persönliches Token (Supabase › Account › Access Tokens) zum Einspielen der Auth-Einstellungen. Nicht auf Vercel setzen. |
 | `SUPABASE_AUTH_SITE_URL` | nur lokal (beim Einspielen) | Adresse der App für Links in Auth-E-Mails, z. B. `http://localhost:3000` (Staging lokal) oder die Vercel-Adresse |
@@ -53,10 +54,12 @@ npm run db:push       # einspielen (fragt nach Bestätigung)
 Danach im Supabase-Dashboard unter Advisors (Security und Performance) prüfen: keine Warnungen (WARN/ERROR).
 
 Prüfung der Rechte (legt Testbenutzer mit MFA und Testdaten an und entfernt sie über `SUPABASE_DB_URL` wieder, weil
-über die API niemand echt löschen darf; nur gegen Staging ausführen):
+über die API niemand echt löschen darf). Alle Tests laufen nur gegen das Projekt aus `ERLAUBTES_TESTPROJEKT` (Staging);
+zeigt `NEXT_PUBLIC_SUPABASE_URL` oder `SUPABASE_DB_URL` woandershin, brechen sie vor dem ersten Schreiben ab:
 
 ```bash
 npm run test:rls
+npm run test:aufraeumen            # Testkonten älter als 2 Stunden entfernen (mit -- --alle: alle)
 ```
 
 ## Anmeldung
