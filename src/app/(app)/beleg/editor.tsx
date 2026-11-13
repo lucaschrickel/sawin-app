@@ -37,6 +37,7 @@ import type { AbrechnungKontext, Artikel, KundeFuerBeleg, Textvorlage, Zahlungsb
 import { KundeDialog } from "../kunden/kunde-dialog";
 import { kundenSuchen, type KundeTreffer } from "../anfragen/aktionen";
 import { belegFertigstellen, belegSpeichern, belegVerwerfen, kundeFuerEditor } from "./aktionen";
+import { KontaktWahlDialog, type KontaktWahl } from "./kontakt-wahl";
 
 type Props = {
   /** gezogene Spaltenbreiten der Positionstabelle (je Benutzer) */
@@ -221,10 +222,18 @@ export function BelegEditor({ start, hinweis, modus, zahlungsbedingungen, kundeS
       router.refresh();
     });
 
+  const [kontaktWahl, setKontaktWahl] = useState<KontaktWahl | null>(null);
   const fertigstellen = () =>
     starte(async () => {
       setFehler(null);
       const r = await belegFertigstellen(z);
+      if (r.kontaktWahl) {
+        // Möglicherweise vorhandener Lexware-Kontakt: das Büro wählt, danach geht es von selbst weiter
+        if (r.id && !k.id) setKopf({ id: r.id });
+        setGeaendert(false);
+        geaendertRef.current = false;
+        return setKontaktWahl(r.kontaktWahl);
+      }
       if (r.fehler || !r.id) {
         if (r.id && !k.id && lexArt) {
           // Lexware-Beleg: Entwurf ist gespeichert, die Belegseite zeigt den Fehler und erlaubt das Wiederholen
@@ -992,6 +1001,14 @@ export function BelegEditor({ start, hinweis, modus, zahlungsbedingungen, kundeS
         </DialogContent>
       </Dialog>
 
+      <KontaktWahlDialog
+        wahl={kontaktWahl}
+        onSchliessen={() => setKontaktWahl(null)}
+        onGewaehlt={() => {
+          setKontaktWahl(null);
+          fertigstellen();
+        }}
+      />
       <VerlassenDialog
         verlassen={verlassen}
         text="Der Beleg hat ungespeicherte Änderungen. Was soll mit ihnen passieren?"

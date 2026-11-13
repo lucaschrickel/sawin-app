@@ -188,6 +188,11 @@ Eine Codebasis, je Kunde eine eigene Instanz. Diese Datei gilt für jede Arbeit 
     aus der Zeit vor Airtable).
   - **Storniert:** Übernommene Rechnungen und Abschläge können „Storniert“ sein. Sie zählen nirgends als Forderung,
     Abzug, Folgebeleg oder Schlussrechnung.
+- **Übergang ab dem Go-live (13.11.2026):** Go-live-Datum in Einstellungen › Verbindungen (`einstellung.golive_datum`,
+  nur Admin). Angebote, ABs und Lieferscheine, die danach direkt in Lexware entstehen, liest die App alle 30 Minuten
+  aus der Lexware-Belegliste (Cron und Dashboard, nur lesend, `src/lib/lexware/fremdbelege.ts`) und zeigt sie im
+  Dashboard unter „Braucht Aufmerksamkeit“. Lexware-Belege ohne Gegenstück in der App ignorieren Zahlungsabgleich und
+  Webhook (nur Protokolleintrag). Kurzanleitung fürs Büro in `docs/uebergabe.md`.
 - **KI-Agents (Version 2)** laufen als eigener Hintergrunddienst an einer Warteschlange in Supabase, nicht im Frontend.
 
 ## Anforderungen Version 1
@@ -309,6 +314,10 @@ Die Monteur-App kommt in Version 2.
   eine App-Nummer ab 30000 und nach der ersten Übertragung zusätzlich eine Lexware-Nummer aus Lexwares Kreis (10875 …);
   eine Überschneidung ist ausgeschlossen. Übernommene Kunden behalten ihre Lexware-Nummer als App-Nummer. Auf dem
   Lexware-PDF steht die Lexware-Kundennummer, in der Lexware-Notiz des Kontakts die App-Nummer.
+  **Keine doppelten Kunden (13.11.2026):** Vor dem Anlegen sucht die App in Lexware einen vorhandenen Kontakt
+  (Kundennummer, E-Mail, Name, Adresse; `src/lib/lexware/kontakt-abgleich.ts`). Genau ein sicherer Treffer wird
+  übernommen; nur mögliche Treffer → „Fertigstellen“ fragt „Diesen Kontakt verwenden“ oder „Neuen Kontakt anlegen“.
+  Kontakte, die schon ein anderer Kunde der App nutzt, scheiden aus.
 - Die Kundenseite zeigt alle Anfragen, Aufträge, Service-Tickets und Belege des Kunden.
 - **Konditionen:** Freitextfeld je Kunde (z. B. aktuelle Rabatte). Sehen und ändern dürfen es nur Benutzer mit dem
   Recht „Konditionen sehen“. Die Konditionen liegen in einer eigenen Tabelle mit eigener RLS-Policy, nicht als Spalte

@@ -1,5 +1,6 @@
 import { cronErlaubt } from "@/lib/lexware/webhook-pruefung";
 import { zahlungenAbgleichen } from "@/lib/lexware/zahlungen";
+import { fremdbelegePruefen } from "@/lib/lexware/fremdbelege";
 
 /*
   Vercel-Cron (vercel.json): Zahlungsstand aller offenen Lexware-Belege abgleichen. Vercel schickt
@@ -15,8 +16,10 @@ export async function GET(request: Request) {
   }
   try {
     const r = await zahlungenAbgleichen(null, true);
-    if (!r) return Response.json({ status: "übersprungen", grund: "Lexware nicht eingerichtet oder Abgleich läuft gerade" });
-    return Response.json({ status: "ok", ...r });
+    // Übergang: Angebote, ABs und Lieferscheine, die nach dem Stichtag direkt in Lexware entstanden sind (nur lesend)
+    const fremd = await fremdbelegePruefen(true).catch((x) => (console.error("Cron Fremdbelege:", x instanceof Error ? x.message : x), null));
+    if (!r) return Response.json({ status: "übersprungen", grund: "Lexware nicht eingerichtet oder Abgleich läuft gerade", fremdbelege: fremd?.length ?? null });
+    return Response.json({ status: "ok", ...r, fremdbelege: fremd?.length ?? null });
   } catch (x) {
     console.error("Cron Zahlungsabgleich:", x instanceof Error ? x.message : x);
     return Response.json({ status: "fehler" }, { status: 500 });

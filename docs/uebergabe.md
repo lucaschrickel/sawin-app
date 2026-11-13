@@ -265,6 +265,12 @@ APP_URL=http://localhost:3100 CRON_SECRET=<geheim> npm run test:onedrive
 - **Fehler:** Lehnt Lexware einen Beleg ab, bleibt er Entwurf, die Meldung steht auf der Belegseite, und
   „Fertigstellen“ versucht es erneut. Ein schon angelegter Beleg wird dabei gefunden (Kontakt, Datum, Betrag) und
   nicht doppelt angelegt. Fehlt das Original-PDF, holt die App es beim Öffnen nach („PDF von Lexware holen“).
+- **Keine doppelten Kunden:** Bevor die App für einen Kunden einen Lexware-Kontakt anlegt, sucht sie einen vorhandenen
+  (Kundennummer, E-Mail, Name, Adresse). Passt genau einer sicher, nutzt sie ihn; gibt es nur mögliche Treffer, fragt
+  „Fertigstellen“ nach: „Diesen Kontakt verwenden“ oder „Neuen Kontakt anlegen“. Das gilt mit leerer wie mit
+  übernommener Datenbank.
+- **Unbekannte Lexware-Belege** (z. B. vor dem Go-live in Lexware angelegt) ignorieren Zahlungsabgleich und Webhook:
+  kein Fehler, kein neuer Datensatz, nur ein Protokolleintrag (`lexware_ereignis` bzw. Server-Log).
 - **Beim Go-live in Sawins Lexware prüfen:** ob `vatfree` (steuerfreie Rechnung) für das Konto erlaubt ist, ob die
   Kontakte mit § 13b („Steuerfreie Rechnungen erlauben“) passen, und welche Nummernkreise Lexware für Rechnungen und
   Gutschriften verwendet. Die Kundennummer auf dem Lexware-PDF vergibt Lexware selbst.
@@ -286,6 +292,7 @@ Plan, Zuordnung und Regeln: `docs/airtable-uebernahme.md`. Am Go-live-Tag, nachd
 6. In Vercel (Production) `LEXWARE_ALTBESTAND=aktiv` und `ONEDRIVE_ALTBESTAND=aktiv` setzen und neu bereitstellen.
 7. `npm run golive:pruefen -- --env=.env.produktion` erneut (nach dem Import).
 8. Lexware-Webhook für die Produktionsadresse registrieren (`node scripts/lexware-webhook.mjs`, siehe „Lexware“).
+9. In der App unter Einstellungen › Verbindungen das **Go-live-Datum** eintragen (Stichtag, siehe unten).
 
 Der Lauf ist wiederholbar: Ein zweiter Lauf legt nichts doppelt an und überschreibt nichts, was inzwischen in der App
 geändert wurde.
@@ -294,3 +301,24 @@ Staging vor einem Probelauf leeren: `npm run staging:leeren -- --projekt=<stagin
 Das Skript löscht die Geschäftsdaten endgültig und leert die Storage-Buckets und den OneDrive-Ordner `_App-Test`.
 Benutzer, Einstellungen und Stammdaten bleiben. In einer Umgebung mit aktivem Altbestand-Schalter bricht es ab.
 
+## Ab dem Stichtag: was im Büro wo passiert (Kurzanleitung für Sawin)
+
+Ab dem Go-live-Datum (Einstellungen › Verbindungen) gilt:
+
+| Aufgabe | Wo |
+|---|---|
+| Kunden anlegen und ändern | **App** (der Kunde geht beim ersten Rechnungsbeleg automatisch an Lexware; Änderungen nur in der App pflegen) |
+| Angebote, Auftragsbestätigungen, Teil-ABs, Lieferscheine | **nur App** (nicht mehr in Lexware anlegen) |
+| Rechnungen, Abschlagsrechnungen, Gutschriften | **in der App erstellen**, „Fertigstellen“ legt sie in Lexware an; versendet wird nur das Lexware-PDF |
+| Zahlungseingänge buchen (Bank) | **Lexware** wie bisher; die App übernimmt den Stand automatisch |
+| Bar- oder Kartenzahlung | in der App „Als bezahlt markieren“ **und** in Lexware buchen (die App erinnert mit „in Lexware noch buchen“) |
+| Mahnungen, Buchhaltung, Steuerberater, DATEV | **Lexware** wie bisher |
+| Belege aus der Zeit vor dem Stichtag | bleiben in Lexware; die übernommenen sind in der App als Altbestand mit Link zum Original sichtbar |
+
+Legt jemand nach dem Stichtag doch ein Angebot, eine AB oder einen Lieferschein direkt in Lexware an, zeigt das
+Dashboard unter „Braucht Aufmerksamkeit“ einen Hinweis (Prüfung alle 30 Minuten, nur lesend). Den Beleg dann in der App
+nachtragen und in Lexware archivieren. Rechnungen und Gutschriften, die nicht aus der App kommen, stören die App nicht,
+erscheinen dort aber auch nicht.
+
+Vor dem Stichtag einmal `npm run golive:pruefen` gegen Sawins Lexware laufen lassen (siehe „Datenübernahme“): Die
+Nummernkreise der App müssen über den höchsten Nummern in Lexware liegen.

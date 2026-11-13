@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Field, Input } from "@/components/ui/field";
 import { Formular } from "@/components/ui/formular";
 import { jetztNachladen, verbindungSpeichern } from "../../ablage/aktionen";
-import { bccSpeichern, type Ergebnis } from "./aktionen";
+import { bccSpeichern, fremdbelegeJetztPruefen, stichtagSpeichern, type Ergebnis } from "./aktionen";
 
 const Meldung = ({ e }: { e: { fehler?: string; hinweis?: string; ok?: boolean } }) =>
   e.fehler ? (
@@ -61,6 +61,50 @@ const ART_TEXT: Record<string, string> = {
   zahlungsbestaetigung: "Zahlungsbestätigung",
   gutschrift: "Gutschrift",
 };
+
+/** Go-live-Datum: ab diesem Tag entstehen Angebote, ABs und Lieferscheine nur noch in der App */
+export function StichtagFormular({ wert, admin }: { wert: string | null; admin: boolean }) {
+  const [z, aktion, laeuft] = useActionState<Ergebnis, FormData>(stichtagSpeichern, {});
+  return (
+    <Formular aktion={aktion} className="flex flex-wrap items-end gap-3" data-stichtag-formular>
+      <Field label="Go-live-Datum (Stichtag)" error={z.felder?.golive_datum}>
+        {(p) => <Input {...p} type="date" name="golive_datum" defaultValue={wert ?? ""} disabled={!admin} className="w-[180px]" />}
+      </Field>
+      {admin && (
+        <Button type="submit" variant="secondary" disabled={laeuft}>
+          Speichern
+        </Button>
+      )}
+      {z.fehler && <p role="alert" className="w-full rounded-md bg-tone-red-bg px-3.5 py-2.5 text-sm text-tone-red-fg">{z.fehler}</p>}
+      {z.ok && <p role="status" className="w-full rounded-md bg-tone-green-bg px-3.5 py-2.5 text-sm text-tone-green-fg">Gespeichert und Lexware geprüft.</p>}
+    </Formular>
+  );
+}
+
+/** Lexware sofort auf Belege nach dem Stichtag prüfen (nur lesend) */
+export function FremdbelegeKnopf() {
+  const [laeuft, start] = useTransition();
+  const [fehler, setFehler] = useState<string | null>(null);
+  return (
+    <span className="inline-flex items-center gap-2">
+      <Button
+        variant="ghost"
+        size="sm"
+        disabled={laeuft}
+        data-fremdbelege-pruefen
+        onClick={() =>
+          start(async () => {
+            const r = await fremdbelegeJetztPruefen();
+            setFehler(r.fehler ?? null);
+          })
+        }
+      >
+        {laeuft ? "Prüft …" : "Jetzt prüfen"}
+      </Button>
+      {fehler && <span role="alert" className="text-sm text-tone-red-fg">{fehler}</span>}
+    </span>
+  );
+}
 
 /** Interne Kopie (BCC) je Belegart */
 export function BccFormular({ werte, admin }: { werte: Record<string, string>; admin: boolean }) {

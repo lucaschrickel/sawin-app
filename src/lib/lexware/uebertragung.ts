@@ -10,6 +10,7 @@ import { pdfDateiname } from "@/lib/pdf/beleg-pdf";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { lexware, LexwareFehler } from "./client";
 import { kontaktDaten, kontaktHash, landCode, type KundeLex } from "./kontakt-daten";
+import { kontaktAbgleich, type Abgleich, type Kandidat, type LexKontakt } from "./kontakt-abgleich";
 import { lexwareAltbestandAktiv } from "@/lib/altbestand";
 
 export { landCode };
@@ -48,6 +49,37 @@ const voucherTyp = (art: string) => (art === "gutschrift" ? "creditnote" : "invo
 
 type Kontakt = { id: string; version: number; roles?: unknown; company?: Record<string, unknown>; person?: Record<string, unknown> } & Record<string, unknown>;
 
+/** Mögliche vorhandene Kontakte in Lexware: das Büro wählt (vorhandenen verwenden oder neu anlegen) */
+export class KontaktWahlNoetig extends Error {
+  constructor(
+    public kundeId: string,
+    public kandidaten: Kandidat[],
+  ) {
+    super("In Lexware gibt es möglicherweise schon einen Kontakt für diesen Kunden. Bitte auswählen.");
+  }
+}
+
+/** Vorhandene Lexware-Kontakte zum Kunden suchen (E-Mail, Name, Nachname, Kundennummer; nur lesend) */
+async function kontaktSuchen(k: KundeLex): Promise<Abgleich> {
+  const suchen: string[] = [];
+  if (k.email?.trim()) suchen.push(`email=${encodeURIComponent(k.email.trim())}`);
+  const name = k.name.trim();
+  if (name.length >= 3) suchen.push(`name=${encodeURIComponent(name)}`);
+  const nachname = name.split(/\s+/).at(-1) ?? "";
+  if (nachname.length >= 3 && nachname !== name) suchen.push(`name=${encodeURIComponent(nachname)}`);
+  if (/^\d+$/.test(k.nummer)) suchen.push(`number=${k.nummer}`);
+  const gefunden: LexKontakt[] = [];
+  for (const q of suchen) {
+    const r = await lexware<{ content?: LexKontakt[] }>("GET", `/v1/contacts?${q}&customer=true&size=25`);
+    gefunden.push(...(r.content ?? []));
+  }
+  // Kontakte, die schon ein anderer Kunde der App nutzt, kommen nicht in Frage (eine Lexware-ID gehört zu genau einem Kunden)
+  const ids = [...new Set(gefunden.map((c) => c.id))];
+  const { data: vergeben } = ids.length ? await createAdminClient().from("kunde").select("lexware_kontakt_id").in("lexware_kontakt_id", ids).neq("id", k.id) : { data: [] };
+  const belegt = new Set((vergeben ?? []).map((x) => x.lexware_kontakt_id as string));
+  return kontaktAbgleich({ nummer: k.nummer, name: k.name, email: k.email, strasse: k.strasse, plz: k.plz }, gefunden.filter((c) => !belegt.has(c.id)));
+}
+
 /**
  * Kontakt in Lexware sichern: beim ersten Lexware-Beleg anlegen, danach nur bei Änderungen aktualisieren
  * (App → Lexware, nie zurück). Gibt die Lexware-Kontakt-ID zurück.
@@ -65,14 +97,24 @@ export async function kontaktSichern(kundeId: string, benutzerId: string): Promi
   // Übernommener Kunde, dessen Kontakt in diesem Lexware-Konto nicht genutzt wird (Staging): eigener Kontakt
   const ersetzen = k.altbestand && !lexwareAltbestandAktiv();
   let id = ersetzen ? null : k.lexware_kontakt_id;
+  // Keine doppelten Kunden: vor dem Anlegen nach einem vorhandenen Kontakt suchen
+  let vorhanden = false;
+  if (!id) {
+    const a = await kontaktSuchen(k);
+    if (a.art === "unsicher") throw new KontaktWahlNoetig(k.id, a.kandidaten);
+    if (a.art === "eindeutig") {
+      id = a.id;
+      vorhanden = true;
+    }
+  }
   if (!id) {
     const r = await lexware<{ id: string }>("POST", "/v1/contacts", { body: { version: 0, ...daten } });
     id = r.id;
-  } else if (k.lexware_hash !== hash) {
+  } else if (vorhanden || k.lexware_hash !== hash) {
     const alt = await lexware<Kontakt>("GET", `/v1/contacts/${id}`);
     const neu: Record<string, unknown> = { ...alt, ...daten, roles: alt.roles ?? daten.roles, version: alt.version };
-    if (k.altbestand) {
-      // Aus Lexware übernommen: Vor- und Nachname, Ansprechpartner und Notiz in Lexware nicht durch die einfachere
+    if (k.altbestand || vorhanden || !k.lexware_hash) {
+      // Aus Lexware übernommen bzw. vorhandener Kontakt: Vor- und Nachname, Ansprechpartner und Notiz in Lexware nicht durch die einfachere
       // Darstellung der App ersetzen, solange sie dasselbe meinen
       const p = alt.person as { firstName?: string; lastName?: string } | undefined;
       if (p && [p.firstName, p.lastName].filter(Boolean).join(" ").trim() === k.name.trim())
@@ -88,8 +130,39 @@ export async function kontaktSichern(kundeId: string, benutzerId: string): Promi
   } else {
     return id;
   }
-  const { error: e2 } = await admin.rpc("lexware_kunde", { p_kunde: k.id, p_benutzer: benutzerId, p_kontakt_id: id, p_hash: hash, p_ersetzen: ersetzen });
+  const { error: e2 } = await admin.rpc("lexware_kunde", { p_kunde: k.id, p_benutzer: benutzerId, p_kontakt_id: id, p_hash: hash, p_ersetzen: ersetzen || vorhanden });
   if (e2) throw new LexwareFehler("Die Lexware-Kontakt-ID konnte nicht gespeichert werden.", 0);
+  return id;
+}
+
+/**
+ * Auswahl des Büros nach „möglicherweise schon vorhanden“: vorhandenen Lexware-Kontakt verwenden (wird geprüft) oder
+ * neu anlegen. Danach läuft „Fertigstellen“ wie gewohnt weiter.
+ */
+export async function kontaktFestlegen(kundeId: string, wahl: string, benutzerId: string): Promise<string> {
+  const admin = createAdminClient();
+  const { data: k } = await admin
+    .from("kunde")
+    .select("id, nummer, name, typ, anrede, bauleister_13b, ansprechpartner, strasse, plz, ort, land, telefon, email, lexware_kontakt_id, lexware_hash, altbestand")
+    .eq("id", kundeId)
+    .maybeSingle<KundeLex>();
+  if (!k) throw new LexwareFehler("Der Kunde wurde nicht gefunden.", 0);
+  const ersetzen = k.altbestand && !lexwareAltbestandAktiv();
+  if (k.lexware_kontakt_id && !ersetzen) return k.lexware_kontakt_id;
+  let id: string;
+  let hash: string | null = null;
+  if (wahl === "neu") {
+    id = (await lexware<{ id: string }>("POST", "/v1/contacts", { body: { version: 0, ...kontaktDaten(k) } })).id;
+    hash = kontaktHash(k);
+  } else {
+    if (!/^[0-9a-f-]{36}$/i.test(wahl)) throw new LexwareFehler("Unbekannter Kontakt.", 0);
+    const c = await lexware<LexKontakt & { roles?: { customer?: unknown } }>("GET", `/v1/contacts/${wahl}`);
+    if (!c.roles?.customer) throw new LexwareFehler("Der gewählte Lexware-Kontakt ist kein Kunde.", 0);
+    id = c.id;
+  }
+  // Ohne Prüfsumme gleicht die nächste Übertragung die Daten der App behutsam mit dem Kontakt ab
+  const { error } = await admin.rpc("lexware_kunde", { p_kunde: k.id, p_benutzer: benutzerId, p_kontakt_id: id, p_hash: hash ?? "", p_ersetzen: true });
+  if (error) throw new LexwareFehler("Die Lexware-Kontakt-ID konnte nicht gespeichert werden.", 0);
   return id;
 }
 
@@ -272,7 +345,9 @@ export async function lexwarePdfNachladen(d: BelegDetail): Promise<string | null
   return pfad;
 }
 
-export type Uebertragung = { ok: true; nummer: string; hinweis?: string } | { ok: false; fehler: string };
+export type Uebertragung =
+  | { ok: true; nummer: string; hinweis?: string }
+  | { ok: false; fehler: string; kontaktWahl?: { kundeId: string; kandidaten: Kandidat[] } };
 
 /** Beleg an Lexware übertragen (nach dem Bestätigungsdialog). Fehler werden am Beleg gespeichert und angezeigt. */
 export async function anLexwareUebertragen(id: string): Promise<Uebertragung> {
@@ -343,6 +418,7 @@ export async function anLexwareUebertragen(id: string): Promise<Uebertragung> {
   } catch (e) {
     const meldung = e instanceof Error ? e.message : "Unbekannter Fehler bei der Übertragung an Lexware.";
     await admin.rpc("lexware_fehler", { p_id: id, p_benutzer: benutzer.id, p_fehler: meldung });
+    if (e instanceof KontaktWahlNoetig) return { ok: false, fehler: meldung, kontaktWahl: { kundeId: e.kundeId, kandidaten: e.kandidaten } };
     return { ok: false, fehler: `Lexware: ${meldung}` };
   }
 }

@@ -4,6 +4,7 @@ import { refresh } from "next/cache";
 import { pruefeAdmin } from "@/lib/auth/sitzung";
 import { BELEGARTEN } from "@/lib/belege-status";
 import { adressenLesen } from "@/lib/versand";
+import { fremdbelegePruefen } from "@/lib/lexware/fremdbelege";
 
 export type Ergebnis = { ok?: boolean; fehler?: string; felder?: Record<string, string> };
 
@@ -28,6 +29,34 @@ export async function bccSpeichern(_: Ergebnis, fd: FormData): Promise<Ergebnis>
         ? await supabase.from("belegart_einstellung").insert({ belegart: art, bcc_email: bcc })
         : { error: null };
     if (error) return { fehler: "Die interne Kopie konnte nicht gespeichert werden." };
+  }
+  refresh();
+  return { ok: true };
+}
+
+/** Go-live-Datum (Stichtag) setzen oder leeren (nur Admin); danach sofort Lexware prüfen */
+export async function stichtagSpeichern(_: Ergebnis, fd: FormData): Promise<Ergebnis> {
+  const { supabase } = await pruefeAdmin();
+  const datum = String(fd.get("golive_datum") ?? "").trim();
+  if (datum && !/^\d{4}-\d{2}-\d{2}$/.test(datum)) return { fehler: "Bitte ein gültiges Datum eingeben.", felder: { golive_datum: "Ungültiges Datum." } };
+  const { error } = await supabase.from("einstellung").update({ golive_datum: datum || null }).eq("einzig", true);
+  if (error) return { fehler: "Der Stichtag konnte nicht gespeichert werden." };
+  try {
+    await fremdbelegePruefen(true);
+  } catch {
+    // Lexware nicht erreichbar: der nächste Cron-Lauf prüft
+  }
+  refresh();
+  return { ok: true };
+}
+
+/** Lexware jetzt auf Belege nach dem Stichtag prüfen (nur lesend) */
+export async function fremdbelegeJetztPruefen(): Promise<Ergebnis> {
+  await pruefeAdmin();
+  try {
+    await fremdbelegePruefen(true);
+  } catch (x) {
+    return { fehler: `Lexware: ${x instanceof Error ? x.message : "nicht erreichbar"}` };
   }
   refresh();
   return { ok: true };

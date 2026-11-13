@@ -10,6 +10,7 @@ import { rund } from "@/lib/beleg-summen";
 import { anzeigeStatus, auftragFinanzen, type BelegKurz } from "@/lib/belege-status";
 import { AUFTRAG_PHASEN, type AuftragPhase } from "@/lib/status";
 import { kalenderwoche, montagVon, plusTage } from "@/lib/woche";
+import { fremdbelegeImHintergrund, FREMD_TYP_TEXT, type Fremdbeleg } from "@/lib/lexware/fremdbelege";
 import { berlinNachUtc, heuteBerlin, utcNachBerlinLokal } from "@/lib/zeit";
 
 /**
@@ -73,7 +74,8 @@ const tageText = (n: number) => (n < 0 ? "überfällig" : n === 0 ? "heute" : `i
 /** „Braucht Aufmerksamkeit“ – nur was jetzt zu tun ist, je Thema eine Zeile */
 async function ladeHinweise(z: Zeit, einsaetze: TafelEinsatz[], konflikte: Set<string>): Promise<Hinweis[]> {
   const { supabase } = await pruefeSitzung();
-  const [abw, tickets, pruef, wv, aufgaben, bestellungen, fahrzeuge, namen, buchen, rechnungen, angebote, ohneRechnung] = await Promise.all([
+  fremdbelegeImHintergrund();
+  const [abw, tickets, pruef, wv, aufgaben, bestellungen, fahrzeuge, namen, buchen, rechnungen, angebote, ohneRechnung, golive] = await Promise.all([
     supabase.from("abwesenheit").select("mitarbeiter_id, art, von").eq("status", "beantragt").order("von"),
     supabase.from("service_ticket").select("id, nummer, thema").eq("status", "neu").order("nummer"),
     supabase.from("auftrag").select("id, nummer, pruefhinweis, kunde:kunde_id(name)").not("pruefhinweis", "is", null).returns<{ id: string; nummer: string; pruefhinweis: string; kunde: { name: string } | null }[]>(),
@@ -96,6 +98,8 @@ async function ladeHinweise(z: Zeit, einsaetze: TafelEinsatz[], konflikte: Set<s
       .neq("rechnungen.status", "entwurf")
       .order("nummer")
       .returns<{ id: string; nummer: string; rechnungen: { id: string; teil: boolean }[] }[]>(),
+    // Übergang: Angebote, ABs, Lieferscheine, die nach dem Stichtag direkt in Lexware entstanden sind
+    supabase.from("einstellung").select("golive_datum, lexware_fremdbelege").eq("einzig", true).maybeSingle<{ golive_datum: string | null; lexware_fremdbelege: Fremdbeleg[] }>(),
   ]);
   const name = new Map(namen.map((m) => [m.id, m.name]));
   const liste = (xs: string[]) => xs.slice(0, 3).join(" · ") + (xs.length > 3 ? ` · +${xs.length - 3}` : "");
@@ -113,6 +117,14 @@ async function ladeHinweise(z: Zeit, einsaetze: TafelEinsatz[], konflikte: Set<s
   const ueb = bestellungen.liste.filter((b) => b.abgeleitet === "ueberfaellig");
   if (ueb.length) h.push({ titel: `${mehrzahl(ueb.length, "Bestellung", "Bestellungen")} überfällig`, info: liste(ueb.map((b) => `${b.nummer} ${b.lieferant?.name ?? ""}`)), href: "/bestellungen", ton: "red" });
   if (fahrzeuge.length) h.push({ titel: `${mehrzahl(fahrzeuge.length, "Fahrzeugtermin", "Fahrzeugtermine")} fällig`, info: liste(fahrzeuge.map((f) => `${f.kennzeichen} ${f.pruefung} ${tageText(f.tage)}`)), href: "/fahrzeuge", ton: fahrzeuge.some((f) => f.tage < 0) ? "red" : "amber" });
+  const fremd = golive.data?.golive_datum ? (golive.data.lexware_fremdbelege ?? []) : [];
+  if (fremd.length)
+    h.push({
+      titel: `${mehrzahl(fremd.length, "Beleg", "Belege")} nach dem Go-live direkt in Lexware angelegt`,
+      info: liste(fremd.map((f) => `${FREMD_TYP_TEXT[f.typ] ?? f.typ} ${f.nummer ?? "Entwurf"}`)),
+      href: "/einstellungen/verbindungen#stichtag",
+      ton: "red",
+    });
   for (const p of pruef.data ?? []) h.push({ titel: `Prüfhinweis bei ${p.nummer}`, info: `${p.kunde?.name ?? ""} · ${p.pruefhinweis.length > 60 ? `${p.pruefhinweis.slice(0, 60)}…` : p.pruefhinweis}`, href: `/auftraege/${p.id}`, ton: "amber" });
   const w = wv.data ?? [];
   if (w.length) h.push({ titel: `${mehrzahl(w.length, "Anfrage", "Anfragen")} zur Wiedervorlage`, info: liste(w.map((x) => x.titel)), href: w.length === 1 ? `/anfragen/${w[0].id}` : "/anfragen", ton: "gray" });

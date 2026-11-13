@@ -7,7 +7,8 @@ import { abrechnungAnwenden } from "@/lib/beleg-abrechnung";
 import { aufbereiten, meldung } from "@/lib/beleg-eingabe";
 import { BELEGART_TEXT, LEXWARE_BELEGARTEN } from "@/lib/belege-status";
 import { adressenLesen, versandDateiname } from "@/lib/versand";
-import { anLexwareUebertragen, lexwarePdfNachladen } from "@/lib/lexware/uebertragung";
+import { anLexwareUebertragen, kontaktFestlegen, lexwarePdfNachladen } from "@/lib/lexware/uebertragung";
+import type { Kandidat } from "@/lib/lexware/kontakt-abgleich";
 import { zahlstandHolen } from "@/lib/lexware/zahlungen";
 import { imHintergrund, ordnerFuer, ordnerZumAuftrag } from "@/lib/onedrive/ablage";
 import { aufmasseNachziehen } from "@/lib/formular-ablage";
@@ -15,7 +16,18 @@ import type { EditorZustand } from "@/lib/beleg-typen";
 import { lexwareAltbestandAktiv } from "@/lib/altbestand";
 import { ladeBeleg, ladeKundeFuerBeleg, kundeVorbelegung, type KundeFuerBeleg } from "@/lib/belege";
 
-export type Ergebnis = { fehler?: string; ok?: boolean; hinweis?: string; id?: string; nummer?: string | null; auftragId?: string | null; frage?: "anfrage_verloren"; anfrageId?: string };
+export type Ergebnis = {
+  fehler?: string;
+  ok?: boolean;
+  hinweis?: string;
+  id?: string;
+  nummer?: string | null;
+  auftragId?: string | null;
+  frage?: "anfrage_verloren";
+  anfrageId?: string;
+  /** Mögliche vorhandene Lexware-Kontakte: das Büro wählt */
+  kontaktWahl?: { kundeId: string; kandidaten: Kandidat[] };
+};
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const kurz = (s: unknown, max: number) => String(s ?? "").slice(0, max);
@@ -66,7 +78,7 @@ export async function belegFertigstellen(z: EditorZustand): Promise<Ergebnis> {
     // Rechnung, Abschlag, Gutschrift: in Lexware anlegen (nach dem Bestätigungsdialog im Editor)
     const u = await anLexwareUebertragen(r.id);
     refresh();
-    return u.ok ? { ok: true, id: r.id, nummer: u.nummer, hinweis: u.hinweis } : { fehler: u.fehler, id: r.id };
+    return u.ok ? { ok: true, id: r.id, nummer: u.nummer, hinweis: u.hinweis } : { fehler: u.fehler, id: r.id, kontaktWahl: u.kontaktWahl };
   }
   const { supabase } = await pruefeSitzung();
   const { data, error } = await supabase.rpc("beleg_fertigstellen", { p_id: r.id });
@@ -262,4 +274,16 @@ export async function belegVersenden(id: string, e: { an: string; bcc: string; b
   if (error) return { fehler: meldung(error, "Der Versand konnte nicht vorbereitet werden.") };
   refresh();
   return { ok: true, datei, version: Number(data) };
+}
+
+/** Auswahl nach „möglicherweise schon vorhanden“: Lexware-Kontakt verwenden (ID) oder neu anlegen („neu“) */
+export async function lexwareKontaktFestlegen(kundeId: string, wahl: string): Promise<Ergebnis> {
+  if (!UUID.test(kundeId)) return { fehler: "Kunde nicht gefunden." };
+  const { benutzer } = await pruefeSitzung();
+  try {
+    await kontaktFestlegen(kundeId, wahl, benutzer.id);
+    return { ok: true };
+  } catch (e) {
+    return { fehler: `Lexware: ${e instanceof Error ? e.message : "unbekannter Fehler"}` };
+  }
 }

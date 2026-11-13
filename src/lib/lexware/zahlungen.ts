@@ -56,7 +56,7 @@ export async function zahlstandHolen(b: { id: string; lexware_id: string; art: s
  * Abgleich aller offenen Lexware-Belege. Höchstens alle 5 Minuten (erzwingen: sofort). Liest die Belegliste ab dem
  * Datum der ältesten offenen Forderung und holt Zahlungsposten nur, wo sich offener Betrag oder Status geändert hat.
  */
-export async function zahlungenAbgleichen(benutzerId: string | null, erzwingen = false): Promise<{ geprueft: number; geaendert: number; fehler: number } | null> {
+export async function zahlungenAbgleichen(benutzerId: string | null, erzwingen = false): Promise<{ geprueft: number; geaendert: number; fehler: number; ignoriert?: number } | null> {
   if (!process.env.LEXWARE_API_KEY?.trim()) return null;
   const admin = createAdminClient();
   const { data: start, error: startFehler } = await admin.rpc("lexware_abgleich_beginnen", { p_abstand: erzwingen ? "0 seconds" : "5 minutes" });
@@ -104,7 +104,12 @@ export async function zahlungenAbgleichen(benutzerId: string | null, erzwingen =
       console.error(`Zahlungsabgleich ${b.id}:`, e instanceof Error ? e.message : e);
     }
   }
-  return { geprueft: belege.length, geaendert, fehler };
+  // Lexware-Belege ohne Gegenstück in der App (z. B. vor dem Go-live direkt in Lexware angelegt) bleiben unberührt:
+  // kein Fehler, kein neuer Datensatz, nur ein Protokolleintrag
+  const bekannt = new Set(belege.map((b) => b.lexware_id));
+  const ignoriert = [...liste.keys()].filter((id) => !bekannt.has(id)).length;
+  if (ignoriert) console.info(`Zahlungsabgleich: ${ignoriert} Lexware-Belege ohne Beleg in der App ignoriert`);
+  return { geprueft: belege.length, geaendert, fehler, ignoriert };
 }
 
 /** Beim Öffnen einer Seite: Abgleich im Hintergrund nach der Antwort (höchstens alle 5 Minuten) */
