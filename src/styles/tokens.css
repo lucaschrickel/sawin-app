@@ -137,42 +137,48 @@
 [data-theme="dark"] {
   color-scheme: dark;
 
-  --canvas: #0c0c0c;
-  --surface: #1a1a1a;
-  --surface-muted: #171717;
-  --surface-sunken: #2a2a2a;
+  /* Gestaffelte, warme Dunkelgrautöne wie in der Demo (kein reines Schwarz): Rahmen < Seite < Karte < Feld */
+  --canvas: #1b1a18;
+  --surface: #252320;
+  --surface-muted: #211f1c;
+  --surface-sunken: #2a2824;
 
-  --line: rgb(255 255 255 / 0.1);
-  --line-strong: rgb(255 255 255 / 0.25);
-  --line-soft: rgb(255 255 255 / 0.06);
+  --line: #3b3833;
+  --line-strong: #57524b;
+  --line-soft: #34312c;
 
-  --ink: #ffffff;
-  --ink-2: #d1d5db;
-  --ink-3: #d1d5db;
-  --muted: #9ca3af;
-  --muted-2: #9ca3af;
+  /* Text, auf allen vier Flächen mind. 4,5:1 */
+  --ink: #eeeae5;
+  --ink-2: #ddd8d1;
+  --ink-3: #c4beb6;
+  --muted: #ada79f;
+  --muted-2: #a29c94;
 
-  --accent: #e9e6e2;
+  /* Seitenleiste im Dunkelmodus: dunkelste Stufe */
+  --frame: #121110;
+  --frame-2: #1b1a18;
+
+  --accent: #eeeae5;
   --accent-hover: #ffffff;
   --accent-ink: #171717;
-  --accent-soft: #222120;
-  --accent-soft-2: #2a2a2a;
-  --accent-text: #e9e6e2;
+  --accent-soft: #2f2c28;
+  --accent-soft-2: #3a3732;
+  --accent-text: #eeeae5;
 
-  --tone-gray-bg: #222120;
-  --tone-gray-fg: #b8b2a6;
-  --tone-blue-bg: #222120;
-  --tone-blue-fg: #c9c4ba;
-  --tone-green-bg: #16231b;
-  --tone-green-fg: #8fc4a3;
-  --tone-amber-bg: #26220f;
-  --tone-amber-fg: #d4c07a;
-  --tone-red-bg: #2a1813;
-  --tone-red-fg: #e09a86;
-  --tone-dark-bg: #2a2a2a;
-  --tone-dark-fg: #ffffff;
+  --tone-gray-bg: #2f2c28;
+  --tone-gray-fg: #c4beb6;
+  --tone-blue-bg: #1e2b3a;
+  --tone-blue-fg: #a7c1e0;
+  --tone-green-bg: #1d3327;
+  --tone-green-fg: #8fcca6;
+  --tone-amber-bg: #3a2f1c;
+  --tone-amber-fg: #e5be78;
+  --tone-red-bg: #43251f;
+  --tone-red-fg: #ee968a;
+  --tone-dark-bg: #3a3732;
+  --tone-dark-fg: #eeeae5;
 
-  --dot-dark: #d1d5db;
+  --dot-dark: #ddd8d1;
 
   --plan-1: #6b5444;
   --plan-2: #3f5268;
@@ -198,12 +204,12 @@
   --cal-abw: #e58c80;
   --cal-abw-bg: #43251f;
 
-  --focus-ring: #e9e6e2;
+  --focus-ring: #eeeae5;
   --logo-ink: #ffffff;
 
-  --shadow-card: none;
-  --shadow-hover: none;
-  --shadow-pop: 0 4px 6px -1px rgb(0 0 0 / 0.5), 0 2px 4px -1px rgb(0 0 0 / 0.4);
+  --shadow-card: 0 1px 2px rgb(0 0 0 / 0.3);
+  --shadow-hover: 0 6px 18px rgb(0 0 0 / 0.4);
+  --shadow-pop: 0 24px 60px rgb(0 0 0 / 0.6);
 }
 
 /*

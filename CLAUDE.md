@@ -917,7 +917,9 @@ Maßstab ist OWASP ASVS Level 1. Vor dem Start mit Echtdaten müssen alle Mindes
   `seitenleiste_hell`, wirkt sofort). Gesetzt wird `data-theme="dark"` bzw. `data-seitenleiste="hell"` auf `<html>`
   (Dialoge und Auswahllisten hängen am `<body>`); ein kleines Skript im `<head>` setzt die zuletzt gewählte
   Darstellung aus dem localStorage vor dem ersten Zeichnen, die App gleicht sie danach mit der Datenbank ab („Wie das
-  System“ folgt einem Wechsel des Betriebssystems sofort). Bei der CSP mit Nonce muss das Skript die Nonce bekommen. Die
+  System“ folgt einem Wechsel des Betriebssystems sofort). **Dunkle Werte wie in der Demo (13.11.2026):** gestaffelte,
+  warme Grautöne statt Schwarz (Seitenleiste `#121110` < Seite `#1b1a18` < Karte `#252320` < Feld `#2a2824`), Text
+  `#eeeae5` bis `#a29c94`, Statusfarben der Demo; alle Text/Fläche-Paare mind. 4,5:1 (rechnerisch geprüft). Bei der CSP mit Nonce muss das Skript die Nonce bekommen. Die
   Seitenleiste nutzt nur Frame-Tokens (`--frame-text`, `--frame-strong`, `--frame-hover`, `--frame-chip`,
   `--frame-alarm`); die helle Seitenleiste setzt sie unter `:root[data-seitenleiste="hell"]:not([data-theme="dark"])`.
 - **Logo:** exakt das Logo von sawin-bauelemente.de, als SVG nachgezeichnet: Gebäude-Symbol (Konturen in Strichfarbe,

@@ -59,12 +59,12 @@
   --accent: #d1b19a;
   --accent-hover: #c4a089;
   --accent-ink: #171717;
-  --accent-soft: #241d18;
-  --accent-soft-2: #2e241c;
-  --accent-text: #d1b19a;
+  --accent-soft: #3a2f27;
+  --accent-soft-2: #4a3b30;
+  --accent-text: #dcbfa9;
 
-  --tone-brand-bg: #241d18;
-  --tone-brand-fg: #e0c9b2;
+  --tone-brand-bg: #3a2f27;
+  --tone-brand-fg: #e6cdb9;
 
   --focus-ring: #d1b19a;
   /* Logo auf dunklem Grund: Konturen weiß */

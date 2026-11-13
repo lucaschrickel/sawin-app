@@ -96,7 +96,7 @@ try {
   const hellCanvas = await var_("--canvas");
   await b.klick("[data-farbschema=dunkel]");
   pruefe("Dunkel sofort", await b.warte("document.documentElement.dataset.theme === 'dark'"));
-  pruefe("… Flächen dunkel", (await var_("--canvas")) === "#0c0c0c", `${hellCanvas} → ${await var_("--canvas")}`);
+  pruefe("… Flächen dunkel", (await var_("--canvas")) === "#1b1a18", `${hellCanvas} → ${await var_("--canvas")}`);
   pruefe("… Akzent Sawin-Sand bleibt", (await var_("--accent")) === "#d1b19a");
   pruefe("… gespeichert", !!(await (async () => { for (let i = 0; i < 40; i++) { const [r] = await dbAbfrage("select farbschema from public.benutzer_einstellung where benutzer_id = $1", [admin.id]); if (r?.farbschema === "dunkel") return true; await sleep(250); } return false; })()));
   await foto("darstellung-dunkel");
@@ -117,7 +117,7 @@ try {
   pruefe("Helle Seitenleiste", await b.warte("document.documentElement.dataset.seitenleiste === 'hell'") && (await var_("--frame")) === "#efede8");
   await foto("seitenleiste-hell");
   await b.klick("[data-farbschema=dunkel]");
-  pruefe("Im Dunkelmodus bleibt die Seitenleiste dunkel", await b.warte("document.documentElement.dataset.theme === 'dark'") && (await var_("--frame")) === "#171717");
+  pruefe("Im Dunkelmodus bleibt die Seitenleiste dunkel", await b.warte("document.documentElement.dataset.theme === 'dark'") && (await var_("--frame")) === "#121110");
   const [e] = await dbAbfrage("select farbschema, seitenleiste_hell from public.benutzer_einstellung where benutzer_id = $1", [admin.id]);
   pruefe("Gespeichert: dunkel, Seitenleiste hell (wirkt im hellen Schema)", e?.farbschema === "dunkel" && e.seitenleiste_hell === true, JSON.stringify(e));
   await b.klick("[data-farbschema=hell]");
