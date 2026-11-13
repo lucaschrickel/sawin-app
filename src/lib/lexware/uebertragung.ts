@@ -1,7 +1,7 @@
 import "server-only";
 import { belegPdfAblegen, imHintergrund } from "@/lib/onedrive/ablage";
 import { pruefeSitzung } from "@/lib/auth/sitzung";
-import { BUCKET } from "@/lib/beleg-ablage";
+import { pdfSpeichern } from "@/lib/beleg-ablage";
 import { belegSummen, rund } from "@/lib/beleg-summen";
 import { htmlZuText, zahlungsbedingungFuellen } from "@/lib/beleg-typen";
 import { ladeBeleg, type BelegDetail } from "@/lib/belege";
@@ -322,16 +322,15 @@ async function vorhandenSuchen(d: BelegDetail, kontaktId: string, seit: string):
   return frei[0]?.id ?? null;
 }
 
-/** Original-PDF von Lexware holen und im Speicher „belege“ ablegen; gibt den Pfad zurück */
-async function pdfHolen(b: { id: string; art: BelegDetail["beleg"]["art"]; lexware_id: string; nummer: string; lexware_link?: string | null }): Promise<string> {
-  const { supabase, benutzer } = await pruefeSitzung();
+/** Original-PDF von Lexware holen und im Speicher „belege“ ablegen; gibt Pfad und SHA-256 zurück */
+async function pdfHolen(b: { id: string; art: BelegDetail["beleg"]["art"]; lexware_id: string; nummer: string; lexware_link?: string | null }): Promise<{ pfad: string; sha256: string }> {
+  const { benutzer } = await pruefeSitzung();
   const pdf = await lexware<Buffer>("GET", `/v1/${pfadArt(b.art, b.lexware_link)}/${b.lexware_id}/file`, { accept: "application/pdf" });
   const pfad = `${b.id}/${pdfDateiname({ art: b.art, nummer: b.nummer, version: 1 })}`;
-  const { error } = await supabase.storage.from(BUCKET).upload(pfad, pdf, { contentType: "application/pdf", upsert: true });
-  if (error) throw new Error("Das PDF konnte nicht abgelegt werden.");
+  const pruefsumme = await pdfSpeichern(pfad, pdf);
   // Lexware-Original zusätzlich in den OneDrive-Ordner (im Hintergrund)
   imHintergrund(() => belegPdfAblegen(b.id, pdf, benutzer.id), "Lexware-PDF");
-  return pfad;
+  return { pfad, sha256: pruefsumme };
 }
 
 /** Fehlendes Original-PDF nachladen (Belegseite, PDF-Ansicht) */
@@ -340,8 +339,9 @@ export async function lexwarePdfNachladen(d: BelegDetail): Promise<string | null
   if (!b.lexware_id || !b.nummer || b.status === "entwurf") return null;
   if (b.altbestand && !lexwareAltbestandAktiv()) return null;
   const { benutzer } = await pruefeSitzung();
-  const pfad = await pdfHolen({ id: b.id, art: b.art, lexware_id: b.lexware_id, nummer: b.nummer, lexware_link: b.lexware_link });
-  await createAdminClient().rpc("lexware_pdf", { p_id: b.id, p_benutzer: benutzer.id, p_pfad: pfad });
+  const { pfad, sha256 } = await pdfHolen({ id: b.id, art: b.art, lexware_id: b.lexware_id, nummer: b.nummer, lexware_link: b.lexware_link });
+  const { error } = await createAdminClient().rpc("lexware_pdf", { p_id: b.id, p_benutzer: benutzer.id, p_pfad: pfad, p_sha256: sha256 });
+  if (error) throw new Error("Das Original-PDF konnte nicht gespeichert werden.");
   return pfad;
 }
 
@@ -390,9 +390,9 @@ export async function anLexwareUebertragen(id: string): Promise<Uebertragung> {
       }
     }
     const v = await lexware<LexBeleg>("GET", `/v1/${pfadArt(b.art)}/${lexId}`);
-    let pdfPfad: string | null = null;
+    let pdf: { pfad: string; sha256: string } | null = null;
     try {
-      pdfPfad = await pdfHolen({ id: b.id, art: b.art, lexware_id: lexId, nummer: v.voucherNumber });
+      pdf = await pdfHolen({ id: b.id, art: b.art, lexware_id: lexId, nummer: v.voucherNumber });
     } catch {
       // PDF wird beim Öffnen nachgeladen
     }
@@ -404,7 +404,8 @@ export async function anLexwareUebertragen(id: string): Promise<Uebertragung> {
       summe_brutto: v.totalPrice.totalGrossAmount,
       steuern,
       faellig_am: b.art === "gutschrift" ? null : plusTage(b.datum, b.zahlungsziel_tage ?? 0),
-      pdf_pfad: pdfPfad,
+      pdf_pfad: pdf?.pfad ?? null,
+      pdf_sha256: pdf?.sha256 ?? null,
     };
     let fertig = await admin.rpc("lexware_fertig", { p_id: id, p_benutzer: benutzer.id, p_daten: daten });
     if (fertig.error) fertig = await admin.rpc("lexware_fertig", { p_id: id, p_benutzer: benutzer.id, p_daten: daten });
@@ -413,7 +414,7 @@ export async function anLexwareUebertragen(id: string): Promise<Uebertragung> {
     const hinweise: string[] = [];
     if (rund(v.totalPrice.totalGrossAmount) !== rund(b.summe_brutto))
       hinweise.push(`Lexware rechnet ${v.totalPrice.totalGrossAmount.toFixed(2).replace(".", ",")} €, die App hatte ${b.summe_brutto.toFixed(2).replace(".", ",")} €. Maßgeblich ist der Lexware-Beleg.`);
-    if (!pdfPfad) hinweise.push("Das Original-PDF wird nachgeladen, sobald Lexware es bereitstellt.");
+    if (!pdf) hinweise.push("Das Original-PDF wird nachgeladen, sobald Lexware es bereitstellt.");
     return { ok: true, nummer: v.voucherNumber, hinweis: hinweise.join(" ") || undefined };
   } catch (e) {
     const meldung = e instanceof Error ? e.message : "Unbekannter Fehler bei der Übertragung an Lexware.";

@@ -8,12 +8,13 @@
 // auf die Startwerte gesetzt. Nur gegen Staging ausführen.
 import { after, before, describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { createHmac, randomBytes, randomUUID } from "node:crypto";
+import { createHash, createHmac, randomBytes, randomUUID } from "node:crypto";
 import { existsSync } from "node:fs";
 import { createClient } from "@supabase/supabase-js";
 import pg from "pg";
 import { nurTestprojekt } from "../../scripts/testprojekt.mjs";
 import { testkontenEntfernen } from "../../scripts/testkonten.mjs";
+import { belegSummen } from "../../src/lib/beleg-summen.ts";
 
 if (existsSync(".env.local")) process.loadEnvFile(".env.local");
 nurTestprojekt();
@@ -93,6 +94,16 @@ async function belegSpeichern(wer, kopf, positionen = [{ titel: "Haustür", meng
   const { data: pos } = await service.from("beleg_position").select("id").eq("beleg_id", id);
   for (const p of pos ?? []) angelegt.push(["beleg_position", p.id]);
   return b;
+}
+/** Lesende Abfrage direkt in der Datenbank (z. B. Audit-Log) */
+async function dbAbfrage(sql, werte = []) {
+  const db = new pg.Client({ connectionString: DB_URL, ssl: { rejectUnauthorized: false } });
+  await db.connect();
+  try {
+    return (await db.query(sql, werte)).rows;
+  } finally {
+    await db.end();
+  }
 }
 async function fertig(wer, id) {
   const { data, error } = await wer.client.rpc("beleg_fertigstellen", { p_id: id });
@@ -864,17 +875,14 @@ describe("Einkauf", () => {
 });
 
 describe("Belege", () => {
-  it("neue Belege sind immer Entwurf, ohne eigene Nummer und ohne Lexware-Daten", async () => {
-    const { data, error } = await buero.client
-      .from("beleg")
-      .insert({ art: "lieferschein", auftrag_id: daten.auftrag.id, kunde_id: daten.kunde.id, status: "fertiggestellt", nummer: "LS1999999", lexware_id: "x-1" })
-      .select()
-      .single();
-    assert.ifError(error);
-    angelegt.push(["beleg", data.id]);
-    assert.equal(data.status, "entwurf");
-    assert.equal(data.nummer, null);
-    assert.equal(data.lexware_id, null);
+  it("Belege entstehen nur über „Speichern“: immer Entwurf, ohne eigene Nummer und ohne Lexware-Daten", async () => {
+    const direkt = await buero.client.from("beleg")
+      .insert({ art: "lieferschein", auftrag_id: daten.auftrag.id, kunde_id: daten.kunde.id, status: "fertiggestellt", nummer: "LS1999999", lexware_id: "x-1" });
+    assert.equal(direkt.error?.code, "42501", "Beleg direkt angelegt");
+    const ls = await belegSpeichern(buero, { art: "lieferschein", kunde_id: daten.kunde.id, auftrag_id: daten.auftrag.id, status: "fertiggestellt", nummer: "LS1999999", lexware_id: "x-1" });
+    assert.equal(ls.status, "entwurf");
+    assert.equal(ls.nummer, null);
+    assert.equal(ls.lexware_id, null);
   });
 
   it("Status wechselt nur über „Fertigstellen“; Aufträge entstehen nur mit der AB", async () => {
@@ -1035,11 +1043,15 @@ describe("Belege", () => {
       }
     };
     // direkt: keine Lexware-Zahlung, kein Status, kein offener Betrag, keine Zahlungsbestätigung ohne Zahlung
-    const { data: z0, error: e0 } = await buero.client.from("zahlung").insert({ beleg_id: re.id, datum: "2026-11-12", betrag: 1, quelle: "lexware", lex_abgleich: "abgeglichen" }).select().single();
+    const zDirekt = await buero.client.from("zahlung").insert({ beleg_id: re.id, datum: "2026-11-12", betrag: 1, quelle: "lexware", lex_abgleich: "abgeglichen" });
+    assert.equal(zDirekt.error?.code, "42501", "Zahlung an zahlung_erfassen vorbei angelegt");
+    const tag0 = new Intl.DateTimeFormat("sv-SE", { timeZone: "Europe/Berlin" }).format(new Date());
+    const { data: e00, error: e0 } = await buero.client.rpc("zahlung_erfassen", { p_beleg: re.id, p_datum: tag0, p_betrag: 1, p_zahlungsart: "bar", p_bestaetigung: false });
     assert.ifError(e0);
+    const z0 = { id: e00.zahlung_id };
     angelegt.push(["zahlung", z0.id]);
-    assert.equal(z0.quelle, "app", "Benutzer hat eine Lexware-Zahlung angelegt");
-    assert.equal(z0.lex_abgleich, "offen");
+    const { data: z0d } = await service.from("zahlung").select("quelle, lex_abgleich").eq("id", z0.id).single();
+    assert.deepEqual(z0d, { quelle: "app", lex_abgleich: "offen" });
     const betrag = await buero.client.from("zahlung").update({ betrag: 999 }).eq("id", z0.id);
     assert.equal(betrag.error?.code, "42501", "Zahlung geändert");
     assert.ifError((await buero.client.rpc("loeschen", { p_tabelle: "zahlung", p_id: z0.id })).error);
@@ -1132,11 +1144,15 @@ describe("Belege", () => {
     assert.ifError((await service.rpc("lexware_start", { p_id: re.id, p_benutzer: buero.id })).error);
   });
 
-  it("PDF-Speicher: nur angemeldete Benutzer, Löschen gesperrt", async () => {
+  it("PDF-Speicher: schreiben nur der Server, lesen nur angemeldete Benutzer, Löschen gesperrt", async () => {
     const pfad = `rls-${lauf}/test.pdf`;
-    const hoch = await buero.client.storage.from("belege").upload(pfad, new Blob(["%PDF-1.4 test"], { type: "application/pdf" }), { contentType: "application/pdf" });
-    assert.ifError(hoch.error);
-    const falsch = await buero.client.storage.from("belege").upload(`rls-${lauf}/bild.png`, new Blob(["x"], { type: "image/png" }), { contentType: "image/png" });
+    const pdf = () => new Blob(["%PDF-1.4 test"], { type: "application/pdf" });
+    const hoch = await buero.client.storage.from("belege").upload(pfad, pdf(), { contentType: "application/pdf" });
+    assert.ok(hoch.error, "Benutzer hat ein PDF abgelegt");
+    assert.ifError((await service.storage.from("belege").upload(pfad, pdf(), { contentType: "application/pdf" })).error);
+    const ersetzt = await buero.client.storage.from("belege").upload(pfad, pdf(), { contentType: "application/pdf", upsert: true });
+    assert.ok(ersetzt.error, "Benutzer hat ein abgelegtes PDF ersetzt");
+    const falsch = await service.storage.from("belege").upload(`rls-${lauf}/bild.png`, new Blob(["x"], { type: "image/png" }), { contentType: "image/png" });
     assert.ok(falsch.error, "anderer Dateityp angenommen");
     const lesen = await buero.client.storage.from("belege").download(pfad);
     assert.ifError(lesen.error);
@@ -1148,6 +1164,84 @@ describe("Belege", () => {
     const noch = await service.storage.from("belege").download(pfad);
     assert.ok(!noch.error, "Benutzer konnte die Datei löschen");
     await service.storage.from("belege").remove([pfad]);
+  });
+});
+
+describe("Belege unveränderbar (GoBD)", () => {
+  it("PDF legt nur der Server ab; Pfad und SHA-256 stehen mit dem Benutzer im Audit-Log", async () => {
+    const ls = await belegSpeichern(buero, { art: "lieferschein", kunde_id: daten.kunde.id, auftrag_id: daten.auftrag.id });
+    await fertig(buero, ls.id);
+    const pfad = `${ls.id}/LS_Test.pdf`;
+    const direkt = await buero.client.from("beleg").update({ pdf_pfad: pfad }).eq("id", ls.id);
+    assert.equal(direkt.error?.code, "42501", "pdf_pfad von Hand gesetzt");
+    const sha = createHash("sha256").update(`pdf-${lauf}`).digest("hex");
+    const fn = await buero.client.rpc("beleg_pdf_setzen", { p_id: ls.id, p_benutzer: buero.id, p_pfad: pfad, p_sha256: sha });
+    assert.ok(fn.error, "beleg_pdf_setzen für Benutzer ausführbar");
+    const fremd = await service.rpc("beleg_pdf_setzen", { p_id: ls.id, p_benutzer: buero.id, p_pfad: `${daten.ab.id}/x.pdf`, p_sha256: sha });
+    assert.ok(fremd.error, "Pfad unter einem anderen Beleg angenommen");
+    assert.ifError((await service.rpc("beleg_pdf_setzen", { p_id: ls.id, p_benutzer: buero.id, p_pfad: pfad, p_sha256: sha })).error);
+    const log = await dbAbfrage(
+      "select benutzer_id, nachher ->> 'pdf_pfad' as pfad, nachher ->> 'pdf_sha256' as sha from audit.log where tabelle = 'beleg' and datensatz_id = $1 and nachher ->> 'pdf_sha256' is not null",
+      [ls.id],
+    );
+    assert.deepEqual(log.map((l) => [l.benutzer_id, l.pfad, l.sha]), [[buero.id, pfad, sha]]);
+  });
+
+  it("Belegart, Kette und Vorgänger sind unveränderlich; die Kette bestimmt die Datenbank", async () => {
+    const ag = await belegSpeichern(buero, { art: "angebot", kunde_id: daten.kunde.id });
+    assert.equal(ag.kette_id, ag.id, "neues Angebot beginnt eine eigene Kette");
+    for (const feld of [{ art: "auftragsbestaetigung" }, { kette_id: daten.ab.kette_id ?? daten.ab.id }, { vorgaenger_id: daten.ab.id }]) {
+      const { error } = await buero.client.from("beleg").update(feld).eq("id", ag.id);
+      assert.equal(error?.code, "42501", `${Object.keys(feld)[0]} am Entwurf geändert`);
+    }
+  });
+
+  it("Positionen, Summen, Versionen und Versand nur über die Funktionen; fertiges Angebot nur über „Speichern“", async () => {
+    const ag = await belegSpeichern(buero, { art: "angebot", kunde_id: daten.kunde.id, summe_netto: "1", summe_brutto: "1" });
+    assert.deepEqual([Number(ag.summe_netto), Number(ag.summe_brutto)], [1000, 1190], "Summen vom Aufrufer übernommen");
+    const { data: p } = await service.from("beleg_position").select("id").eq("beleg_id", ag.id).limit(1).single();
+    const neuPos = await buero.client.from("beleg_position").insert({ beleg_id: ag.id, titel: "direkt", menge: 1, einzelpreis: 5 });
+    assert.equal(neuPos.error?.code, "42501", "Position direkt angelegt");
+    const posAend = await buero.client.from("beleg_position").update({ einzelpreis: 1 }).eq("id", p.id);
+    assert.equal(posAend.error?.code, "42501", "Position direkt geändert");
+    const summe = await buero.client.from("beleg").update({ summe_brutto: 1 }).eq("id", ag.id);
+    assert.equal(summe.error?.code, "42501", "Summe direkt geändert");
+    await fertig(buero, ag.id);
+    const titel = await buero.client.from("beleg").update({ titel: "an Speichern vorbei" }).eq("id", ag.id);
+    assert.equal(titel.error?.code, "42501", "fertiges Angebot direkt geändert");
+    const version = await buero.client.from("beleg_version").insert({ beleg_id: ag.id, version: 1, daten: {} });
+    assert.equal(version.error?.code, "42501", "Version direkt eingefroren");
+    const versand = await buero.client.from("beleg_versand").insert({ beleg_id: ag.id, version: 1, kanal: "uebergeben" });
+    assert.equal(versand.error?.code, "42501", "Versand direkt protokolliert");
+  });
+
+  it("Summen der Datenbank stimmen centgenau mit beleg-summen.ts überein (Zufallsfälle)", async () => {
+    const ag = await belegSpeichern(buero, { art: "angebot", kunde_id: daten.kunde.id });
+    const zufall = (max, stellen) => Math.round(Math.random() * max * 10 ** stellen) / 10 ** stellen;
+    const saetze = [19, 7, 0];
+    for (let i = 0; i < 40; i++) {
+      const kopf = {
+        steuerart: ["standard", "standard", "bauleistung_13b", "steuerfrei"][i % 4],
+        preise_brutto: i % 3 === 0,
+        gesamtrabatt_prozent: i % 5 === 0 ? zufall(15, 2) : 0,
+      };
+      const positionen = Array.from({ length: 1 + (i % 5) }, (_, j) => ({
+        typ: j === 3 ? "text" : "artikel",
+        titel: `P${j}`,
+        optional: j === 2 && i % 2 === 0,
+        menge: zufall(20, j % 3) || 1,
+        einzelpreis: (j === 4 ? -1 : 1) * zufall(3000, 4),
+        rabatt_prozent: j % 2 ? zufall(30, 1) : 0,
+        steuersatz: saetze[(i + j) % 3],
+      }));
+      const { error } = await buero.client.rpc("beleg_speichern", { p_id: ag.id, p_kopf: { ...kopf, kunde_id: daten.kunde.id }, p_positionen: positionen });
+      assert.ifError(error);
+      const { data: b } = await service.from("beleg").select("summe_netto, summe_brutto").eq("id", ag.id).single();
+      const ts = belegSummen(positionen, kopf);
+      assert.deepEqual([Number(b.summe_netto), Number(b.summe_brutto)], [ts.netto, ts.brutto], `Fall ${i}: ${JSON.stringify({ kopf, positionen })}`);
+    }
+    const { data: pos } = await service.from("beleg_position").select("id").eq("beleg_id", ag.id);
+    for (const x of pos) if (!angelegt.some(([, y]) => y === x.id)) angelegt.push(["beleg_position", x.id]);
   });
 });
 
