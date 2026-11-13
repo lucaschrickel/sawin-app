@@ -117,6 +117,7 @@ try {
   // 6. Speichern: bereinigtes HTML, PDF
   await b.klick("[data-aktion=speichern]");
   await b.warte("/^\\/beleg\\/[0-9a-f-]{36}$/.test(location.pathname)");
+  await b.warte("/^\\/beleg\\/[0-9a-f-]{36}/.test(location.pathname)", 20000);
   const id = await b.js("location.pathname.split('/')[2]");
   const pos = await dbAbfrage("select titel, beschreibung_html from public.beleg_position where beleg_id = $1 and deleted_at is null order by reihenfolge", [id]);
   pruefe("Gespeichert: Beschreibung 1 fett, Beschreibung 2 kursiv, Aufzählung, Farbe", pos.length === 2 && /<strong>/.test(pos[0].beschreibung_html) && /<ul><li><p>.*<em>.*Montage inkl\. Abdichtung/.test(pos[1].beschreibung_html) && /color:(#a33a2e|rgb\(163, 58, 46\))/.test(pos[1].beschreibung_html), JSON.stringify(pos));

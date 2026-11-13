@@ -187,7 +187,8 @@ try {
   if (fotos) await b.foto(path.join(fotos, "montageplan.png"));
 
   // 14. Monteur deaktivieren
-  await b.js(`${sichtbar(`button[aria-label='Ben Plan ${lauf} deaktivieren']`)}.setAttribute('data-x', 'weg')`);
+  // Zeilenaktionen sind erst beim Überfahren bzw. mit Fokus klickbar (focus-within): Fokus setzen wie mit der Tastatur
+  await b.js(`(() => { const k = ${sichtbar(`button[aria-label='Ben Plan ${lauf} deaktivieren']`)}; k.setAttribute('data-x', 'weg'); k.focus(); })()`);
   await b.klick("[data-x='weg']");
   await imLetztenDialog("Deaktivieren");
   pruefe("Ben deaktiviert und aus der Tafel", await warteDb("select aktiv from public.mitarbeiter where id = $1", [ben.id], (r) => r[0]?.aktiv === false) && (await b.warte(`!document.querySelector("[data-zeile='${ben.id}']")`)));

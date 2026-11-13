@@ -76,7 +76,7 @@ async function benutzerAnlegen(name, { admin = false, konditionen = false, mfa =
     const ver = await client.auth.mfa.challengeAndVerify({ factorId: enr.data.id, code: totp(enr.data.totp.secret) });
     if (ver.error) throw new Error(`MFA-Bestätigung ${name}: ${ver.error.message}`);
   }
-  return { id: data.user.id, client };
+  return { id: data.user.id, client, email };
 }
 async function tabellenDerApi() {
   const res = await fetch(`${URL}/rest/v1/`, { headers: { apikey: SERVICE, Authorization: `Bearer ${SERVICE}` } });
@@ -1602,6 +1602,71 @@ describe("Chat", () => {
     const html = await service.storage.from("chat-fotos").upload(`${randomUUID()}/foto`, Buffer.from("<html>"), { contentType: "text/html" });
     assert.ok(html.error, "Speicher nimmt HTML an");
     await service.storage.from("chat-fotos").remove([pfad]);
+  });
+});
+
+describe("Anmeldung: Sperre je Konto, Konto-Historie, Funktionen im Schema app", () => {
+  it("Sperr-Funktionen nur für den Server; 10 Fehlversuche sperren 15 Minuten, mit Eintrag im Audit-Log", async () => {
+    for (const c of [buero.client, anon]) {
+      const { error } = await c.rpc("anmeldung_fehlversuch", { p_email: deaktiviert.email, p_art: "passwort" });
+      assert.ok(error, "Fehlversuch durch Benutzer gezählt");
+      const g = await c.rpc("anmeldung_gesperrt", { p_email: deaktiviert.email });
+      assert.ok(g.error, "Sperrstand durch Benutzer gelesen");
+    }
+    try {
+      let bis = null;
+      for (let i = 1; i <= 10; i++) {
+        const { data, error } = await service.rpc("anmeldung_fehlversuch", { p_email: deaktiviert.email.toUpperCase(), p_art: i % 2 ? "passwort" : "code" });
+        assert.ifError(error);
+        if (i < 10) assert.equal(data, null, `nach ${i} Versuchen schon gesperrt`);
+        bis = data;
+      }
+      assert.ok(bis && Date.parse(bis) > Date.now() + 14 * 60_000, "nicht 15 Minuten gesperrt");
+      const { data: gesperrt } = await service.rpc("anmeldung_gesperrt", { p_email: deaktiviert.email });
+      assert.ok(gesperrt, "Sperre gilt nicht unabhängig von der Schreibweise");
+      // Eine erfolgreiche Anmeldung hebt eine laufende Sperre nicht auf
+      assert.ifError((await service.rpc("anmeldung_erfolgreich", { p_email: deaktiviert.email })).error);
+      assert.ok((await service.rpc("anmeldung_gesperrt", { p_email: deaktiviert.email })).data, "Sperre durch Anmeldung aufgehoben");
+      const log = await dbAbfrage(
+        "select nachher ->> 'ereignis' as e, count(*)::int as n from audit.log where tabelle = 'konto' and datensatz_id = $1 and zeit > now() - interval '5 minutes' group by 1",
+        [deaktiviert.id],
+      );
+      const n = Object.fromEntries(log.map((l) => [l.e, l.n]));
+      assert.equal(n.anmeldung_fehlgeschlagen, 10);
+      assert.equal(n.konto_gesperrt, 1);
+      const unbekannt = await service.rpc("anmeldung_fehlversuch", { p_email: `niemand-${lauf}@example.com`, p_art: "passwort" });
+      assert.ifError(unbekannt.error);
+      const roh = await dbAbfrage("select count(*)::int as n from app.anmelde_sperre where schluessel like '%@%'");
+      assert.equal(roh[0].n, 0, "E-Mail-Adressen im Klartext gespeichert");
+    } finally {
+      await dbAbfrage("delete from app.anmelde_sperre where schluessel in (app.anmelde_schluessel($1), app.anmelde_schluessel($2))", [deaktiviert.email, `niemand-${lauf}@example.com`]);
+    }
+  });
+
+  it("Konto-Historie: eigene Ereignisse, die anderer Benutzer nur als Admin", async () => {
+    for (const id of [buero.id, admin.id]) {
+      assert.ifError((await service.rpc("konto_ereignis", { p_benutzer: id, p_art: "test_ereignis", p_daten: {} })).error);
+    }
+    const eigene = await buero.client.rpc("historie", { p_tabelle: "konto", p_id: buero.id });
+    assert.ifError(eigene.error);
+    assert.ok(eigene.data.length >= 1, "eigene Konto-Ereignisse nicht lesbar");
+    const fremde = await buero.client.rpc("historie", { p_tabelle: "konto", p_id: admin.id });
+    assert.equal(fremde.data?.length ?? 0, 0, "Konto-Ereignisse eines anderen Benutzers gelesen");
+    const alsAdmin = await admin.client.rpc("historie", { p_tabelle: "konto", p_id: buero.id });
+    assert.ok(alsAdmin.data?.length >= 1, "Admin sieht die Konto-Ereignisse nicht");
+  });
+
+  it("Funktionen im Schema app sind nicht für PUBLIC bzw. anon ausführbar", async () => {
+    const [r] = await dbAbfrage(
+      `select count(*) filter (where has_function_privilege('anon', p.oid, 'execute'))::int as anon,
+              count(*) filter (where exists (select 1 from aclexplode(coalesce(p.proacl, acldefault('f', p.proowner))) a where a.grantee = 0 and a.privilege_type = 'EXECUTE'))::int as oeffentlich,
+              count(*) filter (where has_function_privilege('authenticated', p.oid, 'execute'))::int as angemeldet,
+              count(*)::int as alle
+         from pg_proc p join pg_namespace n on n.oid = p.pronamespace where n.nspname = 'app'`,
+    );
+    assert.equal(r.anon, 0, "app-Funktionen für anon ausführbar");
+    assert.equal(r.oeffentlich, 0, "app-Funktionen für PUBLIC ausführbar");
+    assert.ok(r.angemeldet > 0 && r.angemeldet < r.alle, `Freigabe für angemeldete Benutzer nicht gezielt (${r.angemeldet} von ${r.alle})`);
   });
 });
 

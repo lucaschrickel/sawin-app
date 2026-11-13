@@ -5,6 +5,7 @@ import { pruefeSitzung } from "@/lib/auth/sitzung";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { supabaseEnv } from "@/lib/supabase/env";
 import { passwortRegeln } from "@/lib/passwort";
+import { fehlversuch, gesperrtBis, sperrText } from "@/lib/auth/sperre";
 
 export type PasswortZustand = { fehler?: string; felder?: Record<string, string>; ok?: boolean };
 
@@ -25,14 +26,19 @@ export async function passwortAendern(_: PasswortZustand, fd: FormData): Promise
   if (neu !== wiederholung) felder.wiederholung = "Die Wiederholung stimmt nicht mit dem neuen Passwort überein.";
   if (Object.keys(felder).length) return { fehler: Object.values(felder)[0], felder };
 
+  // Sperre nach zu vielen Fehlversuchen (gemeinsam mit der Anmeldung)
+  const bis = await gesperrtBis(benutzer.email).catch(() => null);
+  if (bis) return { fehler: sperrText(bis) };
+
   // Aktuelles Passwort prüfen, ohne die Sitzung des Benutzers anzufassen
   const { url, key } = supabaseEnv();
   const pruefer = createSupabase(url, key, { auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false } });
   const { error: falsch } = await pruefer.auth.signInWithPassword({ email: benutzer.email, password: aktuell });
   if (falsch) {
-    return falsch.status === 429
-      ? { fehler: "Zu viele Versuche. Bitte in einigen Minuten erneut versuchen." }
-      : { fehler: "Das aktuelle Passwort stimmt nicht.", felder: { aktuell: "Das aktuelle Passwort stimmt nicht." } };
+    if (falsch.status === 429) return { fehler: "Zu viele Versuche. Bitte in einigen Minuten erneut versuchen." };
+    const gesperrt = await fehlversuch(benutzer.email, "passwort_aendern");
+    if (gesperrt) return { fehler: sperrText(gesperrt) };
+    return { fehler: "Das aktuelle Passwort stimmt nicht.", felder: { aktuell: "Das aktuelle Passwort stimmt nicht." } };
   }
   await pruefer.auth.signOut({ scope: "local" });
 

@@ -193,6 +193,9 @@ export async function browser() {
     const r = await js(`(() => { const el = ${F}(${q(sel)}); el.scrollIntoView({ block: "center" }); const b = el.getBoundingClientRect(); return { x: b.x + b.width / 2, y: b.y + b.height / 2 }; })()`);
     await cdp("Input.dispatchMouseEvent", { type: "mouseMoved", x: r.x, y: r.y, buttons: 0 });
     await sleep(60);
+    // Bedienelemente, die erst beim Überfahren klickbar werden (z. B. Zeilenaktionen der Plantafel): warten, bis das
+    // Element unter dem Mauszeiger oben liegt
+    await warte(`(() => { const el = ${F}(${q(sel)}); const e = document.elementFromPoint(${r.x}, ${r.y}); return !!el && !!e && (el === e || el.contains(e)); })()`, 1500);
     await cdp("Input.dispatchMouseEvent", { type: "mousePressed", x: r.x, y: r.y, button: "left", buttons: 1, clickCount: 1 });
     await sleep(40);
     await cdp("Input.dispatchMouseEvent", { type: "mouseReleased", x: r.x, y: r.y, button: "left", buttons: 0, clickCount: 1 });

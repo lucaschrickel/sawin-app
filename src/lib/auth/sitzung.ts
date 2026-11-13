@@ -1,7 +1,10 @@
 import "server-only";
 import { cache } from "react";
+import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { nochAktiv } from "./aktivitaet";
+import { AKTIV_COOKIE } from "./konstanten";
 
 export type Benutzer = {
   id: string;
@@ -15,7 +18,8 @@ export type Benutzer = {
 
 /**
  * Zentrale Prüfung für jede App-Seite und jede Server-Aktion (Data Access Layer):
- * angemeldet, zweiter Faktor bestätigt (aal2) und aktives Benutzerkonto. Sonst Umleitung.
+ * angemeldet, zweiter Faktor bestätigt (aal2), nicht länger als INAKTIV_MINUTEN untätig (Aktivitäts-Cookie, an die
+ * Sitzung gebunden; zusätzlich zum Proxy, der nicht jeden Pfad sieht) und aktives Benutzerkonto. Sonst Umleitung.
  * Die Datenbank prüft dieselben Bedingungen zusätzlich per RLS.
  */
 export const pruefeSitzung = cache(async () => {
@@ -28,6 +32,8 @@ export const pruefeSitzung = cache(async () => {
     const { data: faktoren } = await supabase.auth.mfa.listFactors();
     redirect(faktoren?.totp?.some((f) => f.status === "verified") ? "/anmelden/code" : "/anmelden/einrichten");
   }
+  const sitzung = typeof claims.session_id === "string" ? claims.session_id : undefined;
+  if (!(await nochAktiv((await cookies()).get(AKTIV_COOKIE)?.value, sitzung))) redirect("/abmelden?grund=inaktiv");
 
   // Liefert nur bei aktivem Konto eine Zeile (RLS: app.ist_benutzer)
   const { data: benutzer } = await supabase
@@ -59,8 +65,10 @@ export async function anmeldeStand() {
   return {
     supabase,
     angemeldet: true as const,
+    id: data.claims.sub as string,
     aal: data.claims.aal as string | undefined,
     email: data.claims.email as string | undefined,
+    sitzung: typeof data.claims.session_id === "string" ? data.claims.session_id : undefined,
     faktor: verifiziert,
     offeneFaktoren: (faktoren?.all ?? []).filter((f) => f.status !== "verified"),
   };

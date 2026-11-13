@@ -120,6 +120,7 @@ async function aufraeumen() {
   const db = new pg.Client({ connectionString: DB_URL, ssl: { rejectUnauthorized: false } });
   await db.connect();
   try {
+    await db.query("delete from app.anmelde_sperre where schluessel in (app.anmelde_schluessel($1), app.anmelde_schluessel($2))", [email, einladungEmail]);
     for (const u of nutzer) {
       await db.query("delete from public.benutzer_einstellung where benutzer_id = $1", [u]);
       await db.query("delete from public.benutzer where id = $1", [u]);
@@ -201,6 +202,18 @@ try {
   pruefe("nach 60 Minuten ohne Aktivität abgemeldet", (await pfad()) === "/anmelden?grund=inaktiv", await pfad());
   pruefe("Hinweis auf der Anmeldeseite", (await text()).includes("ohne Aktivität abgemeldet"));
 
+  // 7b. Erneut anmelden; ohne Link kein Passwort setzen; fehlendes Aktivitäts-Cookie (Browser war geschlossen) = abgelaufen
+  await formular({ email, passwort });
+  await warte("location.pathname === '/anmelden/code'");
+  code = await frischerCode(secret, code);
+  await formular({ code });
+  pruefe("erneut angemeldet", await warte("location.pathname === '/'"), await pfad());
+  await gehe("/passwort-setzen");
+  pruefe("Passwort setzen nur nach einem Link (angemeldet: weiter zu Konto › Passwort)", await warte("location.pathname === '/konto/passwort'"), await pfad());
+  await cdp("Network.deleteCookies", { name: "app_letzte_aktivitaet", domain: host, path: "/" });
+  await gehe("/styleguide");
+  pruefe("ohne Aktivitäts-Cookie abgemeldet", (await pfad()) === "/anmelden?grund=inaktiv", await pfad());
+
   // 8. Passwort vergessen (Link über die Admin-API statt E-Mail)
   const { data: rec } = await service.auth.admin.generateLink({ type: "recovery", email });
   await gehe(`/auth/bestaetigen?token_hash=${rec.properties.hashed_token}&type=recovery`);
@@ -252,6 +265,21 @@ try {
   await service.from("benutzer").update({ aktiv: false }).eq("id", inv.user.id);
   await gehe("/styleguide");
   pruefe("deaktiviert: abgemeldet mit Hinweis", (await pfad()) === "/anmelden?grund=gesperrt", await pfad());
+
+  // 12. Sperre je Konto: nach 10 Fehlversuchen ist auch das richtige Passwort 15 Minuten gesperrt (Audit-Log)
+  for (let i = 0; i < 10; i++) await service.rpc("anmeldung_fehlversuch", { p_email: email, p_art: "passwort" });
+  await gehe("/anmelden");
+  await formular({ email, passwort: neuesPasswort });
+  await warte("document.body.innerText.includes('Zu viele Fehlversuche')");
+  pruefe("nach 10 Fehlversuchen gesperrt, auch mit richtigem Passwort", (await text()).includes("Zu viele Fehlversuche") && (await pfad()).startsWith("/anmelden"), await pfad());
+  const sperrLog = new pg.Client({ connectionString: DB_URL, ssl: { rejectUnauthorized: false } });
+  await sperrLog.connect();
+  try {
+    const { rows } = await sperrLog.query("select count(*)::int as n from audit.log where tabelle = 'konto' and datensatz_id = $1 and nachher ->> 'ereignis' = 'konto_gesperrt'", [angelegt.user.id]);
+    pruefe("Sperre steht im Audit-Log", rows[0].n === 1, String(rows[0].n));
+  } finally {
+    await sperrLog.end();
+  }
 } catch (e) {
   pruefe(`Abbruch: ${e.message}`, false);
 } finally {

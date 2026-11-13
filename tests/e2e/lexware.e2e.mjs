@@ -16,7 +16,11 @@ let kunde;
 let ticket;
 const kundeName = `Lexware-Durchlauf ${lauf}`;
 const beleg = async (id) => (await dbAbfrage("select * from public.beleg where id = $1", [id]))[0];
-const belegId = () => b.js("location.pathname.split('/')[2]");
+const belegId = async () => {
+  // Erst nach dem Wechsel von /beleg/neu auf den gespeicherten Beleg (sonst „neu“ statt der ID)
+  await b.warte("/^\\/beleg\\/[0-9a-f-]{36}/.test(location.pathname)", 20000);
+  return b.js("location.pathname.split('/')[2]");
+};
 const euro = (n) => new Intl.NumberFormat("de-DE", { style: "currency", currency: "EUR" }).format(Number(n));
 const rund = (n) => Math.round(Number(n) * 100) / 100;
 
@@ -242,7 +246,7 @@ try {
     await b.warte("/^\\/beleg\\/[0-9a-f-]{36}$/.test(location.pathname) && !!document.querySelector('[role=alert]')?.innerText.includes('Lexware')", 60000),
     await b.js("document.querySelector('[role=alert]')?.innerText"),
   );
-  const trId = await b.js("location.pathname.split('/')[2]");
+  const trId = await belegId();
   await b.da("[name=steuerart]");
   const trFehler = await beleg(trId);
   pruefe("Fehler am Beleg gespeichert, Beleg bleibt Entwurf", trFehler?.status === "entwurf" && trFehler.lexware_status === "fehler" && !!trFehler.lexware_fehler, `${trFehler?.lexware_status}: ${trFehler?.lexware_fehler}`);

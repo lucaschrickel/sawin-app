@@ -7,3 +7,11 @@ export function supabaseEnv() {
   }
   return { url, key };
 }
+
+/**
+ * Optionen der Supabase-Sitzungscookies: httpOnly (für Skripte im Browser nicht lesbar; der Browser braucht keinen
+ * Supabase-Client), secure außer bei lokalem HTTP, sameSite lax.
+ */
+export function authCookieOptionen(sicher: boolean) {
+  return { httpOnly: true, secure: sicher, sameSite: "lax" as const, path: "/" };
+}

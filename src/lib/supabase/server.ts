@@ -2,7 +2,7 @@ import "server-only";
 import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
 import { connection } from "next/server";
-import { supabaseEnv } from "./env";
+import { authCookieOptionen, supabaseEnv } from "./env";
 
 /**
  * Supabase-Client für Server-Komponenten, Server-Aktionen und Route-Handler. Arbeitet mit der Sitzung des
@@ -14,6 +14,8 @@ export async function createClient() {
   const cookieStore = await cookies();
   const { url, key } = supabaseEnv();
   return createServerClient(url, key, {
+    // secure: in Produktion immer (HTTPS); lokal mit next dev über HTTP ohne
+    cookieOptions: authCookieOptionen(process.env.NODE_ENV === "production"),
     cookies: {
       getAll() {
         return cookieStore.getAll();

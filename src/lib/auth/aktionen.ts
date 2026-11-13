@@ -2,29 +2,42 @@
 
 import { redirect } from "next/navigation";
 import { getCustomer } from "@/customers";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 import { sicheresZiel } from "./konstanten";
 import { anmeldeStand } from "./sitzung";
+import { anmeldungAbgeschlossen, fehlversuch, gesperrtBis, linkMerken, linkPruefen, linkVergessen, sperrText } from "./sperre";
 
 export type Zustand = { fehler?: string; hinweis?: string; email?: string };
 
 const text = (fd: FormData, name: string) => String(fd.get(name) ?? "").trim();
 const CODE = /^\d{6}$/;
 
+/** Text, wenn das Konto nach zu vielen Fehlversuchen gesperrt ist (oder die Prüfung nicht möglich ist), sonst null */
+async function sperre(email: string): Promise<string | null> {
+  try {
+    const bis = await gesperrtBis(email);
+    return bis ? sperrText(bis) : null;
+  } catch (e) {
+    return e instanceof Error ? e.message : "Die Anmeldung ist gerade nicht möglich.";
+  }
+}
+
 /** Schritt 1: E-Mail und Passwort. Danach immer der zweite Faktor (Code oder Einrichtung). */
 export async function anmelden(_: Zustand, fd: FormData): Promise<Zustand> {
   const email = text(fd, "email").toLowerCase();
   const passwort = String(fd.get("passwort") ?? "");
   if (!email || !passwort) return { fehler: "Bitte E-Mail und Passwort eingeben.", email };
+  const gesperrt = await sperre(email);
+  if (gesperrt) return { fehler: gesperrt, email };
 
   const supabase = await createClient();
   const { error } = await supabase.auth.signInWithPassword({ email, password: passwort });
   if (error) {
+    if (error.status === 429) return { fehler: "Zu viele Versuche. Bitte in einigen Minuten erneut versuchen.", email };
     // Keine Unterscheidung zwischen unbekannter Adresse, falschem Passwort und gesperrtem Zugang
-    return {
-      fehler: error.status === 429 ? "Zu viele Versuche. Bitte in einigen Minuten erneut versuchen." : "E-Mail oder Passwort ist falsch.",
-      email,
-    };
+    const bis = await fehlversuch(email, "passwort");
+    return { fehler: bis ? sperrText(bis) : "E-Mail oder Passwort ist falsch.", email };
   }
   const { data } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
   redirect(data?.nextLevel === "aal2" ? "/anmelden/code" : "/anmelden/einrichten");
@@ -37,8 +50,15 @@ export async function codePruefen(_: Zustand, fd: FormData): Promise<Zustand> {
   const stand = await anmeldeStand();
   if (!stand.angemeldet) redirect("/anmelden");
   if (!stand.faktor) redirect("/anmelden/einrichten");
+  const email = stand.email ?? "";
+  const gesperrt = await sperre(email);
+  if (gesperrt) return { fehler: gesperrt };
   const { error } = await stand.supabase.auth.mfa.challengeAndVerify({ factorId: stand.faktor.id, code });
-  if (error) return { fehler: "Der Code stimmt nicht oder ist abgelaufen. Bitte den aktuellen Code aus der App eingeben." };
+  if (error) {
+    const bis = await fehlversuch(email, "code");
+    return { fehler: bis ? sperrText(bis) : "Der Code stimmt nicht oder ist abgelaufen. Bitte den aktuellen Code aus der App eingeben." };
+  }
+  await anmeldungAbgeschlossen(email, stand.sitzung);
   redirect(sicheresZiel(fd.get("weiter")));
 }
 
@@ -68,8 +88,15 @@ export async function faktorBestaetigen(_: Zustand, fd: FormData): Promise<Zusta
   if (!stand.offeneFaktoren.some((f) => f.id === factorId)) {
     return { fehler: "Die Einrichtung ist abgelaufen. Bitte Seite neu laden." };
   }
+  const email = stand.email ?? "";
+  const gesperrt = await sperre(email);
+  if (gesperrt) return { fehler: gesperrt };
   const { error } = await stand.supabase.auth.mfa.challengeAndVerify({ factorId, code });
-  if (error) return { fehler: "Der Code stimmt nicht oder ist abgelaufen. Bitte den aktuellen Code aus der App eingeben." };
+  if (error) {
+    const bis = await fehlversuch(email, "code");
+    return { fehler: bis ? sperrText(bis) : "Der Code stimmt nicht oder ist abgelaufen. Bitte den aktuellen Code aus der App eingeben." };
+  }
+  await anmeldungAbgeschlossen(email, stand.sitzung);
   redirect("/");
 }
 
@@ -93,6 +120,11 @@ export async function linkEinloesen(fd: FormData) {
   await supabase.auth.signOut({ scope: "local" });
   const { error } = await supabase.auth.verifyOtp({ type: typ, token_hash: tokenHash });
   if (error) redirect("/anmelden?grund=link");
+  // Nur nach einem eingelösten Link lässt sich das Passwort ohne das bisherige setzen (60 Minuten)
+  const { data } = await supabase.auth.getClaims();
+  const sitzung = data?.claims?.session_id;
+  if (typeof sitzung !== "string") redirect("/anmelden?grund=link");
+  await linkMerken(sitzung);
   redirect("/passwort-setzen");
 }
 
@@ -102,7 +134,11 @@ function passwortRegelVerletzt(pw: string): string | null {
   return null;
 }
 
-/** Neues Passwort nach Einladung oder „Passwort vergessen“. Mit Faktor erst nach Code-Eingabe. */
+/**
+ * Neues Passwort nach Einladung oder „Passwort vergessen“: nur mit eingelöstem Link (Link-Cookie, an die Sitzung
+ * gebunden), mit Faktor erst nach Code-Eingabe. Angemeldet ändert man das Passwort unter /konto/passwort (mit dem
+ * bisherigen). Danach sind alle anderen Sitzungen abgemeldet; Eintrag im Audit-Log.
+ */
 export async function passwortSetzen(_: Zustand, fd: FormData): Promise<Zustand> {
   const pw = String(fd.get("passwort") ?? "");
   const pw2 = String(fd.get("passwort2") ?? "");
@@ -112,6 +148,7 @@ export async function passwortSetzen(_: Zustand, fd: FormData): Promise<Zustand>
 
   const stand = await anmeldeStand();
   if (!stand.angemeldet) redirect("/anmelden?grund=link");
+  if (!(await linkPruefen(stand.sitzung))) redirect("/anmelden?grund=link");
   if (stand.faktor && stand.aal !== "aal2") redirect("/anmelden/code?weiter=/passwort-setzen");
   const { error } = await stand.supabase.auth.updateUser({ password: pw });
   if (error) {
@@ -122,5 +159,8 @@ export async function passwortSetzen(_: Zustand, fd: FormData): Promise<Zustand>
         : "Das Passwort konnte nicht gespeichert werden. Bitte erneut versuchen.",
     };
   }
+  await linkVergessen();
+  await stand.supabase.auth.signOut({ scope: "others" });
+  await createAdminClient().rpc("konto_ereignis", { p_benutzer: stand.id, p_art: "passwort_gesetzt", p_daten: { andere_sitzungen_abgemeldet: true } });
   redirect(stand.faktor ? "/" : "/anmelden/einrichten");
 }

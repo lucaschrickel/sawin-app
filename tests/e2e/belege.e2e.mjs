@@ -21,7 +21,11 @@ let firmaVorher;
 const kundeName = `Belegkunde ${lauf}`;
 const zbName = `E2E 14 Tage ${lauf}`;
 const beleg = async (id) => (await dbAbfrage("select * from public.beleg where id = $1", [id]))[0];
-const belegId = () => b.js("location.pathname.split('/')[2]");
+const belegId = async () => {
+  // Erst nach dem Wechsel von /beleg/neu auf den gespeicherten Beleg (sonst „neu“ statt der ID)
+  await b.warte("/^\\/beleg\\/[0-9a-f-]{36}/.test(location.pathname)", 20000);
+  return b.js("location.pathname.split('/')[2]");
+};
 const text = () => b.js("document.querySelector('main').innerText");
 const eingeben = async (sel, wert) => {
   await b.tippe(sel, wert);
